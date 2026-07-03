@@ -129,6 +129,20 @@ public final class EntityMetaRegistry {
     }
 
     /**
+     * Re-runs the classpath index scan, picking up any {@code XxxMeta}
+     * classes added since the last load. Entries already in the registry
+     * are kept; only missing entries are inserted.
+     *
+     * <p>Intended as a test hook: {@code @AfterEach} cleanup via
+     * {@link #clear()} wipes the registry, and the static initializer does
+     * not re-run, so integration tests that depend on classpath scanning
+     * must call this method explicitly in their {@code @BeforeAll}.
+     */
+    public static void reload() {
+        loadIndex();
+    }
+
+    /**
      * Test hook: clears the registry. Intended for {@code @AfterEach}
      * cleanup so tests do not leak state.
      */
