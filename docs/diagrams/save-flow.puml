@@ -1,0 +1,88 @@
+@startuml save-flow
+!theme plain
+title HORM Active Record save() 流程
+
+skinparam shadowing false
+skinparam activityBorderColor #2C3E50
+skinparam activityBackgroundColor #ECF0F1
+
+start
+
+:entity.save();
+
+:Validation 阶段;
+note right
+  调用 Validator 校验
+  - 字段类型
+  - 约束（@NotBlank 等）
+  - 业务规则
+end note
+
+if (校验通过?) then (no)
+  :抛出 ValidationException;
+  stop
+else (yes)
+endif
+
+:触发 @BeforeSave 钩子;
+note right
+  - beforeValidation
+  - afterValidation
+  - beforeSave
+  - beforeCreate / beforeUpdate
+end note
+
+if (是 UPDATE?) then (yes)
+  :查询缓存链获取原值\n(用于 diff);
+  :Mapper.toRow(entity);
+else (no, INSERT)
+  :Mapper.toRow(entity);
+  note right
+    编译期生成的 Mapper
+    零反射映射
+  end note
+endif
+
+:加入当前事务\n(如果存在);
+
+:DataSource.openSession();
+:QueryTranslator.translate(Query);
+note right
+  - SQL DataSource: 生成 SQL
+  - Mongo DataSource: 生成文档
+  - REST DataSource: 生成 HTTP 请求
+end note
+
+:执行原生命令;
+
+if (是 INSERT?) then (yes)
+  :获取生成的主键;
+  :Mapper.setId(entity, generatedId);
+endif
+
+:事务提交\n(如果 HORM 管理事务);
+
+:缓存链更新\nput(id, entity);
+note right
+  - L1: Caffeine
+  - L2: Redis
+  - L3: 不缓存
+  按 WriteStrategy:
+    - 写穿透
+    - 失效模式
+    - 写回
+end note
+
+:触发 @AfterSave 钩子;
+note right
+  - afterCreate / afterUpdate
+  - afterSave
+  - 观察者回调
+  - 事件发布
+end note
+
+:return entity (含主键);
+
+stop
+
+@enduml

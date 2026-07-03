@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.holo.framework</groupId>
+        <artifactId>holo-parent-pom</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../holo-parent-pom/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>holo-horm</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>Holo :: HORM :: Aggregator</name>
+    <description>HORM（Holo Object-Relational Mapping）是 Holo 自研 ORM 框架，采用 Active Record 风格、零反射、多数据源适配、可组合缓存链设计。</description>
+
+    <modules>
+        <module>holo-horm-bom</module>
+        <module>holo-horm-meta</module>
+        <module>holo-horm-core</module>
+        <module>holo-horm-datasource</module>
+        <module>holo-horm-cache</module>
+        <module>holo-horm-codegen</module>
+        <module>holo-horm-migration</module>
+        <module>holo-horm-spring-boot-starter</module>
+        <module>holo-horm-examples</module>
+        <module>holo-horm-benchmark</module>
+    </modules>
+
+    <properties>
+        <holo-horm.version>${project.version}</holo-horm.version>
+        <!-- 以下属性需与 holo-dependency-bom 中保持一致，便于子模块引用 -->
+        <spring-boot.version>3.2.5</spring-boot.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- 外部依赖版本：复用 holo-dependency-bom -->
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-dependency-bom</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+            <!-- HORM 内部模块版本（直接声明，避免 BOM 与聚合 pom 之间形成 import 循环；
+                 业务方仍可通过 import holo-horm-bom 获取所有版本） -->
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-meta</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-core</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-datasource</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-cache</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-codegen</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-migration</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-spring-boot-starter</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <configuration>
+                    <rules>
+                        <requireMavenVersion>
+                            <version>${maven.version}</version>
+                        </requireMavenVersion>
+                        <requireJavaVersion>
+                            <version>${java.version}</version>
+                        </requireJavaVersion>
+                        <banDuplicatePomDependencyVersions/>
+                    </rules>
+                    <!-- 关闭依赖收敛，避免 BOM 中的版本噪声阻塞开发 -->
+                    <skip>${enforcer.skip}</skip>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>skip-enforcer</id>
+            <properties>
+                <enforcer.skip>true</enforcer.skip>
+            </properties>
+        </profile>
+    </profiles>
+</project>

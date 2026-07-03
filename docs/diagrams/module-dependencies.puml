@@ -1,0 +1,70 @@
+@startuml module-dependencies
+!theme plain
+title HORM 模块依赖关系
+
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+package "外部" {
+    [holo-parent-pom] as Parent
+    [holo-dependency-bom] as DepBom
+}
+
+package "HORM 内部" {
+    [holo-horm\n(聚合 pom)] as Agg
+    [holo-horm-bom] as HormBom
+    [holo-horm-meta\n(APT)] as Meta
+    [holo-horm-core\n(API)] as Core
+    [holo-horm-datasource\n(SPI+实现)] as Ds
+    [holo-horm-cache\n(缓存链)] as Cache
+    [holo-horm-codegen\n(代码生成)] as Codegen
+    [holo-horm-migration\n(DB迁移)] as Mig
+    [holo-horm-spring-boot-starter\n(Spring集成)] as SBS
+    [holo-horm-examples\n(示例)] as Ex
+    [holo-horm-benchmark\n(JMH基准)] as Bench
+}
+
+Parent <-- Agg : 继承
+DepBom <-- Agg : import
+Agg --|> HormBom
+Agg --|> Meta
+Agg --|> Core
+Agg --|> Ds
+Agg --|> Cache
+Agg --|> Codegen
+Agg --|> Mig
+Agg --|> SBS
+Agg --|> Ex
+Agg --|> Bench
+
+Meta <-- Core : 依赖
+Core <-- Ds
+Cache <-- Ds
+Core <-- Cache
+Meta <-- Codegen
+Core <-- Codegen
+Core <-- Mig
+Ds <-- Mig
+Core <-- SBS
+Ds <-- SBS
+Cache <-- SBS
+SBS <-- Ex
+SBS <-- Bench
+
+note right of Meta
+  APT 处理器
+  编译期生成元数据
+end note
+
+note right of Ds
+  SPI + 参考实现
+  SQL/NoSQL/REST/File
+end note
+
+note right of Cache
+  L1 Caffeine
+  L2 Redis
+  责任链组合
+end note
+
+@enduml

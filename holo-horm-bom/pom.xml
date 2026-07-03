@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.holo.framework</groupId>
+        <artifactId>holo-horm</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>holo-horm-bom</artifactId>
+    <packaging>pom</packaging>
+
+    <name>Holo :: HORM :: BOM</name>
+    <description>HORM 模块自身版本清单，业务方 import 即可锁定 HORM 各模块版本。</description>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-meta</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-core</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-datasource</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-cache</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-codegen</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-migration</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

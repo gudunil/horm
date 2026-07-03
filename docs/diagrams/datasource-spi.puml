@@ -1,0 +1,123 @@
+@startuml datasource-spi
+!theme plain
+title HORM 数据源 SPI 类图
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam classBorderColor #2C3E50
+skinparam classBackgroundColor #F8F9FA
+
+interface DataSource {
+  + name(): String
+  + openSession(): Session
+  + capabilities(): Capabilities
+  + health(): HealthStatus
+  + close(): void
+}
+
+interface Session {
+  + execute(Query<T>): List<T>
+  + executeUpdate(Query<T>): int
+  + executeDelete(Query<T>): int
+  + executeInsert(Query<T>): Object
+  + executeBatch(List<Query<?>>): BatchResult
+  + stream(Query<T>): Stream<T>
+  + beginTransaction(def: TransactionDefinition): void
+  + commit(): void
+  + rollback(): void
+  + close(): void
+}
+
+interface QueryTranslator {
+  + translate(Query<?>): TranslatedQuery
+  + capabilities(): Capabilities
+}
+
+interface ResultHandler<T> {
+  + handle(nativeResult: Object, mapper: Mapper<T>): List<T>
+}
+
+interface Capabilities {
+  + supportsTransaction(): boolean
+  + supportsBatch(): boolean
+  + supportsPagination(): boolean
+  + supportsJoin(): boolean
+  + supportsSort(): boolean
+  + supportsStreaming(): boolean
+  + supportsGeneratedId(): boolean
+  + supportsComplexCondition(): boolean
+}
+
+interface DataSourceRegistry {
+  + register(ds: DataSource): void
+  + defaultDataSource(): DataSource
+  + get(name: String): DataSource
+  + current(): DataSource
+  + names(): Set<String>
+}
+
+class SqlDataSource {
+  - connectionPool: ConnectionPool
+  - dialect: Dialect
+  - translator: SqlQueryTranslator
+}
+
+class MongoDataSource {
+  - client: MongoClient
+  - database: String
+  - translator: MongoQueryTranslator
+}
+
+class RedisDataSource {
+  - redisson: RedissonClient
+  - namespace: String
+  - translator: RedisQueryTranslator
+}
+
+class RestDataSource {
+  - httpClient: OkHttpClient
+  - baseUrl: String
+  - protocol: RestProtocol
+  - translator: RestQueryTranslator
+}
+
+class CsvDataSource {
+  - file: Path
+  - data: List<Row>
+  - translator: CsvQueryTranslator
+}
+
+class CustomDataSource {
+  - 用户自定义实现
+}
+
+DataSource <|.. SqlDataSource
+DataSource <|.. MongoDataSource
+DataSource <|.. RedisDataSource
+DataSource <|.. RestDataSource
+DataSource <|.. CsvDataSource
+DataSource <|.. CustomDataSource
+
+DataSourceRegistry --> DataSource : 管理
+DataSource --> Session : openSession
+DataSource --> Capabilities : 声明
+Session ..> QueryTranslator : 使用
+QueryTranslator ..> ResultHandler : 配合
+
+note right of Capabilities
+  能力声明机制
+  上层根据能力自动降级
+  如：Redis 不支持 JOIN
+  自动降级为应用层 JOIN
+end note
+
+note bottom of CustomDataSource
+  用户实现三件套：
+  1. DataSource（生命周期）
+  2. QueryTranslator（Query → 原生命令）
+  3. ResultHandler（原生结果 → 实体）
+
+  通过 ServiceLoader 或 Spring Bean 自动注册
+end note
+
+@enduml

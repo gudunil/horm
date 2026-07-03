@@ -1,0 +1,94 @@
+@startuml architecture
+!theme plain
+title HORM 整体架构
+
+skinparam componentStyle rectangle
+skinparam packageStyle frame
+skinparam shadowing false
+skinparam roundCorner 8
+
+actor "业务应用" as App
+
+package "HORM" {
+    package "API 层 (holo-horm-core)" {
+        [Active Record\nModel 基类] as Model
+        [Query DSL\n类型安全查询] as Query
+        [Repository\n仓储接口] as Repo
+        [Transaction\n事务管理] as Tx
+        [Validation\n数据校验] as Val
+        [Relation\n关联关系] as Rel
+        [Lifecycle\n生命周期钩子] as Life
+        [Meta API\n元数据访问] as MetaApi
+    }
+
+    package "元数据层 (holo-horm-meta)" {
+        [Annotations\n@Entity/@Column/@Id] as Anno
+        [APT Processor\n编译期处理] as APT
+        [Generated Classes\nEntityMeta/Mapper/QueryMeta] as Gen
+    }
+
+    package "数据源层 (holo-horm-datasource)" {
+        [DataSource SPI] as DsSPI
+        [SQL DataSource\nMySQL/PG/Oracle] as SqlDs
+        [NoSQL DataSource\nMongo/Redis] as NoSqlDs
+        [REST DataSource] as RestDs
+        [File DataSource\nCSV/Excel] as FileDs
+        [Custom SPI\n用户实现] as CustomDs
+    }
+
+    package "缓存层 (holo-horm-cache)" {
+        [CacheChain\n责任链] as Chain
+        [L1: Caffeine] as L1
+        [L2: Redis] as L2
+        [L3: Remote/DB] as L3
+        [Policy\nLRU/TTL/WriteThrough] as Policy
+    }
+
+    package "支持模块" {
+        [Codegen CLI] as Codegen
+        [Migration] as Mig
+        [Spring Boot Starter] as SBS
+    }
+}
+
+App --> Model : 使用
+App --> Query : 使用
+App --> Repo : 使用
+
+Model --> MetaApi : 读取元数据
+Model --> Tx : 事务
+Model --> Val : 验证
+Model --> Rel : 关联
+Model --> Life : 钩子
+Model --> Chain : 缓存
+
+Query --> MetaApi
+Repo --> DsSPI
+Tx --> DsSPI
+
+MetaApi --> Gen
+Anno --> APT
+APT --> Gen : 编译期生成
+
+DsSPI --> SqlDs
+DsSPI --> NoSqlDs
+DsSPI --> RestDs
+DsSPI --> FileDs
+DsSPI --> CustomDs
+
+Chain --> L1
+Chain --> L2
+Chain --> L3
+Chain --> Policy
+
+SqlDs --> L1 : 缓存查询
+SqlDs --> L2
+SqlDs --> L3
+
+SBS --> Model : 自动装配
+SBS --> DsSPI
+SBS --> Chain
+Codegen --> Gen : 触发生成
+Mig --> SqlDs
+
+@enduml

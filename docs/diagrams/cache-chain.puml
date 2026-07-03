@@ -1,0 +1,80 @@
+@startuml cache-chain
+!theme plain
+title HORM 缓存链查询流程
+
+skinparam shadowing false
+skinparam activityBorderColor #2C3E50
+skinparam activityBackgroundColor #FEF9E7
+
+|CacheChain|
+
+start
+
+:User.find(User.class, 1L);
+
+:构建缓存键\nUser:id:1:v1;
+
+:L1 (Caffeine).get(key);
+
+if (L1 命中?) then (yes)
+  :metrics.recordHit(L1);
+  :返回 Optional<User>;
+  stop
+else (no)
+  :metrics.recordMiss(L1);
+endif
+
+:L2 (Redis).get(key);
+
+if (L2 命中?) then (yes)
+  :metrics.recordHit(L2);
+  :反序列化\n(Protostuff);
+  :回填 L1\n(异步);
+  :返回 Optional<User>;
+  stop
+else (no)
+  :metrics.recordMiss(L2);
+endif
+
+:SingleFlightLoader.lock(key);
+note right
+  防缓存击穿
+  同 key 并发只触发一次数据源查询
+end note
+
+|DataSource|
+
+:DataSource.openSession();
+:QueryTranslator.translate(Query);
+note right
+  SQL: SELECT * FROM users WHERE id = ?
+end note
+
+:执行原生命令;
+:ResultHandler 处理\nMapper.map(Row) -> User;
+
+|CacheChain|
+
+if (实体存在?) then (yes)
+  :序列化\n(Protostuff);
+  :L2.put(key, user, policy=TTL_30m);
+  :L1.put(key, user, policy=TTL_30m);
+  :metrics.recordLoad(key);
+  :SingleFlightLoader.complete(key);
+  :返回 Optional<User>;
+else (no)
+  if (policy.nullable?) then (yes)
+    :L2.put(key, NULL_MARKER, policy=TTL_1m);
+    note right
+      防缓存穿透
+      缓存空值短时间
+    end note
+    :L1.put(key, NULL_MARKER, policy=TTL_1m);
+  endif
+  :SingleFlightLoader.complete(key);
+  :返回 Optional.empty();
+endif
+
+stop
+
+@enduml
