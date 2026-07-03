@@ -1,5 +1,7 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.core.query.Query;
+import com.holo.framework.horm.core.query.QueryImpl;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.Mapper;
 
@@ -119,6 +121,16 @@ public abstract class Model<T extends Model<T>> {
     /** Returns the total number of persisted entities of the given type. */
     public static <T extends Model<T>> long count(Class<T> type) {
         return Horm.repository(type).count();
+    }
+
+    /**
+     * Returns a fluent {@link Query} bound to the given entity type and the
+     * currently installed {@link HormContext}. The query is mutable; call a
+     * terminal method ({@code list}/{@code findFirst}/{@code count}/{@code exists})
+     * to execute.
+     */
+    public static <T extends Model<T>> Query<T> query(Class<T> type) {
+        return new QueryImpl<>(type, HormContext.current());
     }
 
     /**
