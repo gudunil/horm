@@ -25,6 +25,11 @@ import java.util.Set;
  *
  * <p>Per entity, the processor invokes:
  * <ul>
+ *   <li>{@link EntityDescriptorParser} — parses the {@code @Entity} type into an
+ *       {@link EntityDescriptor} IR (permissive; does not report contract violations)</li>
+ *   <li>{@link EntityValidator} — compile-time validation of the descriptor
+ *       (reports {@code @Id} presence, {@code Model<T>} inheritance, non-final
+ *       fields, type-mapping support as {@code ERROR} diagnostics)</li>
  *   <li>{@link MetaClassBuilder} — generates {@code XxxMeta} (field metadata + {@code entityMeta()} factory)</li>
  *   <li>{@link MapperBuilder} — generates {@code XxxMapper} (zero-reflection {@code Row} bidirectional mapper)</li>
  *   <li>{@link QueryMetaBuilder} — generates {@code XxxQueryMeta} (type-safe {@code TypedField} constants)</li>
@@ -77,6 +82,7 @@ public class HormEntityProcessor extends AbstractProcessor {
             TypeElement type = (TypeElement) element;
             try {
                 EntityDescriptor descriptor = EntityDescriptorParser.parse(type, processingEnv);
+                EntityValidator.validate(descriptor, type, processingEnv);
                 descriptors.add(descriptor);
                 MetaClassBuilder.build(descriptor, processingEnv.getFiler());
                 MapperBuilder.build(descriptor, processingEnv.getFiler());

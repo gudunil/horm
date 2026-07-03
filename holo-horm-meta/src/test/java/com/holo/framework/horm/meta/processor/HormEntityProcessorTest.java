@@ -22,8 +22,27 @@ import static org.assertj.core.api.Assertions.assertThat;
  * {@code XxxQueryMeta} classes and {@code entities.idx} resource are present
  * and structurally correct via {@link Compilation#generatedSourceFiles()} and
  * {@link Compilation#generatedFiles()}.
+ *
+ * <p>M1-5 scope: verify {@link EntityValidator} reports {@code ERROR}
+ * diagnostics for entities that violate the HORM contract (missing {@code @Id},
+ * missing {@code Model<T>} inheritance, final mapped fields, unsupported field
+ * types). Happy-path entities extend a stub {@code Model<T>} (see
+ * {@link #MODEL_SOURCE}) so that R2 passes and code-generation tests remain
+ * green.
  */
 class HormEntityProcessorTest {
+
+    /**
+     * Stub of the M1-6 {@code Model<T>} base class. Prepended to every
+     * compilation so that entity sources can {@code extends Model<Self>}. The
+     * real implementation will live in the {@code holo-horm-core} module; the
+     * meta module's test classpath does not include it.
+     */
+    private static final String MODEL_SOURCE = """
+        package com.holo.framework.horm.core;
+        public abstract class Model<T> {
+        }
+        """;
 
     private static final String USER_SOURCE = """
         package test;
@@ -31,10 +50,11 @@ class HormEntityProcessorTest {
         import com.holo.framework.horm.meta.annotation.Id;
         import com.holo.framework.horm.meta.annotation.Column;
         import com.holo.framework.horm.meta.annotation.GenerationType;
+        import com.holo.framework.horm.core.Model;
         import java.time.Instant;
 
         @Entity(table = "users")
-        public class User {
+        public class User extends Model<User> {
             @Id(strategy = GenerationType.IDENTITY)
             private Long id;
 
@@ -58,9 +78,10 @@ class HormEntityProcessorTest {
         import com.holo.framework.horm.meta.annotation.Entity;
         import com.holo.framework.horm.meta.annotation.Id;
         import com.holo.framework.horm.meta.annotation.GenerationType;
+        import com.holo.framework.horm.core.Model;
 
         @Entity
-        public class Account {
+        public class Account extends Model<Account> {
             @Id private Long id;
             public Long getId() { return id; }
             public void setId(Long id) { this.id = id; }
@@ -72,9 +93,10 @@ class HormEntityProcessorTest {
         import com.holo.framework.horm.meta.annotation.Entity;
         import com.holo.framework.horm.meta.annotation.Id;
         import com.holo.framework.horm.meta.annotation.GenerationType;
+        import com.holo.framework.horm.core.Model;
 
         @Entity(table = "orders")
-        public class Order {
+        public class Order extends Model<Order> {
             @Id private Long id;
             public Long getId() { return id; }
             public void setId(Long id) { this.id = id; }
@@ -87,10 +109,11 @@ class HormEntityProcessorTest {
         import com.holo.framework.horm.meta.annotation.Id;
         import com.holo.framework.horm.meta.annotation.Column;
         import com.holo.framework.horm.meta.annotation.GenerationType;
+        import com.holo.framework.horm.core.Model;
         import java.math.BigDecimal;
 
         @Entity(table = "products")
-        public class Product {
+        public class Product extends Model<Product> {
             @Id(strategy = GenerationType.IDENTITY)
             private Long id;
 
@@ -162,27 +185,109 @@ class HormEntityProcessorTest {
     }
 
     @Test
-    void entityWithoutIdStillCompiles() {
-        // Parser is permissive: missing @Id is not an error in M1-3.
-        // Validation lives in M1-5 EntityValidator.
+    void rejectsEntityWithoutId() {
+        // R1: @Entity must declare exactly one @Id field.
+        // Foo has only @Column — R1 fires (R2 also fires since Foo does not
+        // extend Model, but the test only asserts the R1 message).
         Compilation comp = compile("""
             package test;
             import com.holo.framework.horm.meta.annotation.Entity;
             import com.holo.framework.horm.meta.annotation.Column;
 
-            @Entity(table = "settings")
-            public class Setting {
-                @Column private String key;
-                @Column private String value;
-                public String getKey() { return key; }
-                public void setKey(String key) { this.key = key; }
-                public String getValue() { return value; }
-                public void setValue(String value) { this.value = value; }
+            @Entity
+            public class Foo {
+                @Column
+                private String name;
+                public String getName() { return name; }
+                public void setName(String name) { this.name = name; }
             }
             """);
 
-        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
-        assertThat(noteMessages(comp)).anyMatch(m -> m.contains("Parsed 1 entity"));
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("must declare exactly one @Id field"));
+    }
+
+    @Test
+    void rejectsEntityNotExtendingModel() {
+        // R2: @Entity must extend Model<T>. Foo has @Id (R1 passes) but does
+        // not extend Model, so only R2 fires.
+        Compilation comp = compile("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Entity;
+            import com.holo.framework.horm.meta.annotation.Id;
+
+            @Entity
+            public class Foo {
+                @Id
+                private Long id;
+                public Long getId() { return id; }
+                public void setId(Long id) { this.id = id; }
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("must extend Model"));
+    }
+
+    @Test
+    void rejectsFinalFieldWithColumn() {
+        // R3: @Id/@Column fields must not be final (Model<T> requires setters).
+        // Foo has @Id Long id (R1 passes) and @Column final String name (R3
+        // fires). R2 also fires since Foo does not extend Model.
+        Compilation comp = compile("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Entity;
+            import com.holo.framework.horm.meta.annotation.Id;
+            import com.holo.framework.horm.meta.annotation.Column;
+
+            @Entity
+            public class Foo {
+                @Id
+                private Long id;
+                @Column
+                private final String name = "x";
+                public Long getId() { return id; }
+                public void setId(Long id) { this.id = id; }
+                public String getName() { return name; }
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("must not be final"));
+    }
+
+    @Test
+    void rejectsUnsupportedFieldType() {
+        // R4: field types must be supported by TypeMapper. java.util.Date is
+        // not in the supported set (Long/Integer/String/Boolean/Instant/
+        // BigDecimal/enum/byte[]). R2 also fires since Foo does not extend
+        // Model.
+        Compilation comp = compile("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Entity;
+            import com.holo.framework.horm.meta.annotation.Id;
+            import com.holo.framework.horm.meta.annotation.Column;
+            import java.util.Date;
+
+            @Entity
+            public class Foo {
+                @Id
+                private Long id;
+                @Column
+                private Date created;
+                public Long getId() { return id; }
+                public void setId(Long id) { this.id = id; }
+                public Date getCreated() { return created; }
+                public void setCreated(Date created) { this.created = created; }
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("unsupported field type"));
     }
 
     @Test
@@ -303,11 +408,18 @@ class HormEntityProcessorTest {
     }
 
     private static Compilation compile(String... sources) {
-        JavaFileObject[] files = new JavaFileObject[sources.length];
-        for (int i = 0; i < sources.length; i++) {
-            String packageName = extractPackageName(sources[i]);
-            String className = extractClassName(sources[i]);
-            files[i] = JavaFileObjects.forSourceString(packageName + "." + className, sources[i]);
+        // Prepend the stub Model<T> base class so entity sources that
+        // `extends Model<Self>` resolve. The M1-6 core module is not on the
+        // meta test classpath; error-scenario entities that do NOT extend
+        // Model are unaffected (R2 still fires for them).
+        String[] all = new String[sources.length + 1];
+        all[0] = MODEL_SOURCE;
+        System.arraycopy(sources, 0, all, 1, sources.length);
+        JavaFileObject[] files = new JavaFileObject[all.length];
+        for (int i = 0; i < all.length; i++) {
+            String packageName = extractPackageName(all[i]);
+            String className = extractClassName(all[i]);
+            files[i] = JavaFileObjects.forSourceString(packageName + "." + className, all[i]);
         }
         return javac()
             .withProcessors(new HormEntityProcessor())
