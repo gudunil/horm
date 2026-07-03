@@ -12,10 +12,12 @@ import org.mockito.ArgumentCaptor;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -180,7 +182,70 @@ class JdbcRepositoryTest {
             .isEqualTo("DELETE FROM test_entities WHERE id = ?");
     }
 
+    @Test
+    void findWrapsSQLExceptionInHormException() throws Exception {
+        when(conn.prepareStatement(anyString())).thenThrow(new SQLException("boom"));
+
+        assertThatThrownBy(() -> repo.find(1L))
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("Failed to find")
+            .hasMessageContaining(TestEntity.class.getName())
+            .hasCauseInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void allWrapsSQLExceptionInHormException() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenThrow(new SQLException("boom"));
+
+        assertThatThrownBy(() -> repo.all())
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("Failed to fetch all")
+            .hasMessageContaining(TestEntity.class.getName())
+            .hasCauseInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void saveInsertWrapsSQLExceptionInHormException() throws Exception {
+        TestEntity entity = new TestEntity();
+        when(mapper.getId(entity)).thenReturn(null);
+        when(mapper.toRow(entity)).thenReturn(Row.create("test_entities"));
+        when(conn.prepareStatement(anyString(), eq(Statement.RETURN_GENERATED_KEYS)))
+            .thenThrow(new SQLException("boom"));
+
+        assertThatThrownBy(() -> repo.save(entity))
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("Failed to insert")
+            .hasMessageContaining(TestEntity.class.getName())
+            .hasCauseInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void findThrowsHormExceptionWhenNoIdField() {
+        @SuppressWarnings("unchecked")
+        Mapper<NoIdEntity> noIdMapper = mock(Mapper.class);
+        EntityMeta<NoIdEntity> noIdMeta = EntityMeta.<NoIdEntity>builder()
+            .type(NoIdEntity.class)
+            .tableName("no_id_entities")
+            .fields(List.of())
+            .idField(null)
+            .mapper(noIdMapper)
+            .build();
+        EntityMetaRegistry.registerManual(noIdMeta);
+        JdbcRepository<NoIdEntity> noIdRepo =
+            new JdbcRepository<>(NoIdEntity.class, new HormContext(conn));
+
+        assertThatThrownBy(() -> noIdRepo.find(1L))
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("has no @Id field")
+            .hasMessageContaining(NoIdEntity.class.getName());
+    }
+
     /** Concrete CRTP subtype used only as a registry key for these tests. */
     static final class TestEntity extends Model<TestEntity> {
+    }
+
+    /** Entity type with no {@code @Id} field, used to exercise requireIdField's error path. */
+    static final class NoIdEntity extends Model<NoIdEntity> {
     }
 }
