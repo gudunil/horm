@@ -1,0 +1,28 @@
+# Maven
+target/
+.flattened-pom.xml
+
+# IDE
+*.iml
+.idea/
+.vscode/
+.project
+.classpath
+.settings/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Help
+HELP.md
+
+# Codegraph (local dev tool, keep if shared)
+# .codegraph/
+
+# JaCoCo aggregate reports (per-module reports kept in target/)
+# aggregate report intentionally committed for visibility

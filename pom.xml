@@ -35,6 +35,14 @@
         <holo-horm.version>${project.version}</holo-horm.version>
         <!-- 以下属性需与 holo-dependency-bom 中保持一致，便于子模块引用 -->
         <spring-boot.version>3.2.5</spring-boot.version>
+        <!-- JavaPoet 版本统一管理（meta/codegen 直接声明，避免版本漂移） -->
+        <javapoet.version>1.13.0</javapoet.version>
+        <!-- JaCoCo 配置（parent-pom 未提供，由本聚合 pom 统一管理） -->
+        <jacoco.version>0.8.11</jacoco.version>
+        <!-- argLine 占位：JaCoCo prepare-agent 会注入 -javaagent 到 jacoco.argLine；
+             surefire/failsafe 通过 @{argLine} 引用以串联 JIT 参数与 agent -->
+        <jacoco.argLine></jacoco.argLine>
+        <argLine>${jacoco.argLine}</argLine>
     </properties>
 
     <dependencyManagement>
@@ -107,6 +115,37 @@
                     <skip>${enforcer.skip}</skip>
                 </configuration>
             </plugin>
+            <!-- JaCoCo 覆盖率：prepare-agent 注入 -javaagent 到 jacoco.argLine；
+                 report 在 verify 阶段生成单模块报告；
+                 聚合报告通过 jacoco-aggregate profile 触发 -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                        <configuration>
+                            <propertyName>jacoco.argLine</propertyName>
+                            <destFile>${project.build.directory}/jacoco.exec</destFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+                            <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -116,6 +155,31 @@
             <properties>
                 <enforcer.skip>true</enforcer.skip>
             </properties>
+        </profile>
+        <!-- 聚合所有模块的 JaCoCo 报告：mvn -Pjacoco-aggregate verify -->
+        <profile>
+            <id>jacoco-aggregate</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jacoco</groupId>
+                        <artifactId>jacoco-maven-plugin</artifactId>
+                        <version>${jacoco.version}</version>
+                        <executions>
+                            <execution>
+                                <id>aggregate-report</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>report-aggregate</goal>
+                                </goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.directory}/site/jacoco-aggregate</outputDirectory>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>

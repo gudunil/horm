@@ -22,11 +22,11 @@
             <artifactId>jakarta.annotation-api</artifactId>
         </dependency>
 
-        <!-- 代码生成模板引擎 -->
+        <!-- 代码生成模板引擎（版本由聚合 pom properties 统一管理） -->
         <dependency>
             <groupId>com.squareup</groupId>
             <artifactId>javapoet</artifactId>
-            <version>1.13.0</version>
+            <version>${javapoet.version}</version>
         </dependency>
 
         <dependency>
