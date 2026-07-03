@@ -13,32 +13,31 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.tools.Diagnostic;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 /**
  * APT entry point for HORM entity processing. Scans {@code @Entity}-annotated
- * types and produces an {@link EntityDescriptor} for each, deferring code
- * generation to the JavaPoet builders that arrive in M1-4.
+ * types, produces an {@link EntityDescriptor} for each, and drives the JavaPoet
+ * builders that emit the zero-reflection companion classes.
  *
- * <p>This M1-3 milestone release:
+ * <p>Per entity, the processor invokes:
  * <ul>
- *   <li>Parses every {@code @Entity} class via {@link EntityDescriptorParser}</li>
- *   <li>Collects descriptors across processing rounds</li>
- *   <li>Emits a single {@code NOTE} diagnostic summarising how many entities
- *       were parsed when {@link RoundEnvironment#processingOver()} is reached</li>
- *   <li>Reports a compile-time {@code ERROR} when {@code @Entity} is applied to
- *       a non-class element, or when parsing throws</li>
+ *   <li>{@link MetaClassBuilder} — generates {@code XxxMeta} (field metadata + {@code entityMeta()} factory)</li>
+ *   <li>{@link MapperBuilder} — generates {@code XxxMapper} (zero-reflection {@code Row} bidirectional mapper)</li>
+ *   <li>{@link QueryMetaBuilder} — generates {@code XxxQueryMeta} (type-safe {@code TypedField} constants)</li>
  * </ul>
+ *
+ * <p>On the final round ({@link RoundEnvironment#processingOver()}), it writes
+ * {@code META-INF/horm/entities.idx} via {@link IndexWriter}, listing every
+ * generated {@code XxxMeta} class for runtime discovery by
+ * {@code EntityMetaRegistry} (M1-6).
  *
  * <p>The {@code process()} method returns {@code true} to claim ownership of
  * the {@code @Entity} annotation type, preventing other processors from
  * re-processing the same elements.
- *
- * <p>M1-4 will extend this class to invoke {@code MetaClassBuilder},
- * {@code MapperBuilder}, {@code QueryMetaBuilder} on each descriptor and write
- * the {@code META-INF/horm/entities.idx} index file via {@code IndexWriter}.
  */
 @SupportedAnnotationTypes("com.holo.framework.horm.meta.annotation.Entity")
 @SupportedSourceVersion(SourceVersion.RELEASE_17)
@@ -52,8 +51,16 @@ public class HormEntityProcessor extends AbstractProcessor {
             if (!descriptors.isEmpty()) {
                 messager().printMessage(
                     Diagnostic.Kind.NOTE,
-                    "[HORM] Parsed " + descriptors.size() + " entity(es); generation deferred to M1-4"
+                    "[HORM] Parsed " + descriptors.size() + " entity(es); companion classes generated"
                 );
+                try {
+                    IndexWriter.write(processingEnv.getFiler(), descriptors);
+                } catch (IOException ex) {
+                    messager().printMessage(
+                        Diagnostic.Kind.ERROR,
+                        "Failed to write entities.idx: " + ex.getMessage()
+                    );
+                }
             }
             return false;
         }
@@ -71,11 +78,13 @@ public class HormEntityProcessor extends AbstractProcessor {
             try {
                 EntityDescriptor descriptor = EntityDescriptorParser.parse(type, processingEnv);
                 descriptors.add(descriptor);
-                // M1-4 extension point: MetaClassBuilder / MapperBuilder / QueryMetaBuilder / IndexWriter
+                MetaClassBuilder.build(descriptor, processingEnv.getFiler());
+                MapperBuilder.build(descriptor, processingEnv.getFiler());
+                QueryMetaBuilder.build(descriptor, processingEnv.getFiler());
             } catch (Exception ex) {
                 messager().printMessage(
                     Diagnostic.Kind.ERROR,
-                    "Failed to parse @Entity " + type.getQualifiedName() + ": " + ex.getMessage(),
+                    "Failed to process @Entity " + type.getQualifiedName() + ": " + ex.getMessage(),
                     element
                 );
             }
