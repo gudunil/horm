@@ -8,8 +8,10 @@ import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.Row;
+import com.holo.framework.horm.meta.query.Condition;
 import com.holo.framework.horm.meta.query.LongField;
 import com.holo.framework.horm.meta.query.StringField;
+import com.holo.framework.horm.meta.query.TypedField;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -314,7 +316,114 @@ class QueryImplTest {
             .isEqualTo("SELECT * FROM test_entities ORDER BY id DESC, email ASC");
     }
 
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void orderByWithForeignFieldThrowsHormException() {
+        // Compile-time generics would reject a TypedField<OtherEntity> here; we
+        // intentionally use a raw type to simulate the runtime-only check that
+        // guards against cross-entity column leakage (e.g. via reflection or
+        // raw-type callers).
+        TypedField raw = LongField.of(OtherEntity.class, "id", "id");
+        assertThatThrownBy(() -> query.orderBy(raw, Order.ASC))
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("ORDER BY field 'id'")
+            .hasMessageContaining("does not belong to entity")
+            .hasMessageContaining(TestEntity.class.getName());
+    }
+
+    @Test
+    void limitNegativeThrowsIllegalArgumentException() {
+        assertThatThrownBy(() -> query.limit(-1L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("limit must be >= 0");
+    }
+
+    @Test
+    void offsetNegativeThrowsIllegalArgumentException() {
+        assertThatThrownBy(() -> query.offset(-5L))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("offset must be >= 0");
+    }
+
+    @Test
+    void whereNullOrEmptyIsNoOp() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        query.where((Condition) null).where().list();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        assertThat(sql.getValue()).isEqualTo("SELECT * FROM test_entities");
+    }
+
+    @Test
+    void findFirstWrapsSQLExceptionInHormException() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenThrow(new SQLException("boom"));
+
+        assertThatThrownBy(() -> query.findFirst())
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("Failed to findFirst")
+            .hasCauseInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void countWrapsSQLExceptionInHormException() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenThrow(new SQLException("boom"));
+
+        assertThatThrownBy(() -> query.count())
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("Failed to count")
+            .hasCauseInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void existsWrapsSQLExceptionInHormException() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenThrow(new SQLException("boom"));
+
+        assertThatThrownBy(() -> query.exists())
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("Failed to check existence")
+            .hasCauseInstanceOf(SQLException.class);
+    }
+
+    @Test
+    void limitZeroProducesLimitZeroSql() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        query.limit(0L).list();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        assertThat(sql.getValue()).isEqualTo("SELECT * FROM test_entities LIMIT ?");
+        verify(ps).setObject(1, 0L);
+    }
+
+    @Test
+    void offsetWithoutLimitRendersOffsetOnly() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        query.offset(5L).list();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        assertThat(sql.getValue()).isEqualTo("SELECT * FROM test_entities OFFSET ?");
+        verify(ps).setObject(1, 5L);
+    }
+
     /** Concrete CRTP subtype used as a registry key for these tests. */
     static final class TestEntity extends Model<TestEntity> {
+    }
+
+    /** Foreign entity type used to verify ORDER BY cross-entity rejection. */
+    static final class OtherEntity extends Model<OtherEntity> {
     }
 }
