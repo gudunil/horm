@@ -2,7 +2,7 @@ package com.holo.framework.horm.meta.query;
 
 import java.math.BigDecimal;
 
-public final class BigDecimalField<E> implements TypedField<E, BigDecimal> {
+public final class BigDecimalField<E> implements ComparableField<E, BigDecimal> {
     private final Class<E> entityType;
     private final String name;
     private final String column;

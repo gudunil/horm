@@ -2,7 +2,7 @@ package com.holo.framework.horm.meta.query;
 
 import java.time.Instant;
 
-public final class InstantField<E> implements TypedField<E, Instant> {
+public final class InstantField<E> implements ComparableField<E, Instant> {
     private final Class<E> entityType;
     private final String name;
     private final String column;

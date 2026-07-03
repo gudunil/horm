@@ -1,6 +1,6 @@
 package com.holo.framework.horm.meta.query;
 
-public final class IntegerField<E> implements TypedField<E, Integer> {
+public final class IntegerField<E> implements ComparableField<E, Integer> {
     private final Class<E> entityType;
     private final String name;
     private final String column;

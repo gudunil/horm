@@ -1,5 +1,7 @@
 package com.holo.framework.horm.meta.query;
 
+import java.util.Collection;
+
 /**
  * Type-safe field reference for the HORM query DSL.
  *
@@ -9,16 +11,42 @@ package com.holo.framework.horm.meta.query;
  * public static final LongField<User> ID = LongField.of(User.class, "id", "id");
  * }</pre>
  *
- * <p>M1-4 ships a minimal contract (entity type / name / column / type).
- * Condition builders ({@code eq}/{@code ne}/{@code gt}/{@code lt}/{@code like}/
- * {@code in}/{@code between}/{@code asc}/{@code desc}) arrive in M2.
+ * <p>Default condition builders ({@code eq}/{@code ne}/{@code isNull}/
+ * {@code isNotNull}/{@code in}) delegate to {@link Conditions} and return a
+ * renderable {@link Condition}. Comparison operators ({@code gt}/{@code lt}/
+ * {@code ge}/{@code le}/{@code between}) live on {@link ComparableField} and
+ * are only available on fields whose value type is {@link Comparable}.
  *
  * @param <E> entity type
  * @param <T> field value type
  */
 public interface TypedField<E, T> {
+
     Class<E> entityType();
+
     String name();
+
     String column();
+
     Class<T> type();
+
+    default Condition eq(T value) {
+        return Conditions.eq(this, value);
+    }
+
+    default Condition ne(T value) {
+        return Conditions.ne(this, value);
+    }
+
+    default Condition isNull() {
+        return Conditions.isNull(this);
+    }
+
+    default Condition isNotNull() {
+        return Conditions.isNotNull(this);
+    }
+
+    default Condition in(Collection<T> values) {
+        return Conditions.in(this, values);
+    }
 }

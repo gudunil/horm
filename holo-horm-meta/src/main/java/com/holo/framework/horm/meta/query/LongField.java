@@ -1,6 +1,6 @@
 package com.holo.framework.horm.meta.query;
 
-public final class LongField<E> implements TypedField<E, Long> {
+public final class LongField<E> implements ComparableField<E, Long> {
     private final Class<E> entityType;
     private final String name;
     private final String column;
