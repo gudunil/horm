@@ -3,47 +3,49 @@ package com.holo.framework.horm.core;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
+import com.holo.framework.horm.meta.Row;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
  * Unit tests for {@link Model}.
  *
- * <p>M1-6 covers two concerns:
- * <ul>
- *   <li>{@link Model#isPersisted()} — fully usable, exercises
- *       {@link EntityMetaRegistry#lookup} + APT-generated {@link Mapper}.</li>
- *   <li>{@code save}/{@code delete}/{@code reload}/{@code find}/{@code all}/
- *       {@code count} — assert they surface {@link UnsupportedOperationException}
- *       from {@link Horm#repository(Class)} until M1-7 ships
- *       {@code JdbcRepository}.</li>
- * </ul>
+ * <p>M1-7 expands the surface beyond {@link Model#isPersisted()}: the
+ * Active Record methods ({@code save}/{@code delete}/{@code reload} and the
+ * static {@code find}/{@code all}/{@code count} helpers) now route through
+ * a real {@link JdbcRepository}, so each test installs a mocked
+ * {@link HormContext} (with a mock {@link Connection}) and verifies that
+ * the corresponding JDBC call is made.
  *
  * <p>{@link EntityMeta} is {@code final} and cannot be mocked; we build a
  * real instance via {@link EntityMeta.Builder} with a mocked {@link Mapper}
- * to control {@code getId()} return values.
+ * to control {@code getId()} / {@code toRow()} return values.
  *
- * <p><b>Coverage note:</b> the repository-throwing assertions use explicit
- * try/catch with direct method calls rather than {@code assertThatThrownBy}
- * with a lambda/throwing-callable. JaCoCo does not attribute bytecode
- * coverage to {@link Model} methods when they are invoked through AssertJ's
- * {@code ThrowingCallable} lambda indirection — the methods run, but their
- * probes are not recorded. Calling the method directly from the test
- * method's own stack frame is attributed correctly.
+ * <p><b>Coverage note:</b> the {@code isPersistedThrowsWhenEntityHasNoIdField}
+ * assertion uses {@code assertThatThrownBy} because that path runs entirely
+ * inside {@link Model#idValue()} (no JDBC indirection); JaCoCo attributes
+ * it correctly. The repository-delegation tests invoke {@link Model}
+ * methods directly from the test method's own stack frame.
  */
 class ModelTest {
 
     @AfterEach
     void clearRegistry() {
         EntityMetaRegistry.clear();
+        HormContext.install(null);
     }
 
     @Test
@@ -88,73 +90,103 @@ class ModelTest {
             .hasMessageContaining("no @Id field");
     }
 
+    /**
+     * M1-7: {@code Model.save()} delegates to {@link JdbcRepository#save},
+     * which (for a non-null id) issues an UPDATE via PreparedStatement.
+     */
     @Test
-    void saveThrowsUnsupportedOperationBeforeM1_7() {
-        registerTestEntityMeta(1L);
+    void saveDelegatesToRepository() throws Exception {
+        Mapper<TestEntity> mapper = registerTestEntityMeta(1L);
+        Connection conn = installMockContext();
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeUpdate()).thenReturn(1);
+        when(mapper.toRow(any(TestEntity.class))).thenReturn(Row.create("test_entities"));
+
         TestEntity entity = new TestEntity();
-        try {
-            entity.save();
-            throw new AssertionError("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
-            assertThat(e).hasMessageContaining("M1-7");
-        }
+        entity.save();
+
+        verify(ps).executeUpdate();
     }
 
+    /** M1-7: {@code Model.delete()} issues a DELETE via PreparedStatement. */
     @Test
-    void deleteThrowsUnsupportedOperationBeforeM1_7() {
+    void deleteDelegatesToRepository() throws Exception {
         registerTestEntityMeta(1L);
+        Connection conn = installMockContext();
+        PreparedStatement ps = mock(PreparedStatement.class);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeUpdate()).thenReturn(1);
+
         TestEntity entity = new TestEntity();
-        try {
-            entity.delete();
-            throw new AssertionError("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
-            assertThat(e).hasMessageContaining("M1-7");
-        }
+        entity.delete();
+
+        verify(ps).executeUpdate();
     }
 
+    /**
+     * M1-7: {@code Model.reload()} routes through
+     * {@link JdbcRepository#find}, which issues a SELECT ... WHERE id = ?
+     * and returns {@code null} when no row matches.
+     */
     @Test
-    void reloadThrowsUnsupportedOperationBeforeM1_7() {
+    void reloadDelegatesToRepository() throws Exception {
         registerTestEntityMeta(1L);
+        Connection conn = installMockContext();
+        PreparedStatement ps = mock(PreparedStatement.class);
+        ResultSet rs = mock(ResultSet.class);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
         TestEntity entity = new TestEntity();
-        try {
-            entity.reload();
-            throw new AssertionError("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
-            assertThat(e).hasMessageContaining("M1-7");
-        }
+        assertThat(entity.reload()).isNull();
+        verify(ps).executeQuery();
     }
 
+    /** M1-7: {@code Model.find(Class, Object)} issues a SELECT by id. */
     @Test
-    void staticFindThrowsUnsupportedOperationBeforeM1_7() {
+    void staticFindDelegatesToRepository() throws Exception {
         registerTestEntityMeta(1L);
-        try {
-            Model.find(TestEntity.class, 1L);
-            throw new AssertionError("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
-            assertThat(e).hasMessageContaining("M1-7");
-        }
+        Connection conn = installMockContext();
+        PreparedStatement ps = mock(PreparedStatement.class);
+        ResultSet rs = mock(ResultSet.class);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        assertThat(Model.find(TestEntity.class, 1L)).isNull();
+        verify(ps).executeQuery();
     }
 
+    /** M1-7: {@code Model.all(Class)} issues a SELECT * and returns a list. */
     @Test
-    void staticAllThrowsUnsupportedOperationBeforeM1_7() {
+    void staticAllDelegatesToRepository() throws Exception {
         registerTestEntityMeta(1L);
-        try {
-            Model.all(TestEntity.class);
-            throw new AssertionError("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
-            assertThat(e).hasMessageContaining("M1-7");
-        }
+        Connection conn = installMockContext();
+        PreparedStatement ps = mock(PreparedStatement.class);
+        ResultSet rs = mock(ResultSet.class);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        assertThat(Model.all(TestEntity.class)).isEmpty();
+        verify(ps).executeQuery();
     }
 
+    /** M1-7: {@code Model.count(Class)} issues a SELECT COUNT(*). */
     @Test
-    void staticCountThrowsUnsupportedOperationBeforeM1_7() {
+    void staticCountDelegatesToRepository() throws Exception {
         registerTestEntityMeta(1L);
-        try {
-            Model.count(TestEntity.class);
-            throw new AssertionError("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
-            assertThat(e).hasMessageContaining("M1-7");
-        }
+        Connection conn = installMockContext();
+        PreparedStatement ps = mock(PreparedStatement.class);
+        ResultSet rs = mock(ResultSet.class);
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        assertThat(Model.count(TestEntity.class)).isEqualTo(0L);
+        verify(ps).executeQuery();
     }
 
     /**
@@ -182,6 +214,13 @@ class ModelTest {
 
         EntityMetaRegistry.registerManual(meta);
         return mapper;
+    }
+
+    /** Installs a {@link HormContext} backed by a mock {@link Connection}. */
+    private Connection installMockContext() {
+        Connection conn = mock(Connection.class);
+        Horm.install(new HormContext(conn));
+        return conn;
     }
 
     /** Concrete CRTP subtype under test. */
