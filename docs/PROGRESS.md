@@ -10,10 +10,10 @@
 | 里程碑 | 状态 | 完成时间       | Tag        |
 |--------|------|----------------|------------|
 | M1     | ✅ 完成 | 2026-07-04     | v1.0.0-M1  |
-| M2     | ⏳ 待开始 | —              | —          |
+| M2     | ✅ 完成 | 2026-07-04     | v1.0.0-M2  |
 | M3-M9  | 📋 规划中 | —              | —          |
 
-**当前分支**：`feature/m1-meta-spi`（M1 完成后待 squash merge 到 `main`）
+**当前分支**：`feature/m2-query-builder`（M2 完成后待 squash merge 到 `main`）
 
 ---
 
@@ -71,26 +71,50 @@
 
 ---
 
-## M2: 查询构建器与条件查询（待开始）
+## M2: 查询构建器与条件查询（已完成）
 
-### 目标
+### 交付清单
 
-为 `Repository` 添加类型安全的链式查询 API，基于 APT 生成的 `XxxQueryMeta` TypedField 常量。
+| 子任务 | 描述 | Commit |
+|--------|------|--------|
+| C1 | meta 层 `Condition`/`Conditions`/`CompositeCondition` + AND/OR/NOT 组合 | `57cf64d` |
+| C2 | `TypedField` default 方法 + `ComparableField` 子接口 + 5 个子类改 implements | `a08a57f` |
+| C3 | core 层 `Query<T>`/`QueryImpl`/`Order` + `Model.query()` 入口 | `909ac7c` |
+| C4 | `QueryImpl` 错误路径测试（跨实体 orderBy、负数 limit/offset、SQLException 包装） | `2fe6408` |
+| C5 | `HormException` 覆盖率提升（JdbcRepository 错误路径 + 无 @Id 元数据） | `02ec424` |
+| C6 | H2 集成测试（`UserQueryBuilderTest` 13 用例）+ PROGRESS.md 更新 | `<本 commit>` |
 
-### 计划交付
+### 测试与覆盖率
 
-- `Query<T>` 流畅 API：`select`/`where`/`orderBy`/`limit`/`offset`
-- `Predicate` 组合：`eq`/`ne`/`gt`/`lt`/`like`/`in`/`between`/`isNull`/`isNotNull`
-- `AND`/`OR`/`NOT` 逻辑组合
-- `JdbcRepository` 集成 `Query<T>` 执行器
-- `HormException` 错误路径测试
+- **测试总数**：79（meta 模块 13 + core 模块 66，含 13 个 Query H2 集成测试 + 6 个 M1 CRUD 集成测试）
+- **JaCoCo 覆盖率**：
+  - meta 模块 processor 包：~93%（> 80% 目标 ✅）
+  - core 模块整体：~93%（> 80% 目标 ✅）
+  - `HormException`：100%（从 M1 的 0% 提升至 100% ✅）
+  - `QueryImpl`：97% 行覆盖
+  - `JdbcRepository`：86% 行覆盖
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core -am verify -Pskip-enforcer`
 
-### 关键决策点（待 M2 启动时确认）
+### 关键设计决策
 
-1. Query API 风格：JPA Criteria 风格 vs jOOQ 风格 vs MyBatis-Plus LambdaQueryWrapper 风格
-2. 是否支持子查询、JOIN（M2 范围 vs 留到 M3 关联）
-3. 排序方向、分页 API 形状
-4. 是否引入 `Optional<T>` 返回值
+1. **jOOQ 风格类型安全 DSL**：基于 APT 生成的 `XxxQueryMeta` TypedField 常量做强类型列引用，`field.eq(value)` 链式构造条件，编译期防止类型不匹配。
+2. **`Condition` 落 meta 模块**：`TypedField` 的 default 方法返回 `Condition`，而 core 依赖 meta（反向不可），所以 `Condition/Conditions/CompositeCondition` 全部放 `holo-horm-meta` 的 `query` 包，core 层 `QueryImpl` 只做 SQL 拼装。
+3. **`ComparableField` 类型层次**：`StringField/LongField/IntegerField/BigDecimalField/InstantField` 实现 `ComparableField`（含 `gt/lt/ge/le/between`），`BooleanField/EnumField` 保持 `TypedField`（无序语义），编译期类型安全。
+4. **`findFirst` 强制 `LIMIT 1`**：尊重 `offset`，忽略用户设的 `limit`，返回 `Optional<T>`，语义最清晰。
+5. **`select` 投影 defer 到 M3**：M2 保持 `SELECT *`，单表投影对 Active Record 完整实体映射无价值。
+6. **M2 不做子查询/JOIN**：留到 M3 与 `@OneToMany`/`@ManyToOne` 关联一起设计。
+7. **`orderBy(field, ASC/DESC) + limit/offset`**：不引入 `Page` 对象，与 SQL 1:1 对应。
+8. **参数校验异常分层**：`limit/offset < 0` 抛 `IllegalArgumentException`；`HormException` 保留给 `SQLException` 包装 + 元数据缺失 + 跨实体 orderBy 校验。
+9. **SQL 注入防护**：所有用户值（条件值、like 模式、in 列表、limit/offset）一律 `?` 占位符；列名仅来自 APT 冻结的 `TypedField.column()` 拼接。
+
+### 已知限制（M2 范围内）
+
+- 不支持子查询、JOIN、关联查询 —— 留待 M3
+- 不支持 `select` 投影列子集 —— 留待 M3
+- 不支持 `GROUP BY`/`HAVING`/聚合 —— 留待 M5 或后续
+- 不引入 `Page<T>` 对象 —— 用户自行组合 `limit/offset/count`
+- `Query<T>` 是 mutable builder，不可重用：每次查询需新建 `Model.query(type)`
+- 不支持 `UPDATE ... WHERE` / `DELETE ... WHERE` —— 留待 M4 事务管理
 
 ---
 
@@ -122,14 +146,14 @@
 
 ## 接续点（下次开发从这里开始）
 
-1. **可选**：将 `feature/m1-meta-spi` squash merge 到 `main`：
+1. **可选**：将 `feature/m2-query-builder` squash merge 到 `main`：
    ```bash
    git -C e:\project\Holo\holo-horm checkout main
-   git -C e:\project\Holo\holo-horm merge --squash feature/m1-meta-spi
-   git -C e:\project\Holo\holo-horm commit -m "feat(m1): squash merge metadata SPI & APT pipeline"
+   git -C e:\project\Holo\holo-horm merge --squash feature/m2-query-builder
+   git -C e:\project\Holo\holo-horm commit -m "feat(m2): squash merge query builder and Condition DSL"
    # 重新打 tag 到 main HEAD（如需）
-   git -C e:\project\Holo\holo-horm tag -d v1.0.0-M1
-   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M1 -m "M1: ..."
+   git -C e:\project\Holo\holo-horm tag -d v1.0.0-M2
+   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M2 -m "M2: ..."
    ```
-2. **启动 M2**：新建分支 `feature/m2-query-builder`，参考本文档 "M2 计划交付" 章节
-3. **优先修复**：`HormException` 覆盖率 0% —— 在 M2 错误路径测试中补充
+2. **启动 M3**：新建分支 `feature/m3-relations`，实现 `@OneToMany`/`@ManyToOne`/`@ManyToMany` 关联关系映射，并补全 `select` 投影与 JOIN/子查询支持
+3. **可选优化**：为 `Query<T>` 增加批量 `IN` 参数上限校验、`Page<T>` 分页对象、`UPDATE/DELETE ... WHERE` 等扩展（按需）
