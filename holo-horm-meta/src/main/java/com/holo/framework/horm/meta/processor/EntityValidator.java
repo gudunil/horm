@@ -1,6 +1,13 @@
 package com.holo.framework.horm.meta.processor;
 
+import com.holo.framework.horm.meta.RelationType;
+import com.holo.framework.horm.meta.annotation.BelongsTo;
 import com.holo.framework.horm.meta.annotation.Column;
+import com.holo.framework.horm.meta.annotation.Entity;
+import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
+import com.holo.framework.horm.meta.annotation.HasMany;
+import com.holo.framework.horm.meta.annotation.HasManyThrough;
+import com.holo.framework.horm.meta.annotation.HasOne;
 import com.holo.framework.horm.meta.annotation.Id;
 import com.squareup.javapoet.TypeName;
 
@@ -120,6 +127,105 @@ public final class EntityValidator {
                 );
             }
         }
+
+        // R5-R9: relation field validation (M3)
+        validateRelations(d, type, env);
+    }
+
+    /**
+     * Validate relation fields (R5-R9).
+     *
+     * <p>Rules:
+     * <ul>
+     *   <li><b>R5</b> — relation field type must be {@code java.util.List}</li>
+     *   <li><b>R6</b> — relation target entity must be {@code @Entity}-annotated</li>
+     *   <li><b>R7</b> — {@code @HasAndBelongsToMany} must declare non-empty {@code joinTable}</li>
+     *   <li><b>R8</b> — {@code @HasManyThrough} must declare a {@code through} entity</li>
+     *   <li><b>R9</b> — relation fields must not be {@code final}</li>
+     * </ul>
+     */
+    private static void validateRelations(EntityDescriptor d, TypeElement type, ProcessingEnvironment env) {
+        // R5 + R9: scan relation fields directly from the type element
+        for (Element enclosed : type.getEnclosedElements()) {
+            if (enclosed.getKind() != ElementKind.FIELD) {
+                continue;
+            }
+            VariableElement field = (VariableElement) enclosed;
+            boolean isRelationField = field.getAnnotation(BelongsTo.class) != null
+                || field.getAnnotation(HasOne.class) != null
+                || field.getAnnotation(HasMany.class) != null
+                || field.getAnnotation(HasAndBelongsToMany.class) != null
+                || field.getAnnotation(HasManyThrough.class) != null;
+            if (!isRelationField) {
+                continue;
+            }
+
+            // R9: relation fields must not be final
+            if (field.getModifiers().contains(Modifier.FINAL)) {
+                env.getMessager().printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "relation field '" + field.getSimpleName() + "' must not be final; Model<T> requires setter",
+                    field
+                );
+            }
+
+            // R5: relation field type must be java.util.List
+            String typeFqn = field.asType().toString();
+            if (!typeFqn.startsWith("java.util.List<")) {
+                env.getMessager().printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "relation field '" + field.getSimpleName() + "' must be of type java.util.List",
+                    field
+                );
+            }
+        }
+
+        // R6 + R7 + R8: validate each parsed relation descriptor
+        for (EntityDescriptor.RelationDescriptor rd : d.relations()) {
+            VariableElement field = findField(type, rd.name());
+
+            // R6: relation target must be @Entity-annotated
+            TypeElement targetElement = env.getElementUtils().getTypeElement(rd.targetEntityQualifiedName());
+            if (targetElement == null || targetElement.getAnnotation(Entity.class) == null) {
+                env.getMessager().printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "relation '" + rd.name() + "' target '" + rd.targetEntityQualifiedName()
+                        + "' is not an @Entity",
+                    field != null ? field : type
+                );
+            }
+
+            // R7: @HasAndBelongsToMany must declare non-empty joinTable
+            if (rd.type() == RelationType.HAS_AND_BELONGS_TO_MANY
+                && (rd.joinTable() == null || rd.joinTable().isEmpty())) {
+                env.getMessager().printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "relation '" + rd.name() + "' (@HasAndBelongsToMany) must declare a non-empty joinTable",
+                    field != null ? field : type
+                );
+            }
+
+            // R8: @HasManyThrough must declare a through entity
+            if (rd.type() == RelationType.HAS_MANY_THROUGH
+                && rd.throughQualifiedName() == null) {
+                env.getMessager().printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "relation '" + rd.name() + "' (@HasManyThrough) must declare a through entity",
+                    field != null ? field : type
+                );
+            }
+        }
+    }
+
+    /** Find a field element by simple name on the given type. */
+    private static VariableElement findField(TypeElement type, String name) {
+        for (Element enclosed : type.getEnclosedElements()) {
+            if (enclosed.getKind() == ElementKind.FIELD
+                && enclosed.getSimpleName().toString().equals(name)) {
+                return (VariableElement) enclosed;
+            }
+        }
+        return null;
     }
 
     /**

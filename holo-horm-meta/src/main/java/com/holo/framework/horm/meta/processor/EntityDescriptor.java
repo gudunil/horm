@@ -1,5 +1,6 @@
 package com.holo.framework.horm.meta.processor;
 
+import com.holo.framework.horm.meta.RelationType;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ public final class EntityDescriptor {
     private final String dataSource;
     private final List<FieldDescriptor> fields;
     private final FieldDescriptor idField;
+    private final List<RelationDescriptor> relations;
 
     private EntityDescriptor(Builder b) {
         this.packageName = b.packageName;
@@ -33,6 +35,7 @@ public final class EntityDescriptor {
         this.dataSource = b.dataSource;
         this.fields = List.copyOf(b.fields);
         this.idField = b.idField;
+        this.relations = List.copyOf(b.relations);
     }
 
     public String packageName() { return packageName; }
@@ -43,6 +46,7 @@ public final class EntityDescriptor {
     public String dataSource() { return dataSource; }
     public List<FieldDescriptor> fields() { return fields; }
     public FieldDescriptor idField() { return idField; }
+    public List<RelationDescriptor> relations() { return relations; }
 
     /** Package where generated companion classes (XxxMeta, XxxMapper) are written. */
     public String generatedPackage() {
@@ -59,6 +63,7 @@ public final class EntityDescriptor {
         private String schema;
         private String dataSource;
         private final List<FieldDescriptor> fields = new ArrayList<>();
+        private final List<RelationDescriptor> relations = new ArrayList<>();
         private FieldDescriptor idField;
 
         public Builder packageName(String v) { this.packageName = v; return this; }
@@ -68,6 +73,12 @@ public final class EntityDescriptor {
         public Builder schema(String v) { this.schema = v; return this; }
         public Builder dataSource(String v) { this.dataSource = v; return this; }
         public Builder addField(FieldDescriptor f) { this.fields.add(f); return this; }
+        public Builder addRelation(RelationDescriptor r) { this.relations.add(r); return this; }
+        public Builder relations(List<RelationDescriptor> r) {
+            this.relations.clear();
+            this.relations.addAll(r);
+            return this;
+        }
         public Builder idField(FieldDescriptor f) { this.idField = f; return this; }
 
         public EntityDescriptor build() { return new EntityDescriptor(this); }
@@ -140,5 +151,65 @@ public final class EntityDescriptor {
         public String setterName() { return setterName; }
         public boolean enumType() { return enumType; }
         public String enumQualifiedName() { return enumQualifiedName; }
+    }
+
+    /**
+     * Intermediate representation of a relation field, parsed from
+     * {@code @BelongsTo}/{@code @HasOne}/{@code @HasMany}/
+     * {@code @HasAndBelongsToMany}/{@code @HasManyThrough} annotations.
+     *
+     * <p>Type names are stored as fully-qualified strings because {@code Class}
+     * loading is unavailable during annotation processing. The JavaPoet builders
+     * convert these to {@code ClassName} / {@code Class<?>} references when
+     * emitting companion classes.
+     */
+    public static final class RelationDescriptor {
+        private final String name;
+        private final String targetEntityQualifiedName;
+        private final String targetEntitySimpleName;
+        private final RelationType type;
+        private final String foreignKey;
+        private final String associationForeignKey;
+        private final String joinTable;
+        private final String throughQualifiedName;  // null when not HAS_MANY_THROUGH
+        private final String throughSimpleName;     // null when not HAS_MANY_THROUGH
+        private final String getterName;
+        private final String setterName;
+
+        public RelationDescriptor(String name,
+                                  String targetEntityQualifiedName,
+                                  String targetEntitySimpleName,
+                                  RelationType type,
+                                  String foreignKey,
+                                  String associationForeignKey,
+                                  String joinTable,
+                                  String throughQualifiedName,
+                                  String throughSimpleName,
+                                  String getterName,
+                                  String setterName) {
+            this.name = name;
+            this.targetEntityQualifiedName = targetEntityQualifiedName;
+            this.targetEntitySimpleName = targetEntitySimpleName;
+            this.type = type;
+            this.foreignKey = foreignKey;
+            this.associationForeignKey = associationForeignKey;
+            this.joinTable = joinTable;
+            this.throughQualifiedName = throughQualifiedName;
+            this.throughSimpleName = throughSimpleName;
+            this.getterName = getterName;
+            this.setterName = setterName;
+        }
+
+        public String name() { return name; }
+        public String targetEntityQualifiedName() { return targetEntityQualifiedName; }
+        public String targetEntitySimpleName() { return targetEntitySimpleName; }
+        public RelationType type() { return type; }
+        public String foreignKey() { return foreignKey; }
+        public String associationForeignKey() { return associationForeignKey; }
+        public String joinTable() { return joinTable; }
+        public String throughQualifiedName() { return throughQualifiedName; }
+        public String throughSimpleName() { return throughSimpleName; }
+        public String getterName() { return getterName; }
+        public String setterName() { return setterName; }
     }
 }

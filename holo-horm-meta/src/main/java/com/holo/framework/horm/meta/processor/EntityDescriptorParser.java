@@ -1,9 +1,15 @@
 package com.holo.framework.horm.meta.processor;
 
+import com.holo.framework.horm.meta.RelationType;
+import com.holo.framework.horm.meta.annotation.BelongsTo;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
 import com.holo.framework.horm.meta.annotation.GeneratedValue;
 import com.holo.framework.horm.meta.annotation.GenerationType;
+import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
+import com.holo.framework.horm.meta.annotation.HasMany;
+import com.holo.framework.horm.meta.annotation.HasManyThrough;
+import com.holo.framework.horm.meta.annotation.HasOne;
 import com.holo.framework.horm.meta.annotation.Id;
 import com.holo.framework.horm.meta.annotation.Table;
 
@@ -14,10 +20,12 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
 import java.util.Set;
+import java.util.function.Supplier;
 
 /**
  * Parses a {@code @Entity}-annotated {@link TypeElement} into an
@@ -41,8 +49,9 @@ import java.util.Set;
  *
  * <p>Field scan scope: only directly declared fields of the type (no superclass
  * recursion). {@code static} and {@code transient} fields are skipped. Fields
- * without {@code @Id} or {@code @Column} are skipped (M1 does not parse
- * relation annotations — that is M3).
+ * without {@code @Id}, {@code @Column}, or one of the M3 relation annotations
+ * ({@code @BelongsTo}/{@code @HasOne}/{@code @HasMany}/
+ * {@code @HasAndBelongsToMany}/{@code @HasManyThrough}) are skipped.
  */
 public final class EntityDescriptorParser {
 
@@ -96,6 +105,13 @@ public final class EntityDescriptorParser {
             Id idAnno = field.getAnnotation(Id.class);
             Column colAnno = field.getAnnotation(Column.class);
             if (idAnno == null && colAnno == null) {
+                // M3: probe for relation annotations (@BelongsTo/@HasOne/@HasMany/
+                // @HasAndBelongsToMany/@HasManyThrough). A field with only a relation
+                // annotation is a relation field, not a column.
+                EntityDescriptor.RelationDescriptor rd = parseRelation(field, simpleName);
+                if (rd != null) {
+                    builder.addRelation(rd);
+                }
                 continue;
             }
 
@@ -164,6 +180,127 @@ public final class EntityDescriptorParser {
             enumType,
             enumQualifiedName
         );
+    }
+
+    /**
+     * Probe the field for one of the five relation annotations and build a
+     * {@link EntityDescriptor.RelationDescriptor} if present. Returns
+     * {@code null} when the field has no relation annotation.
+     *
+     * <p>Default foreign-key derivation:
+     * <ul>
+     *   <li>{@code @BelongsTo} → {@code <targetSimpleLower>_id} (FK on this entity)</li>
+     *   <li>{@code @HasOne}/{@code @HasMany} → {@code <ownerSimpleLower>_id} (FK on target)</li>
+     *   <li>{@code @HasAndBelongsToMany} → {@code <ownerSimpleLower>_id} and {@code <targetSimpleLower>_id}</li>
+     *   <li>{@code @HasManyThrough} → {@code <ownerSimpleLower>_id} and {@code <targetSimpleLower>_id}</li>
+     * </ul>
+     *
+     * <p>{@code Class<?>} attributes are extracted via {@link MirroredTypeException}
+     * because the {@code Class} cannot be loaded during annotation processing.
+     */
+    static EntityDescriptor.RelationDescriptor parseRelation(VariableElement field, String ownerSimpleName) {
+        BelongsTo belongsTo = field.getAnnotation(BelongsTo.class);
+        if (belongsTo != null) {
+            String targetFqn = mirrorToFqn(belongsTo::targetEntity);
+            String targetSimple = simpleName(targetFqn);
+            String fk = belongsTo.foreignKey().isEmpty()
+                ? snake(targetSimple) + "_id"
+                : belongsTo.foreignKey();
+            return buildRelation(field, RelationType.BELONGS_TO, targetFqn, targetSimple,
+                fk, null, null, null, null);
+        }
+
+        HasOne hasOne = field.getAnnotation(HasOne.class);
+        if (hasOne != null) {
+            String targetFqn = mirrorToFqn(hasOne::targetEntity);
+            String targetSimple = simpleName(targetFqn);
+            String fk = hasOne.foreignKey().isEmpty()
+                ? snake(ownerSimpleName) + "_id"
+                : hasOne.foreignKey();
+            return buildRelation(field, RelationType.HAS_ONE, targetFqn, targetSimple,
+                fk, null, null, null, null);
+        }
+
+        HasMany hasMany = field.getAnnotation(HasMany.class);
+        if (hasMany != null) {
+            String targetFqn = mirrorToFqn(hasMany::targetEntity);
+            String targetSimple = simpleName(targetFqn);
+            String fk = hasMany.foreignKey().isEmpty()
+                ? snake(ownerSimpleName) + "_id"
+                : hasMany.foreignKey();
+            return buildRelation(field, RelationType.HAS_MANY, targetFqn, targetSimple,
+                fk, null, null, null, null);
+        }
+
+        HasAndBelongsToMany habtm = field.getAnnotation(HasAndBelongsToMany.class);
+        if (habtm != null) {
+            String targetFqn = mirrorToFqn(habtm::targetEntity);
+            String targetSimple = simpleName(targetFqn);
+            String fk = habtm.foreignKey().isEmpty()
+                ? snake(ownerSimpleName) + "_id"
+                : habtm.foreignKey();
+            String afk = habtm.associationForeignKey().isEmpty()
+                ? snake(targetSimple) + "_id"
+                : habtm.associationForeignKey();
+            String jt = habtm.joinTable();
+            return buildRelation(field, RelationType.HAS_AND_BELONGS_TO_MANY,
+                targetFqn, targetSimple, fk, afk, jt.isEmpty() ? null : jt, null, null);
+        }
+
+        HasManyThrough hmt = field.getAnnotation(HasManyThrough.class);
+        if (hmt != null) {
+            String targetFqn = mirrorToFqn(hmt::targetEntity);
+            String targetSimple = simpleName(targetFqn);
+            String throughFqn = mirrorToFqn(hmt::through);
+            boolean hasThrough = !"void".equals(throughFqn);
+            String fk = hmt.foreignKey().isEmpty()
+                ? snake(ownerSimpleName) + "_id"
+                : hmt.foreignKey();
+            String afk = hmt.associationForeignKey().isEmpty()
+                ? snake(targetSimple) + "_id"
+                : hmt.associationForeignKey();
+            return buildRelation(field, RelationType.HAS_MANY_THROUGH, targetFqn, targetSimple,
+                fk, afk, null,
+                hasThrough ? throughFqn : null,
+                hasThrough ? simpleName(throughFqn) : null);
+        }
+
+        return null;
+    }
+
+    private static EntityDescriptor.RelationDescriptor buildRelation(VariableElement field,
+                                                     RelationType type,
+                                                     String targetFqn,
+                                                     String targetSimple,
+                                                     String fk,
+                                                     String afk,
+                                                     String jt,
+                                                     String throughFqn,
+                                                     String throughSimple) {
+        String name = field.getSimpleName().toString();
+        String getterName = "get" + capitalize(name);
+        String setterName = "set" + capitalize(name);
+        return new EntityDescriptor.RelationDescriptor(name, targetFqn, targetSimple, type,
+            fk, afk, jt, throughFqn, throughSimple, getterName, setterName);
+    }
+
+    /**
+     * Extract the fully-qualified name from a {@code Class<?>} annotation attribute
+     * via {@link MirroredTypeException}. During annotation processing the {@code Class}
+     * cannot be loaded, so accessing it throws {@link MirroredTypeException} carrying
+     * the {@link TypeMirror}; we stringify that instead.
+     */
+    private static String mirrorToFqn(Supplier<Class<?>> supplier) {
+        try {
+            return supplier.get().getName();
+        } catch (MirroredTypeException e) {
+            return e.getTypeMirror().toString();
+        }
+    }
+
+    private static String simpleName(String fqn) {
+        int idx = fqn.lastIndexOf('.');
+        return idx >= 0 ? fqn.substring(idx + 1) : fqn;
     }
 
     /**
