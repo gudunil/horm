@@ -4,6 +4,8 @@ import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldAccessor;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
+import com.holo.framework.horm.meta.RelationMeta;
+import com.holo.framework.horm.meta.RelationType;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -98,6 +100,8 @@ public final class MetaClassBuilder {
             .initializer(listInit.build())
             .build());
 
+        type.addField(buildAllRelationsConstant(d));
+
         type.addMethod(buildEntityMetaMethod(entityMetaCn, entity, d));
 
         JavaFile.builder(d.generatedPackage(), type.build())
@@ -170,12 +174,64 @@ public final class MetaClassBuilder {
             body.add(".idField($L)", constName(d.idField().name()));
         }
         body.add(".mapper(MAPPER)")
-            .add(".relations($T.of())", ClassName.get(List.class))
+            .add(".relations(ALL_RELATIONS)")
             .add(".build()");
         return MethodSpec.methodBuilder("entityMeta")
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
             .returns(entityMetaT)
             .addStatement(body.build())
+            .build();
+    }
+
+    /**
+     * Emits the {@code ALL_RELATIONS} constant — a {@code List<RelationMeta>}
+     * with one entry per relation field parsed from {@code @BelongsTo}/
+     * {@code @HasOne}/{@code @HasMany}/{@code @HasAndBelongsToMany}/
+     * {@code @HasManyThrough}. Empty list when the entity has no relations,
+     * preserving the M1/M2 behaviour.
+     *
+     * <p>Per relation, only the relevant builder methods are invoked:
+     * {@code foreignKey} is emitted when non-null, {@code joinTable} only for
+     * HABTM, {@code through} only for HAS_MANY_THROUGH.
+     */
+    private static FieldSpec buildAllRelationsConstant(EntityDescriptor d) {
+        ClassName relationMetaCn = ClassName.get(RelationMeta.class);
+        ClassName relationTypeCn = ClassName.get(RelationType.class);
+        TypeName relationListT = ParameterizedTypeName.get(ClassName.get(List.class), relationMetaCn);
+
+        CodeBlock.Builder init = CodeBlock.builder();
+        if (d.relations().isEmpty()) {
+            init.add("$T.of()", ClassName.get(List.class));
+        } else {
+            init.add("$T.of(", ClassName.get(List.class));
+            for (int i = 0; i < d.relations().size(); i++) {
+                if (i > 0) {
+                    init.add(", ");
+                }
+                EntityDescriptor.RelationDescriptor r = d.relations().get(i);
+                ClassName targetCn = ClassName.bestGuess(r.targetEntityQualifiedName());
+                init.add("$T.builder().name($S).targetEntity($T.class).type($T.$L)",
+                    relationMetaCn, r.name(), targetCn, relationTypeCn, r.type().name());
+                if (r.foreignKey() != null) {
+                    init.add(".foreignKey($S)", r.foreignKey());
+                }
+                if (r.associationForeignKey() != null) {
+                    init.add(".associationForeignKey($S)", r.associationForeignKey());
+                }
+                if (r.joinTable() != null) {
+                    init.add(".joinTable($S)", r.joinTable());
+                }
+                if (r.throughQualifiedName() != null) {
+                    ClassName throughCn = ClassName.bestGuess(r.throughQualifiedName());
+                    init.add(".through($T.class)", throughCn);
+                }
+                init.add(".build()");
+            }
+            init.add(")");
+        }
+        return FieldSpec.builder(relationListT, "ALL_RELATIONS",
+                Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+            .initializer(init.build())
             .build();
     }
 

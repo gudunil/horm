@@ -1,5 +1,7 @@
 package com.holo.framework.horm.meta;
 
+import java.util.List;
+
 /**
  * Zero-reflection bidirectional mapper between an entity and a {@link Row}.
  *
@@ -41,4 +43,22 @@ public interface Mapper<T> {
 
     /** Sets the value of a named field. Throws on unknown field. */
     void setField(T entity, String field, Object value);
+
+    /**
+     * Sets a relation collection on the entity by Java property name.
+     *
+     * <p>Default implementation throws {@link UnsupportedOperationException}
+     * so that M1/M2 hand-written mocks (which do not exercise relations)
+     * remain compatible without needing to implement this method. APT-generated
+     * mappers override this with a {@code switch(name)} dispatch to the
+     * entity's typed setter (e.g. {@code u.setOrders((List<Order>) related)}).
+     *
+     * @param entity  the entity instance to mutate
+     * @param name    relation property name (matches the field name)
+     * @param related the related entity collection; never {@code null} but
+     *                may be empty
+     */
+    default void setRelation(T entity, String name, List<?> related) {
+        throw new UnsupportedOperationException("Relation not mapped: " + name);
+    }
 }

@@ -1,5 +1,7 @@
 package com.holo.framework.horm.meta.processor;
 
+import com.holo.framework.horm.meta.RelationType;
+import com.holo.framework.horm.meta.query.RelationField;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
@@ -60,6 +62,43 @@ public final class QueryMetaBuilder {
                     .initializer(init)
                     .build());
             }
+        }
+
+        for (EntityDescriptor.RelationDescriptor r : d.relations()) {
+            ClassName targetCn = ClassName.bestGuess(r.targetEntityQualifiedName());
+            TypeName relationFieldT = ParameterizedTypeName.get(
+                ClassName.get(RelationField.class), entity, targetCn);
+            String constName = constName(r.name());
+
+            CodeBlock.Builder init = CodeBlock.builder()
+                .add("$T.of($T.class, $T.class, $S, $T.$L, ",
+                    ClassName.get(RelationField.class), entity, targetCn,
+                    r.name(), ClassName.get(RelationType.class), r.type().name());
+            if (r.foreignKey() != null) {
+                init.add("$S, ", r.foreignKey());
+            } else {
+                init.add("null, ");
+            }
+            if (r.associationForeignKey() != null) {
+                init.add("$S, ", r.associationForeignKey());
+            } else {
+                init.add("null, ");
+            }
+            if (r.joinTable() != null) {
+                init.add("$S, ", r.joinTable());
+            } else {
+                init.add("null, ");
+            }
+            if (r.throughQualifiedName() != null) {
+                init.add("$T.class)", ClassName.bestGuess(r.throughQualifiedName()));
+            } else {
+                init.add("null)");
+            }
+
+            type.addField(FieldSpec.builder(relationFieldT, constName,
+                    Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+                .initializer(init.build())
+                .build());
         }
 
         JavaFile.builder(d.generatedPackage(), type.build())
