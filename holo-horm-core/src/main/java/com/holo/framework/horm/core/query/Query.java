@@ -2,6 +2,7 @@ package com.holo.framework.horm.core.query;
 
 import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.meta.query.Condition;
+import com.holo.framework.horm.meta.query.RelationField;
 import com.holo.framework.horm.meta.query.TypedField;
 
 import java.util.List;
@@ -69,6 +70,47 @@ public interface Query<T extends Model<T>> {
      * @throws IllegalArgumentException if {@code offset < 0}
      */
     Query<T> offset(long offset);
+
+    /**
+     * Eagerly fetch a relation via LEFT JOIN and populate the relation
+     * collection on each result entity. Convenience alias for
+     * {@link #leftJoin}.
+     *
+     * <p>Cartesian products from HAS_MANY/HAS_AND_BELONGS_TO_MANY are
+     * de-duplicated by root entity id — each root appears once in the
+     * result list with its relation collection fully populated.
+     */
+    Query<T> fetch(RelationField<T, ?> relation);
+
+    /**
+     * LEFT JOIN the relation target and populate the collection on each
+     * result entity.
+     */
+    Query<T> leftJoin(RelationField<T, ?> relation);
+
+    /**
+     * INNER JOIN the relation target and populate the collection on each
+     * result entity. Rows whose join target is null are excluded.
+     */
+    Query<T> innerJoin(RelationField<T, ?> relation);
+
+    /**
+     * Alias of {@link #innerJoin} (jOOQ-style default inner).
+     */
+    Query<T> join(RelationField<T, ?> relation);
+
+    /**
+     * Project the root entity to a subset of columns. The projection
+     * <strong>must</strong> include the root entity's id field;
+     * non-projected fields will be {@code null} on returned entities.
+     *
+     * <p>Projection applies only to the root entity ({@code t0}).
+     * Relation targets fetched via {@link #fetch} are always read in full.
+     *
+     * @throws com.holo.framework.horm.core.HormException if the projection
+     *         does not include the root entity's id field
+     */
+    Query<T> select(TypedField<T, ?>... fields);
 
     /** Execute and return all matching rows. */
     List<T> list();
