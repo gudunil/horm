@@ -23,6 +23,7 @@ public final class DeleteQueryImpl<T extends Model<T>> implements DeleteQuery<T>
     private final Class<T> entityType;
     private final HormContext ctx;
     private final EntityMeta<T> meta;
+    private final String dataSourceName;
 
     private final List<Condition> whereConditions = new ArrayList<>();
 
@@ -30,6 +31,10 @@ public final class DeleteQueryImpl<T extends Model<T>> implements DeleteQuery<T>
         this.entityType = entityType;
         this.ctx = ctx;
         this.meta = EntityMetaRegistry.lookup(entityType);
+        String dsName = meta.dataSource();
+        this.dataSourceName = (dsName == null || dsName.isEmpty())
+            ? com.holo.framework.horm.core.datasource.DataSourceRegistry.DEFAULT_NAME
+            : dsName;
     }
 
     @Override
@@ -50,14 +55,14 @@ public final class DeleteQueryImpl<T extends Model<T>> implements DeleteQuery<T>
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
 
-        Connection conn = TransactionManager.currentConnection(ctx);
+        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             bind(ps, bindings);
             return ps.executeUpdate();
         } catch (SQLException e) {
             throw new HormException("Failed to execute DELETE on " + entityType.getName(), e);
         } finally {
-            TransactionManager.releaseConnection(ctx, conn);
+            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
     }
 

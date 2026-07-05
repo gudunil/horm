@@ -46,6 +46,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
     private final HormContext ctx;
     private final EntityMeta<T> meta;
     private final Mapper<T> mapper;
+    private final String dataSourceName;
 
     private final List<Condition> whereConditions = new ArrayList<>();
     private final List<OrderBy> orderByClauses = new ArrayList<>();
@@ -65,6 +66,10 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         this.ctx = ctx;
         this.meta = EntityMetaRegistry.lookup(entityType);
         this.mapper = meta.mapper();
+        String dsName = meta.dataSource();
+        this.dataSourceName = (dsName == null || dsName.isEmpty())
+            ? com.holo.framework.horm.core.datasource.DataSourceRegistry.DEFAULT_NAME
+            : dsName;
     }
 
     @Override
@@ -212,7 +217,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         appendLimitOffset(sql, bindings);
 
         List<T> result = new ArrayList<>();
-        Connection conn = TransactionManager.currentConnection(ctx);
+        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
@@ -223,7 +228,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         } catch (SQLException e) {
             throw new HormException("Failed to list " + entityType.getName(), e);
         } finally {
-            TransactionManager.releaseConnection(ctx, conn);
+            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
         return result;
     }
@@ -245,7 +250,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
             bindings.add(offset);
         }
 
-        Connection conn = TransactionManager.currentConnection(ctx);
+        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
@@ -257,7 +262,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         } catch (SQLException e) {
             throw new HormException("Failed to findFirst " + entityType.getName(), e);
         } finally {
-            TransactionManager.releaseConnection(ctx, conn);
+            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
     }
 
@@ -267,7 +272,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
 
-        Connection conn = TransactionManager.currentConnection(ctx);
+        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
@@ -279,7 +284,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         } catch (SQLException e) {
             throw new HormException("Failed to count " + entityType.getName(), e);
         } finally {
-            TransactionManager.releaseConnection(ctx, conn);
+            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
     }
 
@@ -290,7 +295,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         appendWhere(sql, bindings);
         sql.append(" LIMIT 1");
 
-        Connection conn = TransactionManager.currentConnection(ctx);
+        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
@@ -299,7 +304,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         } catch (SQLException e) {
             throw new HormException("Failed to check existence of " + entityType.getName(), e);
         } finally {
-            TransactionManager.releaseConnection(ctx, conn);
+            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
     }
 
@@ -561,7 +566,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         }
 
         List<FieldMeta<?>> rootFields = projectedFields();
-        Connection conn = TransactionManager.currentConnection(ctx);
+        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
@@ -596,7 +601,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         } catch (SQLException e) {
             throw new HormException("Failed to listWithFetch " + entityType.getName(), e);
         } finally {
-            TransactionManager.releaseConnection(ctx, conn);
+            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
 
         for (Map.Entry<Object, T> entry : byRootId.entrySet()) {

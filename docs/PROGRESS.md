@@ -13,9 +13,10 @@
 | M2     | ✅ 完成 | 2026-07-04     | v1.0.0-M2  |
 | M3     | ✅ 完成 | 2026-07-05     | v1.0.0-M3  |
 | M4     | ✅ 完成 | 2026-07-05     | v1.0.0-M4  |
-| M5-M9  | 📋 规划中 | —              | —          |
+| M5     | ✅ 完成 | 2026-07-05     | v1.0.0-M5  |
+| M6-M9  | 📋 规划中 | —              | —          |
 
-**当前分支**：`feature/m4-transactions`（M4 完成后待 squash merge 到 `main`）
+**当前分支**：`feature/m5-datasource`（M5 完成后待 squash merge 到 `main`）
 
 ---
 
@@ -221,6 +222,59 @@
 
 ---
 
+## M5: 多数据源 SPI 与路由（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | 状态 |
+|--------|------|------|
+| M5-1 | `DataSourceRegistry` — 多数据源注册表，管理命名数据源 | ✅ |
+| M5-2 | `HormContext` 重构 — 持有 `DataSourceRegistry`，提供按名称/按实体类型获取 DataSourceProvider | ✅ |
+| M5-3 | `Horm` 入口扩展 — `install(String, DataSourceProvider)` + `install(DataSourceProvider)` | ✅ |
+| M5-4 | `JdbcRepository` 路由 — 根据 EntityMeta.dataSource() 选择 DataSourceProvider | ✅ |
+| M5-5 | `TransactionManager` 多数据源 — 按数据源名称独立事务栈 | ✅ |
+| M5-6 | 查询构建器路由 — QueryImpl/UpdateQueryImpl/DeleteQueryImpl 使用实体数据源 | ✅ |
+| M5-7 | H2 多数据源集成测试 — 两个 H2 内存库，验证跨数据源操作 | ✅ |
+| M5-8 | 覆盖率检查 + PROGRESS.md 更新 + tag v1.0.0-M5 | ✅ |
+
+### 测试与覆盖率
+
+- **测试总数**：320（meta 模块 148 + core 模块 172）
+- 新增测试：
+  - `DataSourceRegistryTest`（13 测试）— 数据源注册、查找、默认数据源
+  - `MultiDatasourceIntegrationTest`（4 H2 集成测试）— 跨数据源 CRUD、事务隔离
+  - `HormMultiDatasourceTest`（6 测试）— Horm 入口多数据源安装
+  - `RowTest`（51 测试）— Row.MapRow 类型转换全覆盖
+  - `EntityMetaTest`（16 测试）— EntityMeta Builder + 字段查找
+  - `FieldAccessorTest`（5 测试）— 读写/只读访问器
+  - `MapperTest`（3 测试）— Mapper 默认方法
+  - `TransactionMethodMetaTest`（7 测试）— 事务元数据
+- **JaCoCo 覆盖率**：
+  - meta 模块整体：85%（> 80% 目标 ✅）
+  - core 模块整体：89%（> 80% 目标 ✅）
+  - `com.holo.framework.horm.meta` 包：90%（从 3% 提升至 90%）
+  - `com.holo.framework.horm.core.datasource` 包：100%
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core -am verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **DataSourceRegistry 独立类**：`DataSourceRegistry` 作为独立类管理命名数据源，`HormContext` 持有引用，职责清晰。
+2. **默认数据源名称为 "default"**：未指定 `dataSource` 的实体自动路由到 `"default"` 数据源。
+3. **每个数据源独立事务栈**：`TransactionManager` 使用 `Map<String, Deque<TransactionStatus>>` 为每个数据源维护独立的 ThreadLocal 事务栈，跨数据源操作各自独立事务（不支持 XA）。
+4. **EntityMeta.dataSource() 驱动路由**：`JdbcRepository` 构造时根据 `EntityMeta.dataSource()` 选择对应的 DataSourceProvider，查询构建器同理。
+5. **Horm.install() 双模式**：`install(DataSourceProvider)` 注册默认数据源，`install(String, DataSourceProvider)` 注册命名数据源。
+6. **运行时静态路由**：M5 不支持运行时动态切换数据源，仅在启动时注册，实体与数据源映射在编译期由 APT 生成。
+
+### 已知限制（M5 范围内）
+
+- 不支持运行时动态切换数据源 — 仅启动时注册
+- 不支持 XA 分布式事务 — 跨数据源操作各自独立事务
+- 不支持数据源连接池配置 — 仅 SPI 接口，具体实现由用户提供
+- 不支持读写分离路由 — 留待 M6 缓存链
+- `@Entity(dataSource = "...")` 仅支持字符串字面量，不支持 SpEL 或配置引用
+
+---
+
 ## 后续里程碑概览
 
 | 里程碑 | 主题 | 预计 |
@@ -247,11 +301,11 @@
 
 ## 接续点（下次开发从这里开始）
 
-1. **可选**：将 `feature/m4-transactions` squash merge 到 `main`：
+1. **可选**：将 `feature/m5-datasource` squash merge 到 `main`：
    ```bash
    git -C e:\project\Holo\holo-horm checkout main
-   git -C e:\project\Holo\holo-horm merge --squash feature/m4-transactions
-   git -C e:\project\Holo\holo-horm commit -m "feat(m4): squash merge transaction, cascade, batch, optimistic locking"
-   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M4 -m "M4: ..."
+   git -C e:\project\Holo\holo-horm merge --squash feature/m5-datasource
+   git -C e:\project\Holo\holo-horm commit -m "feat(m5): squash merge multi-datasource SPI and routing"
+   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M5 -m "M5: ..."
    ```
-2. **启动 M5**：新建分支 `feature/m5-datasource`，实现多数据源 SPI 与路由
+2. **启动 M6**：新建分支 `feature/m6-cache`，实现缓存链（L1 + L2 组合）+ batch loading

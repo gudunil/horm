@@ -12,6 +12,7 @@ public final class TransactionStatus {
     private final boolean newTransaction;
     private final TransactionStatus suspended;
     private final DataSourceProvider connectionProvider;
+    private final String dataSourceName;
 
     /**
      * @param connection       the JDBC connection bound to this transaction
@@ -21,14 +22,17 @@ public final class TransactionStatus {
      *                         (for REQUIRES_NEW), or {@code null}
      * @param connectionProvider the provider that supplied the connection,
      *                         used to release it on transaction completion
+     * @param dataSourceName   the name of the datasource this transaction belongs to
      */
     public TransactionStatus(Connection connection, boolean newTransaction,
                              TransactionStatus suspended,
-                             DataSourceProvider connectionProvider) {
+                             DataSourceProvider connectionProvider,
+                             String dataSourceName) {
         this.connection = connection;
         this.newTransaction = newTransaction;
         this.suspended = suspended;
         this.connectionProvider = connectionProvider;
+        this.dataSourceName = dataSourceName;
     }
 
     public Connection connection() { return connection; }

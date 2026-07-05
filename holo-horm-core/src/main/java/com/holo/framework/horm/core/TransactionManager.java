@@ -1,5 +1,6 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.core.datasource.DataSourceRegistry;
 import com.holo.framework.horm.meta.annotation.Isolation;
 import com.holo.framework.horm.meta.annotation.Propagation;
 
@@ -7,22 +8,28 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Thread-local transaction manager for HORM.
  *
- * <p>Manages a per-thread stack of {@link TransactionStatus} entries. Each
- * entry holds a JDBC {@link Connection} bound to the transaction scope.
- * When a transaction is active, {@link #currentConnection(HormContext)}
- * returns the thread-bound connection; otherwise it falls back to the
- * context's default connection.
+ * <p>Manages per-thread, per-datasource stacks of {@link TransactionStatus} entries.
+ * Each entry holds a JDBC {@link Connection} bound to the transaction scope.
+ * When a transaction is active, {@link #currentConnection(HormContext, String)}
+ * returns the thread-bound connection for the specified datasource; otherwise
+ * it falls back to the context's connection for that datasource.
+ *
+ * <p>M5 introduces multi-datasource support. Each datasource maintains its own
+ * independent transaction stack. Cross-datasource transactions are not supported
+ * (no XA); each datasource commits/rollbacks independently.
  *
  * <p>Supported propagation behaviors (M4):
  * <ul>
- *   <li>{@link Propagation#REQUIRED} — join an existing transaction or
- *       start a new one</li>
+ *   <li>{@link Propagation#REQUIRED} — join an existing transaction for the
+ *       same datasource, or start a new one</li>
  *   <li>{@link Propagation#REQUIRES_NEW} — always start a new independent
- *       transaction, suspending any existing one</li>
+ *       transaction, suspending any existing one for the same datasource</li>
  * </ul>
  *
  * <p>Typical usage through {@link Horm#tx}:
@@ -35,68 +42,117 @@ import java.util.Deque;
  */
 public final class TransactionManager {
 
-    private static final ThreadLocal<Deque<TransactionStatus>> TRANSACTION_STACK =
-        ThreadLocal.withInitial(ArrayDeque::new);
+    private static final ThreadLocal<Map<String, Deque<TransactionStatus>>> TRANSACTION_STACKS =
+        ThreadLocal.withInitial(HashMap::new);
 
     private TransactionManager() {
     }
 
     /**
-     * Returns {@code true} if the current thread has an active transaction.
+     * Returns {@code true} if the current thread has an active transaction
+     * for the default datasource.
      */
     public static boolean isActive() {
-        Deque<TransactionStatus> stack = TRANSACTION_STACK.get();
-        return !stack.isEmpty();
+        return isActive(DataSourceRegistry.DEFAULT_NAME);
     }
 
     /**
-     * Returns the connection bound to the current transaction, or falls
-     * back to the context's default connection when no transaction is
-     * active.
+     * Returns {@code true} if the current thread has an active transaction
+     * for the specified datasource.
+     *
+     * @param dataSourceName the datasource name
+     */
+    public static boolean isActive(String dataSourceName) {
+        Map<String, Deque<TransactionStatus>> stacks = TRANSACTION_STACKS.get();
+        Deque<TransactionStatus> stack = stacks.get(dataSourceName);
+        return stack != null && !stack.isEmpty();
+    }
+
+    /**
+     * Returns the connection bound to the current transaction for the default
+     * datasource, or falls back to the context's default connection when no
+     * transaction is active.
      *
      * <p>This is the method that {@link JdbcRepository} and
      * {@link com.holo.framework.horm.core.query.QueryImpl} should use
      * instead of {@code ctx.connection()} directly.
      */
     public static Connection currentConnection(HormContext ctx) {
-        Deque<TransactionStatus> stack = TRANSACTION_STACK.get();
-        if (!stack.isEmpty()) {
-            return stack.peek().connection();
-        }
-        return ctx.connection();
+        return currentConnection(ctx, DataSourceRegistry.DEFAULT_NAME);
     }
 
     /**
-     * Begins a new transaction according to the given definition.
+     * Returns the connection bound to the current transaction for the specified
+     * datasource, or falls back to the context's connection for that datasource
+     * when no transaction is active.
+     *
+     * @param ctx            the current HormContext
+     * @param dataSourceName the datasource name
+     */
+    public static Connection currentConnection(HormContext ctx, String dataSourceName) {
+        Map<String, Deque<TransactionStatus>> stacks = TRANSACTION_STACKS.get();
+        Deque<TransactionStatus> stack = stacks.get(dataSourceName);
+        if (stack != null && !stack.isEmpty()) {
+            return stack.peek().connection();
+        }
+        // No active transaction for this datasource; get connection from context
+        DataSourceProvider provider = ctx.dataSourceRegistry().resolve(dataSourceName);
+        try {
+            return provider.getConnection();
+        } catch (SQLException e) {
+            throw new TransactionException(
+                "Failed to obtain connection from datasource: " + dataSourceName, e);
+        }
+    }
+
+    /**
+     * Begins a new transaction for the default datasource according to the
+     * given definition.
      *
      * @param ctx  the current HormContext
      * @param def  the transaction definition (propagation, isolation, etc.)
      * @return the status of the newly begun transaction
      */
     public static TransactionStatus begin(HormContext ctx, TransactionDefinition def) {
-        Deque<TransactionStatus> stack = TRANSACTION_STACK.get();
+        return begin(ctx, DataSourceRegistry.DEFAULT_NAME, def);
+    }
+
+    /**
+     * Begins a new transaction for the specified datasource according to the
+     * given definition.
+     *
+     * @param ctx            the current HormContext
+     * @param dataSourceName the datasource name
+     * @param def            the transaction definition (propagation, isolation, etc.)
+     * @return the status of the newly begun transaction
+     */
+    public static TransactionStatus begin(HormContext ctx, String dataSourceName,
+                                          TransactionDefinition def) {
+        Map<String, Deque<TransactionStatus>> stacks = TRANSACTION_STACKS.get();
+        Deque<TransactionStatus> stack = stacks.computeIfAbsent(dataSourceName,
+            k -> new ArrayDeque<>());
         Propagation propagation = def.propagation();
 
-        DataSourceProvider provider = ctx.dataSourceProvider();
+        DataSourceProvider provider = ctx.dataSourceRegistry().resolve(dataSourceName);
         switch (propagation) {
             case REQUIRED: {
                 if (!stack.isEmpty()) {
-                    // Join existing transaction
+                    // Join existing transaction for this datasource
                     TransactionStatus existing = stack.peek();
                     stack.push(new TransactionStatus(
-                        existing.connection(), false, null, provider));
+                        existing.connection(), false, null, provider, dataSourceName));
                     return stack.peek();
                 }
                 // Start new transaction
-                Connection conn = newConnection(ctx, def);
-                stack.push(new TransactionStatus(conn, true, null, provider));
+                Connection conn = newConnection(provider, def);
+                stack.push(new TransactionStatus(conn, true, null, provider, dataSourceName));
                 return stack.peek();
             }
             case REQUIRES_NEW: {
-                // Suspend current transaction if one exists
+                // Suspend current transaction for this datasource if one exists
                 TransactionStatus suspended = stack.isEmpty() ? null : stack.pop();
-                Connection conn = newConnection(ctx, def);
-                stack.push(new TransactionStatus(conn, true, suspended, provider));
+                Connection conn = newConnection(provider, def);
+                stack.push(new TransactionStatus(conn, true, suspended, provider, dataSourceName));
                 return stack.peek();
             }
             default:
@@ -142,32 +198,48 @@ public final class TransactionManager {
     }
 
     /**
-     * Executes the given action within a transaction.
+     * Executes the given action within a transaction for the default datasource.
      *
      * <p>Uses default transaction definition (REQUIRED propagation,
      * DEFAULT isolation).
      */
     public static void execute(HormContext ctx, Runnable action) {
-        execute(ctx, TransactionDefinition.builder().build(), action);
+        execute(ctx, DataSourceRegistry.DEFAULT_NAME, TransactionDefinition.builder().build(), action);
     }
 
     /**
-     * Executes the given action within a transaction using the specified
-     * propagation behavior.
+     * Executes the given action within a transaction for the default datasource
+     * using the specified propagation behavior.
      */
     public static void execute(HormContext ctx, Propagation propagation,
                               Runnable action) {
-        execute(ctx, TransactionDefinition.builder()
+        execute(ctx, DataSourceRegistry.DEFAULT_NAME, TransactionDefinition.builder()
             .propagation(propagation).build(), action);
     }
 
     /**
-     * Executes the given action within a transaction using the given
-     * definition. Commits on success; rolls back on exception.
+     * Executes the given action within a transaction for the specified datasource.
+     *
+     * @param ctx            the current HormContext
+     * @param dataSourceName the datasource name
+     * @param action         the action to execute
      */
-    public static void execute(HormContext ctx, TransactionDefinition def,
-                              Runnable action) {
-        TransactionStatus status = begin(ctx, def);
+    public static void execute(HormContext ctx, String dataSourceName, Runnable action) {
+        execute(ctx, dataSourceName, TransactionDefinition.builder().build(), action);
+    }
+
+    /**
+     * Executes the given action within a transaction for the specified datasource
+     * using the given definition. Commits on success; rolls back on exception.
+     *
+     * @param ctx            the current HormContext
+     * @param dataSourceName the datasource name
+     * @param def            the transaction definition
+     * @param action         the action to execute
+     */
+    public static void execute(HormContext ctx, String dataSourceName,
+                              TransactionDefinition def, Runnable action) {
+        TransactionStatus status = begin(ctx, dataSourceName, def);
         try {
             action.run();
             commit(status);
@@ -175,35 +247,65 @@ public final class TransactionManager {
             rollback(status);
             throw ex;
         } finally {
-            popAndResume(status);
+            popAndResume(dataSourceName, status);
         }
     }
 
     /**
-     * Executes the given callable within a transaction and returns its
-     * result. Uses default transaction definition.
+     * Executes the given action within a transaction for the default datasource
+     * using the given definition. Commits on success; rolls back on exception.
      */
-    public static <T> T execute(HormContext ctx, java.util.concurrent.Callable<T> action) {
-        return execute(ctx, TransactionDefinition.builder().build(), action);
+    public static void execute(HormContext ctx, TransactionDefinition def,
+                              Runnable action) {
+        execute(ctx, DataSourceRegistry.DEFAULT_NAME, def, action);
     }
 
     /**
-     * Executes the given callable within a transaction using the specified
-     * propagation behavior and returns its result.
+     * Executes the given callable within a transaction for the default datasource
+     * and returns its result. Uses default transaction definition.
+     */
+    public static <T> T execute(HormContext ctx, java.util.concurrent.Callable<T> action) {
+        return execute(ctx, DataSourceRegistry.DEFAULT_NAME, TransactionDefinition.builder().build(), action);
+    }
+
+    /**
+     * Executes the given callable within a transaction for the default datasource
+     * using the specified propagation behavior and returns its result.
      */
     public static <T> T execute(HormContext ctx, Propagation propagation,
                                java.util.concurrent.Callable<T> action) {
-        return execute(ctx, TransactionDefinition.builder()
+        return execute(ctx, DataSourceRegistry.DEFAULT_NAME, TransactionDefinition.builder()
             .propagation(propagation).build(), action);
     }
 
     /**
-     * Executes the given callable within a transaction using the given
-     * definition. Commits on success; rolls back on exception.
+     * Executes the given callable within a transaction for the specified datasource
+     * and returns its result. Uses default transaction definition.
+     *
+     * @param ctx            the current HormContext
+     * @param dataSourceName the datasource name
+     * @param action         the callable to execute
+     * @return the result of the callable
      */
-    public static <T> T execute(HormContext ctx, TransactionDefinition def,
+    public static <T> T execute(HormContext ctx, String dataSourceName,
                                java.util.concurrent.Callable<T> action) {
-        TransactionStatus status = begin(ctx, def);
+        return execute(ctx, dataSourceName, TransactionDefinition.builder().build(), action);
+    }
+
+    /**
+     * Executes the given callable within a transaction for the specified datasource
+     * using the given definition. Commits on success; rolls back on exception.
+     *
+     * @param ctx            the current HormContext
+     * @param dataSourceName the datasource name
+     * @param def            the transaction definition
+     * @param action         the callable to execute
+     * @return the result of the callable
+     */
+    public static <T> T execute(HormContext ctx, String dataSourceName,
+                               TransactionDefinition def,
+                               java.util.concurrent.Callable<T> action) {
+        TransactionStatus status = begin(ctx, dataSourceName, def);
         try {
             T result = action.call();
             commit(status);
@@ -214,26 +316,32 @@ public final class TransactionManager {
             if (ex instanceof Error err) throw err;
             throw new TransactionException("Transaction action threw checked exception", ex);
         } finally {
-            popAndResume(status);
+            popAndResume(dataSourceName, status);
         }
     }
 
     /**
-     * Clears the transaction stack for the current thread. Used for
+     * Executes the given callable within a transaction for the default datasource
+     * using the given definition. Commits on success; rolls back on exception.
+     */
+    public static <T> T execute(HormContext ctx, TransactionDefinition def,
+                               java.util.concurrent.Callable<T> action) {
+        return execute(ctx, DataSourceRegistry.DEFAULT_NAME, def, action);
+    }
+
+    /**
+     * Clears all transaction stacks for the current thread. Used for
      * testing cleanup.
      */
     public static void clear() {
-        TRANSACTION_STACK.remove();
+        TRANSACTION_STACKS.remove();
     }
 
     // --- Internal helpers ---
 
-    private static Connection newConnection(HormContext ctx, TransactionDefinition def) {
+    private static Connection newConnection(DataSourceProvider provider, TransactionDefinition def) {
         try {
-            DataSourceProvider provider = ctx.dataSourceProvider();
-            Connection conn = provider != null
-                ? provider.getConnection()
-                : ctx.connection();
+            Connection conn = provider.getConnection();
             conn.setAutoCommit(false);
 
             if (def.isolation() != Isolation.DEFAULT) {
@@ -262,33 +370,53 @@ public final class TransactionManager {
     }
 
     /**
-     * Releases {@code connection} to the current context's provider when no
-     * transaction is active. This prevents connection leaks from short-lived,
-     * non-transactional repository/query operations when a real
-     * {@link DataSourceProvider} is installed.
+     * Releases {@code connection} to the default datasource's provider when no
+     * transaction is active for that datasource. This prevents connection leaks
+     * from short-lived, non-transactional repository/query operations when a
+     * real {@link DataSourceProvider} is installed.
      */
     public static void releaseConnection(HormContext ctx, Connection connection) {
-        if (!isActive()) {
-            ctx.releaseConnection(connection);
+        releaseConnection(ctx, DataSourceRegistry.DEFAULT_NAME, connection);
+    }
+
+    /**
+     * Releases {@code connection} to the specified datasource's provider when no
+     * transaction is active for that datasource.
+     *
+     * @param ctx            the current HormContext
+     * @param dataSourceName the datasource name
+     * @param connection     the connection to release
+     */
+    public static void releaseConnection(HormContext ctx, String dataSourceName,
+                                        Connection connection) {
+        if (!isActive(dataSourceName)) {
+            ctx.releaseConnection(dataSourceName, connection);
         }
     }
 
     /**
-     * Pops the current transaction status from the stack and resumes
-     * any suspended transaction (for REQUIRES_NEW).
+     * Pops the current transaction status from the stack for the specified
+     * datasource and resumes any suspended transaction (for REQUIRES_NEW).
      */
-    private static void popAndResume(TransactionStatus status) {
-        Deque<TransactionStatus> stack = TRANSACTION_STACK.get();
-        if (!stack.isEmpty() && stack.peek() == status) {
+    private static void popAndResume(String dataSourceName, TransactionStatus status) {
+        Map<String, Deque<TransactionStatus>> stacks = TRANSACTION_STACKS.get();
+        Deque<TransactionStatus> stack = stacks.get(dataSourceName);
+        if (stack != null && !stack.isEmpty() && stack.peek() == status) {
             stack.pop();
         }
         // Resume suspended transaction if any
         if (status.suspended() != null) {
+            if (stack == null) {
+                stack = stacks.computeIfAbsent(dataSourceName, k -> new ArrayDeque<>());
+            }
             stack.push(status.suspended());
         }
-        // Clean up ThreadLocal if stack is empty
-        if (stack.isEmpty()) {
-            TRANSACTION_STACK.remove();
+        // Clean up ThreadLocal if all stacks are empty
+        if (stack != null && stack.isEmpty()) {
+            stacks.remove(dataSourceName);
+        }
+        if (stacks.isEmpty()) {
+            TRANSACTION_STACKS.remove();
         }
     }
 }

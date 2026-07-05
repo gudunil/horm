@@ -1,5 +1,6 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.core.datasource.DataSourceRegistry;
 import com.holo.framework.horm.meta.annotation.Propagation;
 
 /**
@@ -9,6 +10,10 @@ import com.holo.framework.horm.meta.annotation.Propagation;
  * application boots) and subsequently obtain repositories through
  * {@link #repository(Class)} for entity-specific CRUD operations. The
  * {@link Model} base class delegates to {@link Horm} internally.
+ *
+ * <p>M5 introduces multi-datasource support. Use
+ * {@link #install(String, DataSourceProvider)} to register named datasources;
+ * entities declare their target datasource via {@code @Entity(dataSource = "name")}.
  *
  * <p>M1-7 wires {@link #repository(Class)} to {@link JdbcRepository}, which
  * translates Active Record calls into parameterized JDBC statements driven
@@ -30,14 +35,59 @@ public final class Horm {
 
     /**
      * Installs a {@link HormContext} backed by the given
-     * {@link DataSourceProvider}. Convenience for
+     * {@link DataSourceProvider} as the default datasource. Convenience for
      * {@code HormContext.install(new HormContext(provider))}.
      */
     public static void install(DataSourceProvider provider) {
         HormContext.install(new HormContext(provider));
     }
 
-    /** Returns the installed context. */
+    /**
+     * Registers a named datasource. The datasource is added to the current
+     * context's {@link DataSourceRegistry}.
+     *
+     * <p>If no context is installed yet, a new context is created with an
+     * empty registry, the datasource is registered, and the context is
+     * installed.
+     *
+     * @param name     the logical datasource name
+     * @param provider the datasource provider
+     * @throws IllegalStateException if a datasource with the same name is already registered
+     */
+    public static void install(String name, DataSourceProvider provider) {
+        HormContext ctx = HormContext.current();
+        ctx.dataSourceRegistry().register(name, provider);
+    }
+
+    /**
+     * Registers a named datasource, creating a new context if none exists.
+     *
+     * <p>This overload is useful during bootstrap when no context has been
+     * installed yet. If a context already exists, the datasource is added
+     * to its registry. If no context exists, a new one is created with the
+     * given datasource registered under the specified name AND as the default.
+     *
+     * @param name     the logical datasource name
+     * @param provider the datasource provider
+     */
+    public static void installOrRegister(String name, DataSourceProvider provider) {
+        try {
+            HormContext ctx = HormContext.current();
+            ctx.dataSourceRegistry().register(name, provider);
+        } catch (IllegalStateException e) {
+            // No context installed yet; create one with this datasource as both named and default
+            DataSourceRegistry registry = new DataSourceRegistry();
+            registry.register(name, provider);
+            if (!DataSourceRegistry.DEFAULT_NAME.equals(name)) {
+                registry.registerDefault(provider);
+            }
+            HormContext.install(new HormContext(registry));
+        }
+    }
+
+    /**
+     * Returns the installed context.
+     */
     public static HormContext context() {
         return HormContext.current();
     }
@@ -46,10 +96,13 @@ public final class Horm {
      * Returns the {@link Repository} for the given entity type.
      *
      * <p>Each call constructs a fresh {@link JdbcRepository} bound to the
-     * currently installed {@link HormContext}. The {@code T extends Model<T>}
-     * bound mirrors the {@link JdbcRepository} constructor so the Active
-     * Record surface in {@link Model} can route through here without
-     * unchecked casts at the call site.
+     * currently installed {@link HormContext}. The repository automatically
+     * routes to the datasource declared in the entity's {@code @Entity(dataSource = ...)}
+     * annotation.
+     *
+     * <p>The {@code T extends Model<T>} bound mirrors the {@link JdbcRepository}
+     * constructor so the Active Record surface in {@link Model} can route
+     * through here without unchecked casts at the call site.
      *
      * @throws IllegalStateException if no {@link HormContext} is installed
      * @throws com.holo.framework.horm.meta.EntityMeta lookup failures if
