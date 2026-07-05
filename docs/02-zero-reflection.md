@@ -2,6 +2,8 @@
 
 > 本文档详述 HORM 框架如何通过编译期注解处理器（APT）实现运行时零反射，包括元数据模型、生成策略、降级机制与 AOT 兼容性。
 
+> **实现状态**：APT 元数据生成、`XxxMeta`/`XxxMapper`/`XxxQueryMeta` 伴随类生成、`EntityMetaRegistry` 启动加载等核心机制已在 M1-M3 实现；AOT/GraalVM Native Image 完整验证计划在 M9 进行。
+
 ---
 
 ## 一、设计目标

@@ -1,0 +1,12 @@
+# Test index for EntityMetaRegistry.loadIndex() — exercises the
+# ClassLoader.getResources + Class.forName + entityMeta() reflection path.
+# One FQCN per line; comments and blank lines are skipped by the loader.
+#
+# The two broken entries below deliberately drive the registry's defensive
+# branches: NonExistentMeta triggers Class.forName failure (catch block),
+# and BadEntityMeta.entityMeta() returns a non-EntityMeta value
+# (instanceof false branch). Neither should prevent IndexedEntityMeta from
+# registering successfully.
+com.holo.framework.horm.core.IndexedEntityMeta
+com.holo.framework.horm.core.NonExistentMeta
+com.holo.framework.horm.core.BadEntityMeta
