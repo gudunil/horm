@@ -1,6 +1,7 @@
 package com.holo.framework.horm.core.relations;
 
 import com.holo.framework.horm.core.Model;
+import com.holo.framework.horm.meta.annotation.CascadeType;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
 import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
@@ -40,10 +41,10 @@ public class UserWithRelations extends Model<UserWithRelations> {
     @Column(nullable = false, length = 128)
     private String email;
 
-    @HasOne(targetEntity = Profile.class, foreignKey = "user_id")
+    @HasOne(targetEntity = Profile.class, foreignKey = "user_id", cascade = CascadeType.ALL)
     private List<Profile> profiles;
 
-    @HasMany(targetEntity = Order.class, foreignKey = "user_id")
+    @HasMany(targetEntity = Order.class, foreignKey = "user_id", cascade = CascadeType.ALL)
     private List<Order> orders;
 
     @HasAndBelongsToMany(

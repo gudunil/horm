@@ -7,8 +7,10 @@ import com.holo.framework.horm.core.query.QueryImpl;
 import com.holo.framework.horm.core.query.UpdateQuery;
 import com.holo.framework.horm.core.query.UpdateQueryImpl;
 import com.holo.framework.horm.meta.EntityMeta;
+import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.RelationMeta;
+import com.holo.framework.horm.meta.RelationType;
 import com.holo.framework.horm.meta.annotation.CascadeType;
 
 import java.util.Collection;
@@ -91,8 +93,7 @@ public abstract class Model<T extends Model<T>> {
     public final void save() {
         Set<Object> visited = new HashSet<>();
         visited.add(this);
-        cascadeSave(this, visited);
-        repository().save(self());
+        cascadePersist(this, visited);
     }
 
     /**
@@ -104,8 +105,7 @@ public abstract class Model<T extends Model<T>> {
     public final void saveWith(String... relationNames) {
         Set<Object> visited = new HashSet<>();
         visited.add(this);
-        cascadeSaveNamed(this, relationNames, visited);
-        repository().save(self());
+        cascadePersistNamed(this, Set.of(relationNames), visited);
     }
 
     /** Deletes this entity by its primary key.
@@ -208,46 +208,113 @@ public abstract class Model<T extends Model<T>> {
 
     // ===== Cascade helpers =====
 
+    /**
+     * Persists {@code entity} and recursively cascades {@code PERSIST}
+     * relations. Parents ({@code BELONGS_TO}) are saved first so their ids are
+     * available, then the entity itself, then children ({@code HAS_ONE}/
+     * {@code HAS_MANY}) with their foreign keys populated.
+     */
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void cascadeSave(Model entity, Set<Object> visited) {
+    private static void cascadePersist(Model entity, Set<Object> visited) {
         EntityMeta meta = EntityMetaRegistry.lookup(entity.getClass());
+
+        // 1. Save parent-side relations first and populate this entity's FK.
         for (Object r : meta.relations()) {
             RelationMeta rel = (RelationMeta) r;
             if (!hasCascadeType(rel, CascadeType.PERSIST)) continue;
-            cascadeSaveRelation(entity, rel, visited);
+            if (rel.type() == RelationType.BELONGS_TO) {
+                cascadePersistBelongsTo(entity, rel, visited);
+            }
+        }
+
+        // 2. Save the entity so its generated id is available for children.
+        entity.repository().save(entity);
+
+        // 3. Save child-side relations with the parent's id as foreign key.
+        for (Object r : meta.relations()) {
+            RelationMeta rel = (RelationMeta) r;
+            if (!hasCascadeType(rel, CascadeType.PERSIST)) continue;
+            if (rel.type() == RelationType.HAS_ONE || rel.type() == RelationType.HAS_MANY) {
+                cascadePersistChildren(entity, rel, visited);
+            }
         }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void cascadeSaveNamed(Model entity, String[] relationNames, Set<Object> visited) {
+    private static void cascadePersistNamed(Model entity, Set<String> names, Set<Object> visited) {
         EntityMeta meta = EntityMetaRegistry.lookup(entity.getClass());
-        Set<String> names = Set.of(relationNames);
+
         for (Object r : meta.relations()) {
             RelationMeta rel = (RelationMeta) r;
             if (!names.contains(rel.name())) continue;
-            cascadeSaveRelation(entity, rel, visited);
+            if (rel.type() == RelationType.BELONGS_TO) {
+                cascadePersistBelongsTo(entity, rel, visited);
+            }
+        }
+
+        entity.repository().save(entity);
+
+        for (Object r : meta.relations()) {
+            RelationMeta rel = (RelationMeta) r;
+            if (!names.contains(rel.name())) continue;
+            if (rel.type() == RelationType.HAS_ONE || rel.type() == RelationType.HAS_MANY) {
+                cascadePersistChildren(entity, rel, visited);
+            }
         }
     }
 
-    private static void cascadeSaveRelation(Model<?> entity, RelationMeta rel, Set<Object> visited) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void cascadePersistBelongsTo(Model<?> entity, RelationMeta rel, Set<Object> visited) {
         Object related = getRelationValue(entity, rel);
         if (related == null) return;
-        doCascadeSave(related, visited);
+
+        Object parentId = null;
+        if (related instanceof Collection coll) {
+            for (Object item : coll) {
+                if (item instanceof Model m) {
+                    if (visited.add(m)) {
+                        cascadePersist(m, visited);
+                    }
+                    parentId = m.idValue();
+                }
+            }
+        } else if (related instanceof Model m) {
+            if (visited.add(m)) {
+                cascadePersist(m, visited);
+            }
+            parentId = m.idValue();
+        }
+
+        if (parentId != null) {
+            setForeignKey(entity, entity.getClass(), rel.foreignKey(), parentId);
+        }
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void doCascadeSave(Object related, Set<Object> visited) {
+    private static void cascadePersistChildren(Model<?> entity, RelationMeta rel, Set<Object> visited) {
+        Object related = getRelationValue(entity, rel);
+        if (related == null) return;
+
+        Object parentId = entity.idValue();
+        if (parentId == null) {
+            throw new IllegalStateException(
+                "Parent id not assigned after save for " + entity.getClass().getName());
+        }
+
         if (related instanceof Collection coll) {
             for (Object item : coll) {
-                if (item instanceof Model && visited.add(item)) {
-                    Model m = (Model) item;
-                    cascadeSave(m, visited);
-                    m.repository().save(m);
+                if (item instanceof Model m) {
+                    setForeignKey(m, m.getClass(), rel.foreignKey(), parentId);
+                    if (visited.add(m)) {
+                        cascadePersist(m, visited);
+                    }
                 }
             }
-        } else if (related instanceof Model m && visited.add(related)) {
-            cascadeSave(m, visited);
-            m.repository().save(m);
+        } else if (related instanceof Model m) {
+            setForeignKey(m, m.getClass(), rel.foreignKey(), parentId);
+            if (visited.add(m)) {
+                cascadePersist(m, visited);
+            }
         }
     }
 
@@ -305,5 +372,16 @@ public abstract class Model<T extends Model<T>> {
     private static Object getRelationValue(Model<?> entity, RelationMeta rel) {
         EntityMeta meta = EntityMetaRegistry.lookup(entity.getClass());
         return meta.mapper().getRelation(entity, rel.name());
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void setForeignKey(Model entity, Class<?> entityType, String fkColumn, Object value) {
+        EntityMeta meta = EntityMetaRegistry.lookup(entityType);
+        FieldMeta fkField = (FieldMeta) meta.fieldByColumn(fkColumn).orElse(null);
+        if (fkField == null) {
+            throw new IllegalStateException(
+                "Foreign key column '" + fkColumn + "' not found on " + entityType.getName());
+        }
+        meta.mapper().setField(entity, fkField.name(), value);
     }
 }
