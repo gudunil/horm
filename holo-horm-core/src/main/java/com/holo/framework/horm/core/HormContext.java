@@ -184,6 +184,13 @@ public final class HormContext implements AutoCloseable {
     }
 
     /**
+     * Returns {@code true} if a context has been installed.
+     */
+    public static boolean isInstalled() {
+        return current != null;
+    }
+
+    /**
      * Returns the installed context.
      *
      * @throws IllegalStateException if no context has been installed via

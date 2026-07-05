@@ -46,13 +46,15 @@ public final class Horm {
      * Registers a named datasource. The datasource is added to the current
      * context's {@link DataSourceRegistry}.
      *
-     * <p>If no context is installed yet, a new context is created with an
-     * empty registry, the datasource is registered, and the context is
-     * installed.
+     * <p>A {@link HormContext} must already be installed (e.g. via
+     * {@link #install(DataSourceProvider)}); otherwise an
+     * {@link IllegalStateException} is thrown. To register a named datasource
+     * when no context exists yet, use {@link #installOrRegister(String, DataSourceProvider)}.
      *
      * @param name     the logical datasource name
      * @param provider the datasource provider
-     * @throws IllegalStateException if a datasource with the same name is already registered
+     * @throws IllegalStateException if no context is installed, or if a
+     *         datasource with the same name is already registered
      */
     public static void install(String name, DataSourceProvider provider) {
         HormContext ctx = HormContext.current();
@@ -71,11 +73,9 @@ public final class Horm {
      * @param provider the datasource provider
      */
     public static void installOrRegister(String name, DataSourceProvider provider) {
-        try {
-            HormContext ctx = HormContext.current();
-            ctx.dataSourceRegistry().register(name, provider);
-        } catch (IllegalStateException e) {
-            // No context installed yet; create one with this datasource as both named and default
+        if (HormContext.isInstalled()) {
+            HormContext.current().dataSourceRegistry().register(name, provider);
+        } else {
             DataSourceRegistry registry = new DataSourceRegistry();
             registry.register(name, provider);
             if (!DataSourceRegistry.DEFAULT_NAME.equals(name)) {
@@ -115,35 +115,80 @@ public final class Horm {
     // ===== Programmatic transaction API =====
 
     /**
-     * Executes the given action within a transaction (REQUIRED propagation,
-     * DEFAULT isolation). Commits on success; rolls back on exception.
+     * Executes the given action within a transaction on the default datasource
+     * (REQUIRED propagation, DEFAULT isolation). Commits on success; rolls
+     * back on exception.
      */
     public static void tx(Runnable action) {
         TransactionManager.execute(HormContext.current(), action);
     }
 
     /**
-     * Executes the given action within a transaction using the specified
-     * propagation behavior.
+     * Executes the given action within a transaction on the specified datasource
+     * (REQUIRED propagation, DEFAULT isolation). Commits on success; rolls
+     * back on exception.
+     *
+     * @param dataSourceName the target datasource name
+     */
+    public static void tx(String dataSourceName, Runnable action) {
+        TransactionManager.execute(HormContext.current(), dataSourceName, action);
+    }
+
+    /**
+     * Executes the given action within a transaction on the default datasource
+     * using the specified propagation behavior.
      */
     public static void tx(Propagation propagation, Runnable action) {
         TransactionManager.execute(HormContext.current(), propagation, action);
     }
 
     /**
-     * Executes the given callable within a transaction and returns its
-     * result (REQUIRED propagation, DEFAULT isolation).
+     * Executes the given action within a transaction on the specified datasource
+     * using the specified propagation behavior.
+     *
+     * @param dataSourceName the target datasource name
+     */
+    public static void tx(String dataSourceName, Propagation propagation, Runnable action) {
+        TransactionManager.execute(HormContext.current(), dataSourceName,
+            TransactionDefinition.builder().propagation(propagation).build(), action);
+    }
+
+    /**
+     * Executes the given callable within a transaction on the default datasource
+     * and returns its result (REQUIRED propagation, DEFAULT isolation).
      */
     public static <T> T tx(java.util.concurrent.Callable<T> action) {
         return TransactionManager.execute(HormContext.current(), action);
     }
 
     /**
-     * Executes the given callable within a transaction using the specified
-     * propagation behavior and returns its result.
+     * Executes the given callable within a transaction on the specified datasource
+     * and returns its result (REQUIRED propagation, DEFAULT isolation).
+     *
+     * @param dataSourceName the target datasource name
+     */
+    public static <T> T tx(String dataSourceName, java.util.concurrent.Callable<T> action) {
+        return TransactionManager.execute(HormContext.current(), dataSourceName, action);
+    }
+
+    /**
+     * Executes the given callable within a transaction on the default datasource
+     * using the specified propagation behavior and returns its result.
      */
     public static <T> T tx(Propagation propagation,
                            java.util.concurrent.Callable<T> action) {
         return TransactionManager.execute(HormContext.current(), propagation, action);
+    }
+
+    /**
+     * Executes the given callable within a transaction on the specified datasource
+     * using the specified propagation behavior and returns its result.
+     *
+     * @param dataSourceName the target datasource name
+     */
+    public static <T> T tx(String dataSourceName, Propagation propagation,
+                           java.util.concurrent.Callable<T> action) {
+        return TransactionManager.execute(HormContext.current(), dataSourceName,
+            TransactionDefinition.builder().propagation(propagation).build(), action);
     }
 }
