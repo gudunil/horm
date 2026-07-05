@@ -151,6 +151,211 @@ class HormEntityProcessorTest {
         }
         """;
 
+    private static final String PROFILE_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.core.Model;
+
+        @Entity(table = "profiles")
+        public class Profile extends Model<Profile> {
+            @Id private Long id;
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+        }
+        """;
+
+    private static final String TAG_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.core.Model;
+
+        @Entity(table = "tags")
+        public class Tag extends Model<Tag> {
+            @Id private Long id;
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+        }
+        """;
+
+    private static final String USER_WITH_HAS_MANY_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.meta.annotation.HasMany;
+        import com.holo.framework.horm.core.Model;
+        import java.util.List;
+
+        @Entity(table = "users")
+        public class User extends Model<User> {
+            @Id private Long id;
+            @HasMany(targetEntity = Order.class, foreignKey = "user_id")
+            private List<Order> orders;
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+            public List<Order> getOrders() { return orders; }
+            public void setOrders(List<Order> orders) { this.orders = orders; }
+        }
+        """;
+
+    private static final String USER_ALL_RELATIONS_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.meta.annotation.Column;
+        import com.holo.framework.horm.meta.annotation.BelongsTo;
+        import com.holo.framework.horm.meta.annotation.HasOne;
+        import com.holo.framework.horm.meta.annotation.HasMany;
+        import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
+        import com.holo.framework.horm.meta.annotation.HasManyThrough;
+        import com.holo.framework.horm.core.Model;
+        import java.util.List;
+
+        @Entity(table = "users_all")
+        public class UserAll extends Model<UserAll> {
+            @Id private Long id;
+
+            @Column(name = "parent_order_id")
+            private Long parentOrderId;
+
+            @BelongsTo(targetEntity = Order.class, foreignKey = "parent_order_id")
+            private List<Order> parentOrders;
+
+            @HasOne(targetEntity = Profile.class, foreignKey = "user_id")
+            private List<Profile> profiles;
+
+            @HasMany(targetEntity = Order.class, foreignKey = "user_id")
+            private List<Order> orders;
+
+            @HasAndBelongsToMany(targetEntity = Tag.class,
+                joinTable = "user_tags_all",
+                foreignKey = "user_id",
+                associationForeignKey = "tag_id")
+            private List<Tag> tags;
+
+            @HasManyThrough(targetEntity = Product.class,
+                through = Order.class,
+                foreignKey = "user_id",
+                associationForeignKey = "product_id")
+            private List<Product> products;
+
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+            public Long getParentOrderId() { return parentOrderId; }
+            public void setParentOrderId(Long v) { this.parentOrderId = v; }
+            public List<Order> getParentOrders() { return parentOrders; }
+            public void setParentOrders(List<Order> v) { this.parentOrders = v; }
+            public List<Profile> getProfiles() { return profiles; }
+            public void setProfiles(List<Profile> v) { this.profiles = v; }
+            public List<Order> getOrders() { return orders; }
+            public void setOrders(List<Order> v) { this.orders = v; }
+            public List<Tag> getTags() { return tags; }
+            public void setTags(List<Tag> v) { this.tags = v; }
+            public List<Product> getProducts() { return products; }
+            public void setProducts(List<Product> v) { this.products = v; }
+        }
+        """;
+
+    private static final String BAD_RELATION_NOT_LIST_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.meta.annotation.HasMany;
+        import com.holo.framework.horm.core.Model;
+
+        @Entity
+        public class Bad extends Model<Bad> {
+            @Id private Long id;
+            @HasMany(targetEntity = Order.class, foreignKey = "user_id")
+            private Order orders;
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+            public Order getOrders() { return orders; }
+            public void setOrders(Order o) { this.orders = o; }
+        }
+        """;
+
+    private static final String BAD_HABTM_NO_JOINTABLE_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
+        import com.holo.framework.horm.core.Model;
+        import java.util.List;
+
+        @Entity
+        public class Bad extends Model<Bad> {
+            @Id private Long id;
+            @HasAndBelongsToMany(targetEntity = Tag.class)
+            private List<Tag> tags;
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+            public List<Tag> getTags() { return tags; }
+            public void setTags(List<Tag> t) { this.tags = t; }
+        }
+        """;
+
+    private static final String BAD_THROUGH_NO_THROUGH_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.meta.annotation.HasManyThrough;
+        import com.holo.framework.horm.core.Model;
+        import java.util.List;
+
+        @Entity
+        public class Bad extends Model<Bad> {
+            @Id private Long id;
+            @HasManyThrough(targetEntity = Product.class)
+            private List<Product> products;
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+            public List<Product> getProducts() { return products; }
+            public void setProducts(List<Product> p) { this.products = p; }
+        }
+        """;
+
+    private static final String BAD_FINAL_RELATION_FIELD_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.meta.annotation.HasMany;
+        import com.holo.framework.horm.core.Model;
+        import java.util.List;
+        import java.util.ArrayList;
+
+        @Entity
+        public class Bad extends Model<Bad> {
+            @Id private Long id;
+            @HasMany(targetEntity = Order.class, foreignKey = "user_id")
+            private final List<Order> orders = new ArrayList<>();
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+            public List<Order> getOrders() { return orders; }
+        }
+        """;
+
+    private static final String BAD_RELATION_TARGET_NOT_ENTITY_SOURCE = """
+        package test;
+        import com.holo.framework.horm.meta.annotation.Entity;
+        import com.holo.framework.horm.meta.annotation.Id;
+        import com.holo.framework.horm.meta.annotation.HasMany;
+        import com.holo.framework.horm.core.Model;
+        import java.util.List;
+
+        @Entity
+        public class Bad extends Model<Bad> {
+            @Id private Long id;
+            @HasMany(targetEntity = String.class, foreignKey = "bad_id")
+            private List<String> names;
+            public Long getId() { return id; }
+            public void setId(Long id) { this.id = id; }
+            public List<String> getNames() { return names; }
+            public void setNames(List<String> n) { this.names = n; }
+        }
+        """;
+
     @Test
     void parsesSimpleEntity() {
         Compilation comp = compile(USER_SOURCE);
@@ -405,6 +610,101 @@ class HormEntityProcessorTest {
         assertThat(queryMetaSrc).contains("BooleanField<Product>");
         // byte[] is not supported by any TypedField subclass — must be absent.
         assertThat(queryMetaSrc).doesNotContain("byte[]");
+    }
+
+    @Test
+    void parsesEntityWithHasManyRelation() throws IOException {
+        Compilation comp = compile(USER_WITH_HAS_MANY_SOURCE, ORDER_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String metaSrc = src(generated(comp, "UserMeta.java"));
+        assertThat(metaSrc).contains("ALL_RELATIONS");
+        assertThat(metaSrc).contains("RelationMeta.builder()");
+        assertThat(metaSrc).contains("HAS_MANY");
+        assertThat(metaSrc).contains("\"user_id\"");
+
+        String queryMetaSrc = src(generated(comp, "UserQueryMeta.java"));
+        assertThat(queryMetaSrc).contains("RelationField<User, Order> ORDERS");
+        assertThat(queryMetaSrc).contains("RelationField.of(User.class, Order.class");
+    }
+
+    @Test
+    void generatesMapperSetRelationDispatch() throws IOException {
+        Compilation comp = compile(USER_WITH_HAS_MANY_SOURCE, ORDER_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String mapperSrc = src(generated(comp, "UserMapper.java"));
+        assertThat(mapperSrc).contains("public void setRelation");
+        assertThat(mapperSrc).contains("switch (name)");
+        assertThat(mapperSrc).contains("case \"orders\" -> u.setOrders((");
+        assertThat(mapperSrc).contains("throw new IllegalArgumentException");
+    }
+
+    @Test
+    void rejectsRelationFieldNotList() {
+        // R5: relation field type must be java.util.List
+        Compilation comp = compile(BAD_RELATION_NOT_LIST_SOURCE, ORDER_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("must be of type java.util.List"));
+    }
+
+    @Test
+    void rejectsRelationTargetNotEntity() {
+        // R6: relation target must be @Entity-annotated. String.class is not.
+        Compilation comp = compile(BAD_RELATION_TARGET_NOT_ENTITY_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("is not an @Entity"));
+    }
+
+    @Test
+    void rejectsHabtmWithoutJoinTable() {
+        // R7: @HasAndBelongsToMany must declare non-empty joinTable
+        Compilation comp = compile(BAD_HABTM_NO_JOINTABLE_SOURCE, TAG_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("must declare a non-empty joinTable"));
+    }
+
+    @Test
+    void rejectsHasManyThroughWithoutThrough() {
+        // R8: @HasManyThrough must declare a through entity
+        Compilation comp = compile(BAD_THROUGH_NO_THROUGH_SOURCE, PRODUCT_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("must declare a through entity"));
+    }
+
+    @Test
+    void rejectsFinalRelationField() {
+        // R9: relation fields must not be final
+        Compilation comp = compile(BAD_FINAL_RELATION_FIELD_SOURCE, ORDER_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("must not be final"));
+    }
+
+    @Test
+    void parsesAllFiveRelationTypes() throws IOException {
+        Compilation comp = compile(USER_ALL_RELATIONS_SOURCE, ORDER_SOURCE,
+            PROFILE_SOURCE, TAG_SOURCE, PRODUCT_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+        assertThat(comp.errors()).isEmpty();
+
+        String metaSrc = src(generated(comp, "UserAllMeta.java"));
+        assertThat(metaSrc).contains("BELONGS_TO");
+        assertThat(metaSrc).contains("HAS_ONE");
+        assertThat(metaSrc).contains("HAS_MANY");
+        assertThat(metaSrc).contains("HAS_AND_BELONGS_TO_MANY");
+        assertThat(metaSrc).contains("HAS_MANY_THROUGH");
+
+        String queryMetaSrc = src(generated(comp, "UserAllQueryMeta.java"));
+        assertThat(queryMetaSrc).contains("RelationField<UserAll, Order> PARENT_ORDERS");
+        assertThat(queryMetaSrc).contains("RelationField<UserAll, Profile> PROFILES");
+        assertThat(queryMetaSrc).contains("RelationField<UserAll, Order> ORDERS");
+        assertThat(queryMetaSrc).contains("RelationField<UserAll, Tag> TAGS");
+        assertThat(queryMetaSrc).contains("RelationField<UserAll, Product> PRODUCTS");
     }
 
     private static Compilation compile(String... sources) {

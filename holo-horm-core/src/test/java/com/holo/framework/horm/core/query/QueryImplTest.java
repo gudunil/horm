@@ -7,9 +7,11 @@ import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
+import com.holo.framework.horm.meta.RelationType;
 import com.holo.framework.horm.meta.Row;
 import com.holo.framework.horm.meta.query.Condition;
 import com.holo.framework.horm.meta.query.LongField;
+import com.holo.framework.horm.meta.query.RelationField;
 import com.holo.framework.horm.meta.query.StringField;
 import com.holo.framework.horm.meta.query.TypedField;
 import org.junit.jupiter.api.AfterEach;
@@ -42,12 +44,18 @@ class QueryImplTest {
 
     private static final LongField<TestEntity> ID = LongField.of(TestEntity.class, "id", "id");
     private static final StringField<TestEntity> EMAIL = StringField.of(TestEntity.class, "email", "email");
+    private static final RelationField<TestEntity, OtherEntity> ORDERS = RelationField.of(
+        TestEntity.class, OtherEntity.class, "orders",
+        RelationType.HAS_MANY, "test_entity_id", null, null, null);
+    private static final LongField<OtherEntity> OTHER_ID = LongField.of(OtherEntity.class, "id", "id");
 
     private Connection conn;
     private PreparedStatement ps;
     private ResultSet rs;
     @SuppressWarnings("unchecked")
     private Mapper<TestEntity> mapper;
+    @SuppressWarnings("unchecked")
+    private Mapper<OtherEntity> otherMapper;
     private QueryImpl<TestEntity> query;
 
     @BeforeEach
@@ -70,6 +78,20 @@ class QueryImplTest {
             .mapper(mapper)
             .build();
         EntityMetaRegistry.registerManual(meta);
+
+        // OtherEntity mock meta for JOIN/fetch tests. Has only an id column so
+        // buildJoinAliases can resolve EntityMetaRegistry.lookup(OtherEntity.class).
+        otherMapper = mock(Mapper.class);
+        FieldMeta<Long> otherIdField = FieldMeta.<Long>builder()
+            .name("id").column("id").type(Long.class).id(true).build();
+        EntityMeta<OtherEntity> otherMeta = EntityMeta.<OtherEntity>builder()
+            .type(OtherEntity.class)
+            .tableName("other_entities")
+            .fields(List.of(otherIdField))
+            .idField(otherIdField)
+            .mapper(otherMapper)
+            .build();
+        EntityMetaRegistry.registerManual(otherMeta);
 
         query = new QueryImpl<>(TestEntity.class, new HormContext(conn));
     }
@@ -417,6 +439,103 @@ class QueryImplTest {
         verify(conn).prepareStatement(sql.capture());
         assertThat(sql.getValue()).isEqualTo("SELECT * FROM test_entities OFFSET ?");
         verify(ps).setObject(1, 5L);
+    }
+
+    @Test
+    void fetchHasManyRendersLeftJoinSql() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        query.fetch(ORDERS).list();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        assertThat(sql.getValue())
+            .contains("SELECT t0.id AS t0__id, t0.email AS t0__email, t1.id AS t1__id")
+            .contains("FROM test_entities t0")
+            .contains("LEFT JOIN other_entities t1 ON t1.test_entity_id = t0.id");
+    }
+
+    @Test
+    void innerJoinRendersInnerJoinSql() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        query.innerJoin(ORDERS).list();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        assertThat(sql.getValue())
+            .contains("INNER JOIN other_entities t1 ON t1.test_entity_id = t0.id");
+    }
+
+    @Test
+    void leftJoinRendersLeftJoinSql() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        query.leftJoin(ORDERS).list();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        assertThat(sql.getValue())
+            .contains("LEFT JOIN other_entities t1 ON t1.test_entity_id = t0.id");
+    }
+
+    @Test
+    void selectProjectionRendersAliasedColumns() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        query.select(ID).list();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        assertThat(sql.getValue())
+            .contains("SELECT t0.id AS t0__id FROM test_entities t0")
+            .doesNotContain("t0.email");
+    }
+
+    @Test
+    void selectWithoutIdThrowsHormException() {
+        assertThatThrownBy(() -> query.select(EMAIL))
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("select projection must include id field");
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void orderByOnJoinTargetRendersAliased() throws Exception {
+        when(conn.prepareStatement(anyString())).thenReturn(ps);
+        when(ps.executeQuery()).thenReturn(rs);
+        when(rs.next()).thenReturn(false);
+
+        // OTHER_ID is TypedField<OtherEntity,?>; orderBy expects TypedField<T,?>.
+        // Use raw type to bypass compile-time generics — QueryImpl validates
+        // at runtime via field.entityType() against registered joins.
+        TypedField rawOther = OTHER_ID;
+        query.fetch(ORDERS).orderBy(rawOther, Order.DESC).list();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture());
+        assertThat(sql.getValue()).contains("ORDER BY t1.id DESC");
+    }
+
+    @Test
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    void orderByOnNonJoinTargetStillThrows() {
+        // OTHER_ID belongs to OtherEntity, which is not registered as a join
+        // on this query, so the relaxed orderBy check must still reject it
+        // (preserves orderByWithForeignFieldThrowsHormException semantics).
+        TypedField rawOther = OTHER_ID;
+        assertThatThrownBy(() -> query.orderBy(rawOther, Order.ASC))
+            .isInstanceOf(HormException.class)
+            .hasMessageContaining("does not belong to entity")
+            .hasMessageContaining("or any of its joins");
     }
 
     /** Concrete CRTP subtype used as a registry key for these tests. */

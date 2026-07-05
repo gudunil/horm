@@ -304,15 +304,37 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         if (whereConditions.isEmpty()) {
             return;
         }
+        // JOIN path: prefix column references with "t0." so H2 doesn't
+        // complain about ambiguous columns (root and join target both have
+        // "id"). Default path keeps bare column names to preserve M2 SQL
+        // assertions.
+        String aliasPrefix = joins.isEmpty() ? "" : "t0.";
         sql.append(" WHERE ");
         for (int i = 0; i < whereConditions.size(); i++) {
             if (i > 0) {
                 sql.append(" AND ");
             }
             Condition c = whereConditions.get(i);
-            sql.append("(").append(c.sqlFragment()).append(")");
+            String fragment = c.sqlFragment();
+            if (!aliasPrefix.isEmpty()) {
+                fragment = prefixColumns(fragment, aliasPrefix);
+            }
+            sql.append("(").append(fragment).append(")");
             bindings.addAll(c.bindings());
         }
+    }
+
+    /**
+     * Prefix bare column names in a rendered SQL fragment with the supplied
+     * alias. Matches {@code <column> <op>} patterns where {@code <op>} is one
+     * of {@code =, <>, >, <, >=, <=, BETWEEN, IN, LIKE, IS}. Keywords like
+     * {@code AND}/{@code OR}/{@code NOT} are not followed by these operators
+     * so they are left untouched.
+     */
+    private static String prefixColumns(String fragment, String alias) {
+        return fragment.replaceAll(
+            "(\\b\\w+)(\\s+(?:=|<>|>=|<=|>|<|BETWEEN|IN|LIKE|IS))",
+            alias + "$1$2");
     }
 
     private void appendOrderBy(StringBuilder sql) {
@@ -489,10 +511,15 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
      * write them to a {@link Row} keyed by bare column name. This isolates
      * the per-entity column namespace without modifying {@link Row} or
      * {@link Mapper#map}.
+     *
+     * @param fields the field subset to read; for the root entity this is
+     *               {@link #projectedFields()} (which honors {@link #select}),
+     *               for join targets it is the full {@link EntityMeta#fields()}.
      */
-    private Row splitPrefixedRow(ResultSet rs, String alias, EntityMeta<?> targetMeta) throws SQLException {
+    private Row splitPrefixedRow(ResultSet rs, String alias, EntityMeta<?> targetMeta,
+                                 List<FieldMeta<?>> fields) throws SQLException {
         Row row = Row.create(targetMeta.tableName());
-        for (FieldMeta<?> fd : targetMeta.fields()) {
+        for (FieldMeta<?> fd : fields) {
             row.set(fd.column(), rs.getObject(alias + "__" + fd.column()));
         }
         return row;
@@ -519,11 +546,12 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
             perJoinAccumulated.add(new HashMap<>());
         }
 
+        List<FieldMeta<?>> rootFields = projectedFields();
         try (PreparedStatement ps = ctx.connection().prepareStatement(sql)) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    Row rootRow = splitPrefixedRow(rs, "t0", meta);
+                    Row rootRow = splitPrefixedRow(rs, "t0", meta, rootFields);
                     T root = mapper.map(rootRow);
                     Object rootId = mapper.getId(root);
 
@@ -532,7 +560,8 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
 
                     for (int i = 0; i < joinAliases.size(); i++) {
                         JoinAlias ja = joinAliases.get(i);
-                        Row targetRow = splitPrefixedRow(rs, ja.targetAlias, ja.targetMeta);
+                        Row targetRow = splitPrefixedRow(rs, ja.targetAlias, ja.targetMeta,
+                            new ArrayList<>(ja.targetMeta.fields()));
                         Mapper<Object> targetMapper = (Mapper<Object>) ja.targetMapper;
                         Object target = targetMapper.map(targetRow);
                         Object targetId = targetMapper.getId(target);
