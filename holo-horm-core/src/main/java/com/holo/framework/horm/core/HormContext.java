@@ -4,42 +4,83 @@ import java.sql.Connection;
 import java.sql.SQLException;
 
 /**
- * Ambient runtime context holding the active {@link Connection} (and, in
- * later milestones, the {@code DataSource} SPI, transaction handle, and
- * cache chain).
+ * Ambient runtime context holding the active connection source (and, in
+ * later milestones, the transaction handle and cache chain).
  *
  * <p>A single context is installed process-wide via {@link #install(HormContext)}
  * and retrieved by {@link Model} / repository code through {@link #current()}.
- * This minimal M1-6 shape intentionally exposes only the connection; M2 will
- * replace it with a richer context bound to the {@code holo-horm-datasource}
- * SPI.
+ *
+ * <p>M4 introduces {@link DataSourceProvider} support alongside the original
+ * {@link Connection}-based constructor. When a {@code DataSourceProvider} is
+ * available, {@link TransactionManager#currentConnection(HormContext)} prefers
+ * it over the legacy single-connection path, enabling proper connection pooling
+ * and transaction-scoped connection binding.
  *
  * <p>{@code HormContext} is {@link AutoCloseable}; closing it closes the
- * underlying connection. Callers should typically use it in a
- * try-with-resources block at the boundary (e.g. a request or transaction
- * scope).
+ * underlying connection (if created from a single-connection constructor).
+ * Contexts created from a {@code DataSourceProvider} do <em>not</em> close
+ * the provider on {@code close()} — the provider lifecycle is managed
+ * externally.
  */
 public final class HormContext implements AutoCloseable {
 
     private static volatile HormContext current;
 
     private final Connection connection;
+    private final DataSourceProvider dataSourceProvider;
 
+    /**
+     * Legacy constructor that wraps a single {@link Connection} in a
+     * {@link SimpleDataSourceProvider}. Behaves identically to M1-M3.
+     */
     public HormContext(Connection connection) {
         this.connection = connection;
+        this.dataSourceProvider = new SimpleDataSourceProvider(connection);
     }
 
-    /** Returns the JDBC connection bound to this context. */
+    /**
+     * Creates a context backed by a {@link DataSourceProvider}. The provider
+     * is the preferred source for connections; the legacy {@link #connection()}
+     * method delegates to {@link DataSourceProvider#getConnection()}.
+     */
+    public HormContext(DataSourceProvider dataSourceProvider) {
+        this.connection = null;
+        this.dataSourceProvider = dataSourceProvider;
+    }
+
+    /**
+     * Returns the JDBC connection. When a {@link DataSourceProvider} is set,
+     * delegates to {@link DataSourceProvider#getConnection()}; otherwise
+     * returns the connection supplied at construction.
+     *
+     * <p>For transaction-aware connection resolution, prefer
+     * {@link TransactionManager#currentConnection(HormContext)} which
+     * returns the thread-bound transaction connection when active.
+     */
     public Connection connection() {
+        if (dataSourceProvider != null) {
+            try {
+                return dataSourceProvider.getConnection();
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to obtain connection from DataSourceProvider", e);
+            }
+        }
         return connection;
+    }
+
+    /** Returns the {@link DataSourceProvider}, or {@code null} if not set. */
+    public DataSourceProvider dataSourceProvider() {
+        return dataSourceProvider;
     }
 
     @Override
     public void close() {
-        try {
-            connection.close();
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to close HormContext", e);
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                throw new RuntimeException("Failed to close HormContext", e);
+            }
         }
     }
 

@@ -26,6 +26,15 @@ public final class Horm {
         HormContext.install(ctx);
     }
 
+    /**
+     * Installs a {@link HormContext} backed by the given
+     * {@link DataSourceProvider}. Convenience for
+     * {@code HormContext.install(new HormContext(provider))}.
+     */
+    public static void install(DataSourceProvider provider) {
+        HormContext.install(new HormContext(provider));
+    }
+
     /** Returns the installed context. */
     public static HormContext context() {
         return HormContext.current();
