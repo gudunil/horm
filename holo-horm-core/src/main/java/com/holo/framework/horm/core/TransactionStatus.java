@@ -11,19 +11,24 @@ public final class TransactionStatus {
     private final Connection connection;
     private final boolean newTransaction;
     private final TransactionStatus suspended;
+    private final DataSourceProvider connectionProvider;
 
     /**
-     * @param connection      the JDBC connection bound to this transaction
+     * @param connection       the JDBC connection bound to this transaction
      * @param newTransaction   {@code true} if this is a newly created
      *                         transaction (as opposed to joining an existing one)
-     * @param suspended       the previously suspended transaction status
+     * @param suspended        the previously suspended transaction status
      *                         (for REQUIRES_NEW), or {@code null}
+     * @param connectionProvider the provider that supplied the connection,
+     *                         used to release it on transaction completion
      */
     public TransactionStatus(Connection connection, boolean newTransaction,
-                             TransactionStatus suspended) {
+                             TransactionStatus suspended,
+                             DataSourceProvider connectionProvider) {
         this.connection = connection;
         this.newTransaction = newTransaction;
         this.suspended = suspended;
+        this.connectionProvider = connectionProvider;
     }
 
     public Connection connection() { return connection; }
@@ -31,4 +36,11 @@ public final class TransactionStatus {
 
     /** Returns the suspended transaction (for REQUIRES_NEW), or null. */
     public TransactionStatus suspended() { return suspended; }
+
+    /** Releases the transaction-bound connection to its provider, if any. */
+    void releaseConnection() {
+        if (connectionProvider != null) {
+            connectionProvider.releaseConnection(connection);
+        }
+    }
 }

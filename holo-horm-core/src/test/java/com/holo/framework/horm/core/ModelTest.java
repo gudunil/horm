@@ -203,11 +203,14 @@ class ModelTest {
         FieldMeta<Long> idField = FieldMeta.<Long>builder()
             .name("id").column("id").type(Long.class).id(true)
             .build();
+        FieldMeta<String> nameField = FieldMeta.<String>builder()
+            .name("name").column("name").type(String.class)
+            .build();
 
         EntityMeta<TestEntity> meta = EntityMeta.<TestEntity>builder()
             .type(TestEntity.class)
             .tableName("test_entities")
-            .fields(List.of(idField))
+            .fields(List.of(idField, nameField))
             .idField(idField)
             .mapper(mapper)
             .build();

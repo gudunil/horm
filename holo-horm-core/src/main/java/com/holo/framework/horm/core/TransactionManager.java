@@ -77,25 +77,26 @@ public final class TransactionManager {
         Deque<TransactionStatus> stack = TRANSACTION_STACK.get();
         Propagation propagation = def.propagation();
 
+        DataSourceProvider provider = ctx.dataSourceProvider();
         switch (propagation) {
             case REQUIRED: {
                 if (!stack.isEmpty()) {
                     // Join existing transaction
                     TransactionStatus existing = stack.peek();
                     stack.push(new TransactionStatus(
-                        existing.connection(), false, null));
+                        existing.connection(), false, null, provider));
                     return stack.peek();
                 }
                 // Start new transaction
                 Connection conn = newConnection(ctx, def);
-                stack.push(new TransactionStatus(conn, true, null));
+                stack.push(new TransactionStatus(conn, true, null, provider));
                 return stack.peek();
             }
             case REQUIRES_NEW: {
                 // Suspend current transaction if one exists
                 TransactionStatus suspended = stack.isEmpty() ? null : stack.pop();
                 Connection conn = newConnection(ctx, def);
-                stack.push(new TransactionStatus(conn, true, suspended));
+                stack.push(new TransactionStatus(conn, true, suspended, provider));
                 return stack.peek();
             }
             default:
@@ -254,7 +255,21 @@ public final class TransactionManager {
                 status.connection().setAutoCommit(true);
             } catch (SQLException e) {
                 // Best-effort; connection may already be closed
+            } finally {
+                status.releaseConnection();
             }
+        }
+    }
+
+    /**
+     * Releases {@code connection} to the current context's provider when no
+     * transaction is active. This prevents connection leaks from short-lived,
+     * non-transactional repository/query operations when a real
+     * {@link DataSourceProvider} is installed.
+     */
+    public static void releaseConnection(HormContext ctx, Connection connection) {
+        if (!isActive()) {
+            ctx.releaseConnection(connection);
         }
     }
 

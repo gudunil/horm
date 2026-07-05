@@ -25,4 +25,25 @@ public interface DataSourceProvider {
      * @throws SQLException if a database access error occurs
      */
     Connection getConnection() throws SQLException;
+
+    /**
+     * Releases a connection previously obtained from this provider.
+     *
+     * <p>The default implementation closes the connection. Implementations
+     * that manage a shared or externally-owned connection (such as
+     * {@link SimpleDataSourceProvider}) should override this to avoid
+     * closing the underlying connection prematurely.
+     *
+     * @param connection the connection to release; may be {@code null}
+     */
+    default void releaseConnection(Connection connection) {
+        if (connection != null) {
+            try {
+                connection.close();
+            } catch (SQLException e) {
+                // Best-effort release; suppress so cleanup does not mask
+                // the original failure.
+            }
+        }
+    }
 }

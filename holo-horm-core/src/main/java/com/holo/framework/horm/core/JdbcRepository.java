@@ -5,6 +5,7 @@ import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.Row;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -53,7 +54,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         FieldMeta<?> idField = requireIdField();
         String sql = "SELECT * FROM " + qualifiedTable()
             + " WHERE " + idField.column() + " = ?";
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
+        Connection conn = TransactionManager.currentConnection(ctx);
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
@@ -64,6 +66,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         } catch (SQLException e) {
             throw new HormException(
                 "Failed to find " + entityType.getName() + " by id " + id, e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, conn);
         }
     }
 
@@ -71,13 +75,16 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     public List<T> all() {
         String sql = "SELECT * FROM " + qualifiedTable();
         List<T> result = new ArrayList<>();
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql);
+        Connection conn = TransactionManager.currentConnection(ctx);
+        try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 result.add(mapper.map(toRow(rs)));
             }
         } catch (SQLException e) {
             throw new HormException("Failed to fetch all " + entityType.getName(), e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, conn);
         }
         return result;
     }
@@ -85,7 +92,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     @Override
     public long count() {
         String sql = "SELECT COUNT(*) FROM " + qualifiedTable();
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql);
+        Connection conn = TransactionManager.currentConnection(ctx);
+        try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
                 return rs.getLong(1);
@@ -93,6 +101,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             return 0L;
         } catch (SQLException e) {
             throw new HormException("Failed to count " + entityType.getName(), e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, conn);
         }
     }
 
@@ -103,7 +113,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         // the redundant row and rely on rs.next() short-circuiting.
         String sql = "SELECT 1 FROM " + qualifiedTable()
             + " WHERE " + idField.column() + " = ? LIMIT 1";
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
+        Connection conn = TransactionManager.currentConnection(ctx);
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
@@ -111,6 +122,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         } catch (SQLException e) {
             throw new HormException(
                 "Failed to check existence of " + entityType.getName() + " by id " + id, e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, conn);
         }
     }
 
@@ -135,7 +148,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             + columns.stream().map(c -> "?").collect(Collectors.joining(", "))
             + ")";
         Row row = mapper.toRow(entity);
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(
+        Connection conn = TransactionManager.currentConnection(ctx);
+        try (PreparedStatement ps = conn.prepareStatement(
                 sql, Statement.RETURN_GENERATED_KEYS)) {
             int i = 1;
             for (String col : columns) {
@@ -150,6 +164,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             }
         } catch (SQLException e) {
             throw new HormException("Failed to insert " + entityType.getName(), e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, conn);
         }
         return entity;
     }
@@ -176,6 +192,11 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         List<Object> bindings = new ArrayList<>();
         Row row = mapper.toRow(entity);
 
+        if (columns.isEmpty() && versionField == null) {
+            throw new IllegalStateException(
+                "No updatable fields for " + entityType.getName() + "; nothing to update");
+        }
+
         if (!columns.isEmpty()) {
             sql.append(setClause);
             for (String col : columns) {
@@ -200,8 +221,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             bindings.add(mapper.getField(entity, versionField.name()));
         }
 
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx)
-                .prepareStatement(sql.toString())) {
+        Connection conn = TransactionManager.currentConnection(ctx);
+        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             int i = 1;
             for (Object val : bindings) {
                 ps.setObject(i++, val);
@@ -217,6 +238,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             }
         } catch (SQLException e) {
             throw new HormException("Failed to update " + entityType.getName(), e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, conn);
         }
         return entity;
     }
@@ -233,8 +256,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
                 .append(" = ? AND ")
                 .append(versionField.column())
                 .append(" = ?");
-            try (PreparedStatement ps = TransactionManager.currentConnection(ctx)
-                    .prepareStatement(sql.toString())) {
+            Connection conn = TransactionManager.currentConnection(ctx);
+            try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
                 ps.setObject(1, id);
                 ps.setObject(2, mapper.getField(entity, versionField.name()));
                 int affected = ps.executeUpdate();
@@ -246,6 +269,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             } catch (SQLException e) {
                 throw new HormException(
                     "Failed to delete " + entityType.getName() + " by id " + id, e);
+            } finally {
+                TransactionManager.releaseConnection(ctx, conn);
             }
         } else {
             deleteById(id);
@@ -257,12 +282,15 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         FieldMeta<?> idField = requireIdField();
         String sql = "DELETE FROM " + qualifiedTable()
             + " WHERE " + idField.column() + " = ?";
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
+        Connection conn = TransactionManager.currentConnection(ctx);
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setObject(1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new HormException(
                 "Failed to delete " + entityType.getName() + " by id " + id, e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, conn);
         }
     }
 

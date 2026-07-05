@@ -23,4 +23,10 @@ public final class SimpleDataSourceProvider implements DataSourceProvider {
     public Connection getConnection() throws SQLException {
         return connection;
     }
+
+    @Override
+    public void releaseConnection(Connection connection) {
+        // The lifecycle of the single wrapped connection is managed by the
+        // caller (typically via HormContext.close()); do not close here.
+    }
 }

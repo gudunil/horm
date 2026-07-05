@@ -73,6 +73,19 @@ public final class HormContext implements AutoCloseable {
         return dataSourceProvider;
     }
 
+    /**
+     * Releases a connection obtained from this context's
+     * {@link DataSourceProvider} when it is no longer needed.
+     *
+     * <p>For the legacy single-connection context this is a no-op because the
+     * underlying connection is closed by {@link #close()}.
+     */
+    public void releaseConnection(Connection connection) {
+        if (dataSourceProvider != null) {
+            dataSourceProvider.releaseConnection(connection);
+        }
+    }
+
     @Override
     public void close() {
         if (connection != null) {

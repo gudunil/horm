@@ -8,6 +8,7 @@ import com.holo.framework.horm.core.TransactionManager;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.query.Condition;
 
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -49,12 +50,14 @@ public final class DeleteQueryImpl<T extends Model<T>> implements DeleteQuery<T>
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
 
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx)
-                .prepareStatement(sql.toString())) {
+        Connection conn = TransactionManager.currentConnection(ctx);
+        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             bind(ps, bindings);
             return ps.executeUpdate();
         } catch (SQLException e) {
             throw new HormException("Failed to execute DELETE on " + entityType.getName(), e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, conn);
         }
     }
 
