@@ -53,7 +53,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         FieldMeta<?> idField = requireIdField();
         String sql = "SELECT * FROM " + qualifiedTable()
             + " WHERE " + idField.column() + " = ?";
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql)) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
             ps.setObject(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
@@ -71,7 +71,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     public List<T> all() {
         String sql = "SELECT * FROM " + qualifiedTable();
         List<T> result = new ArrayList<>();
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql);
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
                 result.add(mapper.map(toRow(rs)));
@@ -85,7 +85,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     @Override
     public long count() {
         String sql = "SELECT COUNT(*) FROM " + qualifiedTable();
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql);
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             if (rs.next()) {
                 return rs.getLong(1);
@@ -103,7 +103,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         // the redundant row and rely on rs.next() short-circuiting.
         String sql = "SELECT 1 FROM " + qualifiedTable()
             + " WHERE " + idField.column() + " = ? LIMIT 1";
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql)) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
             ps.setObject(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
@@ -135,7 +135,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             + columns.stream().map(c -> "?").collect(Collectors.joining(", "))
             + ")";
         Row row = mapper.toRow(entity);
-        try (PreparedStatement ps = ctx.connection().prepareStatement(
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(
                 sql, Statement.RETURN_GENERATED_KEYS)) {
             int i = 1;
             for (String col : columns) {
@@ -168,7 +168,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             + " SET " + setClause
             + " WHERE " + idField.column() + " = ?";
         Row row = mapper.toRow(entity);
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql)) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
             int i = 1;
             for (String col : columns) {
                 ps.setObject(i++, row.get(col));
@@ -191,7 +191,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         FieldMeta<?> idField = requireIdField();
         String sql = "DELETE FROM " + qualifiedTable()
             + " WHERE " + idField.column() + " = ?";
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql)) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
             ps.setObject(1, id);
             ps.executeUpdate();
         } catch (SQLException e) {

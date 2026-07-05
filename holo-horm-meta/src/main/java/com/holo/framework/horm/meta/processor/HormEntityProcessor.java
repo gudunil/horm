@@ -1,6 +1,7 @@
 package com.holo.framework.horm.meta.processor;
 
 import com.holo.framework.horm.meta.annotation.Entity;
+import com.holo.framework.horm.meta.annotation.Transactional;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Messager;
@@ -15,6 +16,7 @@ import javax.tools.Diagnostic;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -44,11 +46,15 @@ import java.util.Set;
  * the {@code @Entity} annotation type, preventing other processors from
  * re-processing the same elements.
  */
-@SupportedAnnotationTypes("com.holo.framework.horm.meta.annotation.Entity")
+@SupportedAnnotationTypes({
+    "com.holo.framework.horm.meta.annotation.Entity",
+    "com.holo.framework.horm.meta.annotation.Transactional"
+})
 @SupportedSourceVersion(SourceVersion.RELEASE_17)
 public class HormEntityProcessor extends AbstractProcessor {
 
     private final List<EntityDescriptor> descriptors = new ArrayList<>();
+    private final List<String> transactionAdvisorNames = new ArrayList<>();
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -67,9 +73,20 @@ public class HormEntityProcessor extends AbstractProcessor {
                     );
                 }
             }
+            if (!transactionAdvisorNames.isEmpty()) {
+                try {
+                    IndexWriter.writeTransactionIndex(processingEnv.getFiler(), transactionAdvisorNames);
+                } catch (IOException ex) {
+                    messager().printMessage(
+                        Diagnostic.Kind.ERROR,
+                        "Failed to write transactions.idx: " + ex.getMessage()
+                    );
+                }
+            }
             return false;
         }
 
+        // Process @Entity annotations
         for (Element element : roundEnv.getElementsAnnotatedWith(Entity.class)) {
             if (element.getKind() != ElementKind.CLASS) {
                 messager().printMessage(
@@ -95,6 +112,33 @@ public class HormEntityProcessor extends AbstractProcessor {
                 );
             }
         }
+
+        // Process @Transactional annotations
+        Set<TypeElement> processedTypes = new HashSet<>();
+        for (Element element : roundEnv.getElementsAnnotatedWith(Transactional.class)) {
+            Element enclosing = element.getKind() == ElementKind.METHOD
+                ? element.getEnclosingElement()
+                : element;
+            if (enclosing.getKind() != ElementKind.CLASS) {
+                continue;
+            }
+            TypeElement type = (TypeElement) enclosing;
+            if (processedTypes.add(type)) {
+                try {
+                    String advisorName = TransactionAdvisorBuilder.build(type, processingEnv.getFiler());
+                    if (advisorName != null) {
+                        transactionAdvisorNames.add(advisorName);
+                    }
+                } catch (Exception ex) {
+                    messager().printMessage(
+                        Diagnostic.Kind.ERROR,
+                        "Failed to process @Transactional on " + type.getQualifiedName() + ": " + ex.getMessage(),
+                        element
+                    );
+                }
+            }
+        }
+
         return true;
     }
 

@@ -4,6 +4,7 @@ import com.holo.framework.horm.core.HormContext;
 import com.holo.framework.horm.core.HormException;
 import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.core.EntityMetaRegistry;
+import com.holo.framework.horm.core.TransactionManager;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
@@ -210,7 +211,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         appendLimitOffset(sql, bindings);
 
         List<T> result = new ArrayList<>();
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql.toString())) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql.toString())) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -240,7 +241,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
             bindings.add(offset);
         }
 
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql.toString())) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql.toString())) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -259,7 +260,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
 
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql.toString())) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql.toString())) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -279,7 +280,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         appendWhere(sql, bindings);
         sql.append(" LIMIT 1");
 
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql.toString())) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql.toString())) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
@@ -547,7 +548,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         }
 
         List<FieldMeta<?>> rootFields = projectedFields();
-        try (PreparedStatement ps = ctx.connection().prepareStatement(sql)) {
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
             bind(ps, bindings);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {

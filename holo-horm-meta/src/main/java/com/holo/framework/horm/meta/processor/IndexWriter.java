@@ -34,12 +34,13 @@ import java.util.Set;
 public final class IndexWriter {
 
     static final String INDEX_PATH = "META-INF/horm/entities.idx";
+    static final String TRANSACTION_INDEX_PATH = "META-INF/horm/transactions.idx";
 
     private IndexWriter() {
     }
 
     public static void write(Filer filer, List<EntityDescriptor> descriptors) throws IOException {
-        Set<String> entries = new LinkedHashSet<>(readExistingEntries(filer));
+        Set<String> entries = new LinkedHashSet<>(readExistingEntries(filer, INDEX_PATH));
         for (EntityDescriptor d : descriptors) {
             entries.add(d.generatedPackage() + '.' + d.simpleName() + "Meta");
         }
@@ -53,15 +54,25 @@ public final class IndexWriter {
     }
 
     /**
-     * Reads any pre-existing {@code entities.idx} content from the
-     * {@link StandardLocation#CLASS_OUTPUT} location so it can be merged with
-     * APT-generated entries. Missing files and I/O errors are treated as
-     * "no prior content" — the common case when the APT runs first.
+     * Writes the {@code META-INF/horm/transactions.idx} resource listing every
+     * generated transaction advisor class by fully-qualified name.
      */
-    private static Set<String> readExistingEntries(Filer filer) {
+    public static void writeTransactionIndex(Filer filer, List<String> advisorNames) throws IOException {
+        Set<String> entries = new LinkedHashSet<>(readExistingEntries(filer, TRANSACTION_INDEX_PATH));
+        entries.addAll(advisorNames);
+        FileObject res = filer.createResource(StandardLocation.CLASS_OUTPUT, "", TRANSACTION_INDEX_PATH);
+        try (Writer w = res.openWriter()) {
+            for (String entry : entries) {
+                w.write(entry);
+                w.write('\n');
+            }
+        }
+    }
+
+    private static Set<String> readExistingEntries(Filer filer, String path) {
         Set<String> existing = new LinkedHashSet<>();
         try {
-            FileObject resource = filer.getResource(StandardLocation.CLASS_OUTPUT, "", INDEX_PATH);
+            FileObject resource = filer.getResource(StandardLocation.CLASS_OUTPUT, "", path);
             try (InputStream in = resource.openInputStream();
                  BufferedReader reader = new BufferedReader(
                      new InputStreamReader(in, StandardCharsets.UTF_8))) {

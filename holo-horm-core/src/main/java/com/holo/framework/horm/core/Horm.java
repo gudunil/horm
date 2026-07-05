@@ -1,5 +1,7 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.meta.annotation.Propagation;
+
 /**
  * Process-wide entrypoint for the HORM runtime.
  *
@@ -55,5 +57,40 @@ public final class Horm {
      */
     public static <T extends Model<T>> Repository<T> repository(Class<T> entityType) {
         return new JdbcRepository<>(entityType, HormContext.current());
+    }
+
+    // ===== Programmatic transaction API =====
+
+    /**
+     * Executes the given action within a transaction (REQUIRED propagation,
+     * DEFAULT isolation). Commits on success; rolls back on exception.
+     */
+    public static void tx(Runnable action) {
+        TransactionManager.execute(HormContext.current(), action);
+    }
+
+    /**
+     * Executes the given action within a transaction using the specified
+     * propagation behavior.
+     */
+    public static void tx(Propagation propagation, Runnable action) {
+        TransactionManager.execute(HormContext.current(), propagation, action);
+    }
+
+    /**
+     * Executes the given callable within a transaction and returns its
+     * result (REQUIRED propagation, DEFAULT isolation).
+     */
+    public static <T> T tx(java.util.concurrent.Callable<T> action) {
+        return TransactionManager.execute(HormContext.current(), action);
+    }
+
+    /**
+     * Executes the given callable within a transaction using the specified
+     * propagation behavior and returns its result.
+     */
+    public static <T> T tx(Propagation propagation,
+                           java.util.concurrent.Callable<T> action) {
+        return TransactionManager.execute(HormContext.current(), propagation, action);
     }
 }
