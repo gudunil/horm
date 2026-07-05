@@ -61,4 +61,20 @@ public interface Mapper<T> {
     default void setRelation(T entity, String name, List<?> related) {
         throw new UnsupportedOperationException("Relation not mapped: " + name);
     }
+
+    /**
+     * Returns the value of a named relation on the entity.
+     *
+     * <p>Default implementation throws {@link UnsupportedOperationException}
+     * so that existing code remains compatible. APT-generated mappers override
+     * this with a {@code switch(name)} dispatch to the entity's typed getter
+     * (e.g. {@code return entity.getOrders()}).
+     *
+     * @param entity the entity instance to query
+     * @param name   relation property name (matches the field name)
+     * @return the related entity or collection, or {@code null} if not set
+     */
+    default Object getRelation(T entity, String name) {
+        throw new UnsupportedOperationException("Relation not mapped: " + name);
+    }
 }

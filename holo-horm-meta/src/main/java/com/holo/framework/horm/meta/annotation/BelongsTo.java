@@ -37,4 +37,7 @@ public @interface BelongsTo {
 
     /** Foreign-key column on this entity. Empty means derive from target simple name. */
     String foreignKey() default "";
+
+    /** Cascade operations to apply when the parent entity is persisted/removed. */
+    CascadeType[] cascade() default {};
 }

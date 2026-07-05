@@ -53,6 +53,7 @@ public final class MapperBuilder {
         type.addMethod(buildGetFieldMethod(d, entity));
         type.addMethod(buildSetFieldMethod(d, entity));
         type.addMethod(buildSetRelationMethod(d, entity));
+        type.addMethod(buildGetRelationMethod(d, entity));
 
         JavaFile.builder(d.generatedPackage(), type.build())
             .indent("    ")
@@ -202,6 +203,34 @@ public final class MapperBuilder {
         sw.add("  default -> throw new $T($S + name);\n}",
             ClassName.get(IllegalArgumentException.class), "Unknown relation: ");
         m.addCode(sw.build());
+        return m.build();
+    }
+
+    /**
+     * Emits the {@code getRelation} override — a {@code switch(name)} dispatch
+     * to the entity's typed relation getter (e.g.
+     * {@code return u.getOrders()}). The default branch throws
+     * {@link IllegalArgumentException} for unknown relation names.
+     */
+    private static MethodSpec buildGetRelationMethod(EntityDescriptor d, ClassName entity) {
+        MethodSpec.Builder m = MethodSpec.methodBuilder("getRelation")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(Object.class)
+            .addParameter(entity, "u")
+            .addParameter(String.class, "name");
+        if (d.relations().isEmpty()) {
+            m.addStatement("throw new $T($S + name)",
+                ClassName.get(IllegalArgumentException.class), "Unknown relation: ");
+        } else {
+            CodeBlock.Builder sw = CodeBlock.builder().add("return switch (name) {\n");
+            for (EntityDescriptor.RelationDescriptor r : d.relations()) {
+                sw.add("  case $S -> u.$L();\n", r.name(), r.getterName());
+            }
+            sw.add("  default -> throw new $T($S + name);\n};",
+                ClassName.get(IllegalArgumentException.class), "Unknown relation: ");
+            m.addCode(sw.build());
+        }
         return m.build();
     }
 }

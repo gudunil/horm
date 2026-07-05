@@ -6,6 +6,7 @@ import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.RelationMeta;
 import com.holo.framework.horm.meta.RelationType;
+import com.holo.framework.horm.meta.annotation.CascadeType;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
@@ -224,6 +225,14 @@ public final class MetaClassBuilder {
                 if (r.throughQualifiedName() != null) {
                     ClassName throughCn = ClassName.bestGuess(r.throughQualifiedName());
                     init.add(".through($T.class)", throughCn);
+                }
+                if (r.cascadeTypes() != null && r.cascadeTypes().length > 0) {
+                    init.add(".cascadeTypes(new $T[]{", CascadeType.class);
+                    for (int j = 0; j < r.cascadeTypes().length; j++) {
+                        if (j > 0) init.add(", ");
+                        init.add("$T.$L", CascadeType.class, r.cascadeTypes()[j].name());
+                    }
+                    init.add("})");
                 }
                 init.add(".build()");
             }

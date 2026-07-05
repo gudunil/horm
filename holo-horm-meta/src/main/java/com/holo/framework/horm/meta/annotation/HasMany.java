@@ -38,4 +38,7 @@ public @interface HasMany {
 
     /** Foreign-key column on the target entity. Empty means derive from owner simple name. */
     String foreignKey() default "";
+
+    /** Cascade operations to apply from the owner to the targets. */
+    CascadeType[] cascade() default {};
 }

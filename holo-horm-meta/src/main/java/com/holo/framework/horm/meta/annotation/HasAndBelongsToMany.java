@@ -53,4 +53,7 @@ public @interface HasAndBelongsToMany {
 
     /** Foreign-key column on the join table pointing to the target entity. Empty means derive from target simple name. */
     String associationForeignKey() default "";
+
+    /** Cascade operations to apply from the owner to the targets. */
+    CascadeType[] cascade() default {};
 }

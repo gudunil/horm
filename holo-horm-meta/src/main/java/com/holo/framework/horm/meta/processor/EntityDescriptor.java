@@ -1,6 +1,7 @@
 package com.holo.framework.horm.meta.processor;
 
 import com.holo.framework.horm.meta.RelationType;
+import com.holo.framework.horm.meta.annotation.CascadeType;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 
 import java.util.ArrayList;
@@ -175,6 +176,7 @@ public final class EntityDescriptor {
         private final String throughSimpleName;     // null when not HAS_MANY_THROUGH
         private final String getterName;
         private final String setterName;
+        private final CascadeType[] cascadeTypes;
 
         public RelationDescriptor(String name,
                                   String targetEntityQualifiedName,
@@ -186,7 +188,8 @@ public final class EntityDescriptor {
                                   String throughQualifiedName,
                                   String throughSimpleName,
                                   String getterName,
-                                  String setterName) {
+                                  String setterName,
+                                  CascadeType[] cascadeTypes) {
             this.name = name;
             this.targetEntityQualifiedName = targetEntityQualifiedName;
             this.targetEntitySimpleName = targetEntitySimpleName;
@@ -198,6 +201,7 @@ public final class EntityDescriptor {
             this.throughSimpleName = throughSimpleName;
             this.getterName = getterName;
             this.setterName = setterName;
+            this.cascadeTypes = cascadeTypes == null ? new CascadeType[0] : cascadeTypes;
         }
 
         public String name() { return name; }
@@ -211,5 +215,6 @@ public final class EntityDescriptor {
         public String throughSimpleName() { return throughSimpleName; }
         public String getterName() { return getterName; }
         public String setterName() { return setterName; }
+        public CascadeType[] cascadeTypes() { return cascadeTypes; }
     }
 }

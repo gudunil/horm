@@ -1,11 +1,20 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.core.query.DeleteQuery;
+import com.holo.framework.horm.core.query.DeleteQueryImpl;
 import com.holo.framework.horm.core.query.Query;
 import com.holo.framework.horm.core.query.QueryImpl;
+import com.holo.framework.horm.core.query.UpdateQuery;
+import com.holo.framework.horm.core.query.UpdateQueryImpl;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.Mapper;
+import com.holo.framework.horm.meta.RelationMeta;
+import com.holo.framework.horm.meta.annotation.CascadeType;
 
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Active Record base class for HORM entities.
@@ -76,13 +85,50 @@ public abstract class Model<T extends Model<T>> {
 
     /**
      * Inserts or updates this entity via the configured {@link Repository}.
+     * If any relation has {@code CascadeType.PERSIST} or {@code CascadeType.ALL},
+     * the related entities are cascaded automatically.
      */
     public final void save() {
+        Set<Object> visited = new HashSet<>();
+        visited.add(this);
+        cascadeSave(this, visited);
         repository().save(self());
     }
 
-    /** Deletes this entity by its primary key. */
+    /**
+     * Saves this entity along with the specified related entities.
+     * Only the named relations are cascaded, regardless of annotation config.
+     *
+     * @param relationNames the names of relations to cascade
+     */
+    public final void saveWith(String... relationNames) {
+        Set<Object> visited = new HashSet<>();
+        visited.add(this);
+        cascadeSaveNamed(this, relationNames, visited);
+        repository().save(self());
+    }
+
+    /** Deletes this entity by its primary key.
+     * If any relation has {@code CascadeType.REMOVE} or {@code CascadeType.ALL},
+     * the related entities are cascaded automatically.
+     */
     public final void delete() {
+        Set<Object> visited = new HashSet<>();
+        visited.add(this);
+        cascadeDelete(this, visited);
+        repository().delete(self());
+    }
+
+    /**
+     * Deletes this entity along with the specified related entities.
+     * Only the named relations are cascaded, regardless of annotation config.
+     *
+     * @param relationNames the names of relations to cascade
+     */
+    public final void deleteWith(String... relationNames) {
+        Set<Object> visited = new HashSet<>();
+        visited.add(this);
+        cascadeDeleteNamed(this, relationNames, visited);
         repository().delete(self());
     }
 
@@ -134,6 +180,22 @@ public abstract class Model<T extends Model<T>> {
     }
 
     /**
+     * Returns a fluent {@link UpdateQuery} for batch-updating entities of the
+     * given type.
+     */
+    public static <T extends Model<T>> UpdateQuery<T> update(Class<T> type) {
+        return new UpdateQueryImpl<>(type, HormContext.current());
+    }
+
+    /**
+     * Returns a fluent {@link DeleteQuery} for batch-deleting entities of the
+     * given type.
+     */
+    public static <T extends Model<T>> DeleteQuery<T> delete(Class<T> type) {
+        return new DeleteQueryImpl<>(type, HormContext.current());
+    }
+
+    /**
      * Returns the {@link Repository} for this instance's runtime type.
      *
      * <p>Routing through {@link Horm} (rather than constructing a repository
@@ -142,5 +204,106 @@ public abstract class Model<T extends Model<T>> {
     @SuppressWarnings({"unchecked", "rawtypes"})
     private Repository<T> repository() {
         return (Repository<T>) Horm.repository((Class) getClass());
+    }
+
+    // ===== Cascade helpers =====
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void cascadeSave(Model entity, Set<Object> visited) {
+        EntityMeta meta = EntityMetaRegistry.lookup(entity.getClass());
+        for (Object r : meta.relations()) {
+            RelationMeta rel = (RelationMeta) r;
+            if (!hasCascadeType(rel, CascadeType.PERSIST)) continue;
+            cascadeSaveRelation(entity, rel, visited);
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void cascadeSaveNamed(Model entity, String[] relationNames, Set<Object> visited) {
+        EntityMeta meta = EntityMetaRegistry.lookup(entity.getClass());
+        Set<String> names = Set.of(relationNames);
+        for (Object r : meta.relations()) {
+            RelationMeta rel = (RelationMeta) r;
+            if (!names.contains(rel.name())) continue;
+            cascadeSaveRelation(entity, rel, visited);
+        }
+    }
+
+    private static void cascadeSaveRelation(Model<?> entity, RelationMeta rel, Set<Object> visited) {
+        Object related = getRelationValue(entity, rel);
+        if (related == null) return;
+        doCascadeSave(related, visited);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void doCascadeSave(Object related, Set<Object> visited) {
+        if (related instanceof Collection coll) {
+            for (Object item : coll) {
+                if (item instanceof Model && visited.add(item)) {
+                    Model m = (Model) item;
+                    cascadeSave(m, visited);
+                    m.repository().save(m);
+                }
+            }
+        } else if (related instanceof Model m && visited.add(related)) {
+            cascadeSave(m, visited);
+            m.repository().save(m);
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void cascadeDelete(Model entity, Set<Object> visited) {
+        EntityMeta meta = EntityMetaRegistry.lookup(entity.getClass());
+        for (Object r : meta.relations()) {
+            RelationMeta rel = (RelationMeta) r;
+            if (!hasCascadeType(rel, CascadeType.REMOVE)) continue;
+            cascadeDeleteRelation(entity, rel, visited);
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void cascadeDeleteNamed(Model entity, String[] relationNames, Set<Object> visited) {
+        EntityMeta meta = EntityMetaRegistry.lookup(entity.getClass());
+        Set<String> names = Set.of(relationNames);
+        for (Object r : meta.relations()) {
+            RelationMeta rel = (RelationMeta) r;
+            if (!names.contains(rel.name())) continue;
+            cascadeDeleteRelation(entity, rel, visited);
+        }
+    }
+
+    private static void cascadeDeleteRelation(Model<?> entity, RelationMeta rel, Set<Object> visited) {
+        Object related = getRelationValue(entity, rel);
+        if (related == null) return;
+        doCascadeDelete(related, visited);
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void doCascadeDelete(Object related, Set<Object> visited) {
+        if (related instanceof Collection coll) {
+            for (Object item : coll) {
+                if (item instanceof Model && visited.add(item)) {
+                    Model m = (Model) item;
+                    cascadeDelete(m, visited);
+                    m.repository().delete(m);
+                }
+            }
+        } else if (related instanceof Model m && visited.add(related)) {
+            cascadeDelete(m, visited);
+            m.repository().delete(m);
+        }
+    }
+
+    private static boolean hasCascadeType(RelationMeta rel, CascadeType target) {
+        for (CascadeType ct : rel.cascadeTypes()) {
+            if (ct == CascadeType.ALL || ct == target) return true;
+        }
+        return false;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Object getRelationValue(Model<?> entity, RelationMeta rel) {
+        EntityMeta meta = EntityMetaRegistry.lookup(entity.getClass());
+        return meta.mapper().getRelation(entity, rel.name());
     }
 }

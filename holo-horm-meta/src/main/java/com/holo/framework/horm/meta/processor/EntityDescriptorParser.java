@@ -2,6 +2,7 @@ package com.holo.framework.horm.meta.processor;
 
 import com.holo.framework.horm.meta.RelationType;
 import com.holo.framework.horm.meta.annotation.BelongsTo;
+import com.holo.framework.horm.meta.annotation.CascadeType;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
 import com.holo.framework.horm.meta.annotation.GeneratedValue;
@@ -207,7 +208,7 @@ public final class EntityDescriptorParser {
                 ? snake(targetSimple) + "_id"
                 : belongsTo.foreignKey();
             return buildRelation(field, RelationType.BELONGS_TO, targetFqn, targetSimple,
-                fk, null, null, null, null);
+                fk, null, null, null, null, belongsTo.cascade());
         }
 
         HasOne hasOne = field.getAnnotation(HasOne.class);
@@ -218,7 +219,7 @@ public final class EntityDescriptorParser {
                 ? snake(ownerSimpleName) + "_id"
                 : hasOne.foreignKey();
             return buildRelation(field, RelationType.HAS_ONE, targetFqn, targetSimple,
-                fk, null, null, null, null);
+                fk, null, null, null, null, hasOne.cascade());
         }
 
         HasMany hasMany = field.getAnnotation(HasMany.class);
@@ -229,7 +230,7 @@ public final class EntityDescriptorParser {
                 ? snake(ownerSimpleName) + "_id"
                 : hasMany.foreignKey();
             return buildRelation(field, RelationType.HAS_MANY, targetFqn, targetSimple,
-                fk, null, null, null, null);
+                fk, null, null, null, null, hasMany.cascade());
         }
 
         HasAndBelongsToMany habtm = field.getAnnotation(HasAndBelongsToMany.class);
@@ -244,7 +245,7 @@ public final class EntityDescriptorParser {
                 : habtm.associationForeignKey();
             String jt = habtm.joinTable();
             return buildRelation(field, RelationType.HAS_AND_BELONGS_TO_MANY,
-                targetFqn, targetSimple, fk, afk, jt.isEmpty() ? null : jt, null, null);
+                targetFqn, targetSimple, fk, afk, jt.isEmpty() ? null : jt, null, null, habtm.cascade());
         }
 
         HasManyThrough hmt = field.getAnnotation(HasManyThrough.class);
@@ -262,7 +263,8 @@ public final class EntityDescriptorParser {
             return buildRelation(field, RelationType.HAS_MANY_THROUGH, targetFqn, targetSimple,
                 fk, afk, null,
                 hasThrough ? throughFqn : null,
-                hasThrough ? simpleName(throughFqn) : null);
+                hasThrough ? simpleName(throughFqn) : null,
+                hmt.cascade());
         }
 
         return null;
@@ -276,12 +278,13 @@ public final class EntityDescriptorParser {
                                                      String afk,
                                                      String jt,
                                                      String throughFqn,
-                                                     String throughSimple) {
+                                                     String throughSimple,
+                                                     CascadeType[] cascadeTypes) {
         String name = field.getSimpleName().toString();
         String getterName = "get" + capitalize(name);
         String setterName = "set" + capitalize(name);
         return new EntityDescriptor.RelationDescriptor(name, targetFqn, targetSimple, type,
-            fk, afk, jt, throughFqn, throughSimple, getterName, setterName);
+            fk, afk, jt, throughFqn, throughSimple, getterName, setterName, cascadeTypes);
     }
 
     /**

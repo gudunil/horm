@@ -52,4 +52,7 @@ public @interface HasManyThrough {
 
     /** Foreign-key column on the through entity pointing to the target. Empty means derive from target simple name. */
     String associationForeignKey() default "";
+
+    /** Cascade operations to apply from the owner to the targets. */
+    CascadeType[] cascade() default {};
 }

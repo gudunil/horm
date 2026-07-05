@@ -1,5 +1,7 @@
 package com.holo.framework.horm.meta;
 
+import com.holo.framework.horm.meta.annotation.CascadeType;
+
 import java.util.Objects;
 
 /**
@@ -22,6 +24,7 @@ public final class RelationMeta {
     private final String associationForeignKey;
     private final String joinTable;
     private final Class<?> through;
+    private final CascadeType[] cascadeTypes;
 
     private RelationMeta(Builder b) {
         this.name = Objects.requireNonNull(b.name, "name");
@@ -31,6 +34,7 @@ public final class RelationMeta {
         this.associationForeignKey = b.associationForeignKey;
         this.joinTable = b.joinTable;
         this.through = b.through;
+        this.cascadeTypes = b.cascadeTypes == null ? new CascadeType[0] : b.cascadeTypes;
     }
 
     public String name() { return name; }
@@ -40,6 +44,7 @@ public final class RelationMeta {
     public String associationForeignKey() { return associationForeignKey; }
     public String joinTable() { return joinTable; }
     public Class<?> through() { return through; }
+    public CascadeType[] cascadeTypes() { return cascadeTypes; }
 
     public static Builder builder() { return new Builder(); }
 
@@ -51,6 +56,7 @@ public final class RelationMeta {
         private String associationForeignKey;
         private String joinTable;
         private Class<?> through;
+        private CascadeType[] cascadeTypes;
 
         public Builder name(String name) { this.name = name; return this; }
         public Builder targetEntity(Class<?> targetEntity) { this.targetEntity = targetEntity; return this; }
@@ -59,6 +65,7 @@ public final class RelationMeta {
         public Builder associationForeignKey(String associationForeignKey) { this.associationForeignKey = associationForeignKey; return this; }
         public Builder joinTable(String joinTable) { this.joinTable = joinTable; return this; }
         public Builder through(Class<?> through) { this.through = through; return this; }
+        public Builder cascadeTypes(CascadeType[] cascadeTypes) { this.cascadeTypes = cascadeTypes; return this; }
 
         public RelationMeta build() { return new RelationMeta(this); }
     }
