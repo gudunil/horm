@@ -54,6 +54,7 @@ public final class MapperBuilder {
         type.addMethod(buildSetFieldMethod(d, entity));
         type.addMethod(buildSetRelationMethod(d, entity));
         type.addMethod(buildGetRelationMethod(d, entity));
+        type.addMethod(buildIncrementVersionMethod(d, entity));
 
         JavaFile.builder(d.generatedPackage(), type.build())
             .indent("    ")
@@ -230,6 +231,38 @@ public final class MapperBuilder {
             sw.add("  default -> throw new $T($S + name);\n};",
                 ClassName.get(IllegalArgumentException.class), "Unknown relation: ");
             m.addCode(sw.build());
+        }
+        return m.build();
+    }
+
+    /**
+     * Emits the {@code incrementVersion} override for entities with a
+     * {@code @Version} field. Calls the version getter, adds 1, and calls
+     * the version setter. Entities without a version field do not override
+     * this method (the default throws UnsupportedOperationException).
+     */
+    private static MethodSpec buildIncrementVersionMethod(EntityDescriptor d, ClassName entity) {
+        MethodSpec.Builder m = MethodSpec.methodBuilder("incrementVersion")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter(entity, "u");
+
+        EntityDescriptor.FieldDescriptor versionFd = null;
+        for (EntityDescriptor.FieldDescriptor fd : d.fields()) {
+            if (fd.version()) {
+                versionFd = fd;
+                break;
+            }
+        }
+        if (versionFd == null) {
+            // No @Version field — skip override, default throws UnsupportedOperationException
+            m.addStatement("throw new $T($S)",
+                ClassName.get(UnsupportedOperationException.class), "incrementVersion");
+        } else {
+            // u.setVersion(u.getVersion() + 1)
+            TypeName versionT = TypeMapper.boxType(versionFd);
+            m.addStatement("u.$L(($T) (u.$L() + 1))",
+                versionFd.setterName(), versionT, versionFd.getterName());
         }
         return m.build();
     }

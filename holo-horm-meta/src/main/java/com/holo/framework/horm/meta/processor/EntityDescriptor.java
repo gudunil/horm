@@ -107,13 +107,15 @@ public final class EntityDescriptor {
         private final String setterName;
         private final boolean enumType;
         private final String enumQualifiedName;   // for enum types
+        private final boolean version;
 
         public FieldDescriptor(String name, String column, String typeName, String typeQualifiedName,
                                boolean primitive, boolean id, GenerationType strategy,
                                boolean nullable, boolean unique, int length, int precision, int scale,
                                boolean insertable, boolean updatable,
                                String getterName, String setterName,
-                               boolean enumType, String enumQualifiedName) {
+                               boolean enumType, String enumQualifiedName,
+                               boolean version) {
             this.name = name;
             this.column = (column == null || column.isEmpty()) ? name : column;
             this.typeName = typeName;
@@ -132,6 +134,7 @@ public final class EntityDescriptor {
             this.setterName = setterName;
             this.enumType = enumType;
             this.enumQualifiedName = enumQualifiedName;
+            this.version = version;
         }
 
         public String name() { return name; }
@@ -152,6 +155,7 @@ public final class EntityDescriptor {
         public String setterName() { return setterName; }
         public boolean enumType() { return enumType; }
         public String enumQualifiedName() { return enumQualifiedName; }
+        public boolean version() { return version; }
     }
 
     /**

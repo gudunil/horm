@@ -31,6 +31,7 @@ public final class EntityMeta<T> {
     private final FieldMeta<?> idField;
     private final Mapper<T> mapper;
     private final List<RelationMeta> relations;
+    private final FieldMeta<?> versionField;
 
     private EntityMeta(Builder<T> b) {
         this.type = Objects.requireNonNull(b.type, "type");
@@ -41,6 +42,7 @@ public final class EntityMeta<T> {
         this.idField = b.idField;
         this.mapper = b.mapper;
         this.relations = b.relations == null ? List.of() : List.copyOf(b.relations);
+        this.versionField = b.versionField;
     }
 
     public Class<T> type() { return type; }
@@ -51,6 +53,7 @@ public final class EntityMeta<T> {
     public FieldMeta<?> idField() { return idField; }
     public Mapper<T> mapper() { return mapper; }
     public List<RelationMeta> relations() { return relations; }
+    public FieldMeta<?> versionField() { return versionField; }
 
     /** Looks up a field by Java property name. */
     public Optional<FieldMeta<?>> field(String name) {
@@ -88,6 +91,7 @@ public final class EntityMeta<T> {
         private FieldMeta<?> idField;
         private Mapper<T> mapper;
         private List<RelationMeta> relations;
+        private FieldMeta<?> versionField;
 
         public Builder<T> type(Class<T> type) { this.type = type; return this; }
         public Builder<T> tableName(String tableName) { this.tableName = tableName; return this; }
@@ -97,6 +101,7 @@ public final class EntityMeta<T> {
         public Builder<T> idField(FieldMeta<?> idField) { this.idField = idField; return this; }
         public Builder<T> mapper(Mapper<T> mapper) { this.mapper = mapper; return this; }
         public Builder<T> relations(List<RelationMeta> relations) { this.relations = relations; return this; }
+        public Builder<T> versionField(FieldMeta<?> versionField) { this.versionField = versionField; return this; }
 
         public EntityMeta<T> build() { return new EntityMeta<>(this); }
     }

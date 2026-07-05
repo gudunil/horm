@@ -77,4 +77,18 @@ public interface Mapper<T> {
     default Object getRelation(T entity, String name) {
         throw new UnsupportedOperationException("Relation not mapped: " + name);
     }
+
+    /**
+     * Increments the version field on the entity by 1.
+     *
+     * <p>Default implementation throws {@link UnsupportedOperationException}
+     * so that entities without a {@code @Version} field remain compatible.
+     * APT-generated mappers for entities with {@code @Version} override this
+     * method to call the version field's getter/setter directly.
+     *
+     * @param entity the entity instance to mutate
+     */
+    default void incrementVersion(T entity) {
+        throw new UnsupportedOperationException("incrementVersion");
+    }
 }

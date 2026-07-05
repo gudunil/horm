@@ -28,6 +28,7 @@ public final class FieldMeta<T> {
     private final int scale;
     private final boolean insertable;
     private final boolean updatable;
+    private final boolean version;
 
     private FieldMeta(Builder<T> b) {
         this.name = Objects.requireNonNull(b.name, "name");
@@ -42,6 +43,7 @@ public final class FieldMeta<T> {
         this.scale = b.scale;
         this.insertable = b.insertable;
         this.updatable = b.updatable;
+        this.version = b.version;
     }
 
     public String name() { return name; }
@@ -56,6 +58,7 @@ public final class FieldMeta<T> {
     public int scale() { return scale; }
     public boolean insertable() { return insertable; }
     public boolean updatable() { return updatable; }
+    public boolean version() { return version; }
 
     public static <T> Builder<T> builder() { return new Builder<>(); }
 
@@ -72,6 +75,7 @@ public final class FieldMeta<T> {
         private int scale = 0;
         private boolean insertable = true;
         private boolean updatable = true;
+        private boolean version = false;
 
         public Builder<T> name(String name) { this.name = name; return this; }
         public Builder<T> column(String column) { this.column = column; return this; }
@@ -85,6 +89,7 @@ public final class FieldMeta<T> {
         public Builder<T> scale(int scale) { this.scale = scale; return this; }
         public Builder<T> insertable(boolean insertable) { this.insertable = insertable; return this; }
         public Builder<T> updatable(boolean updatable) { this.updatable = updatable; return this; }
+        public Builder<T> version(boolean version) { this.version = version; return this; }
 
         public FieldMeta<T> build() { return new FieldMeta<>(this); }
     }

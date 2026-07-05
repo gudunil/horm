@@ -9,6 +9,7 @@ import com.holo.framework.horm.meta.annotation.HasMany;
 import com.holo.framework.horm.meta.annotation.HasManyThrough;
 import com.holo.framework.horm.meta.annotation.HasOne;
 import com.holo.framework.horm.meta.annotation.Id;
+import com.holo.framework.horm.meta.annotation.Version;
 import com.squareup.javapoet.TypeName;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -130,6 +131,9 @@ public final class EntityValidator {
 
         // R5-R9: relation field validation (M3)
         validateRelations(d, type, env);
+
+        // R10-R11: @Version field validation (M4)
+        validateVersion(d, type, env, fieldElements);
     }
 
     /**
@@ -276,5 +280,44 @@ public final class EntityValidator {
         }
         // byte[] has no TypedField subclass but is supported via Row.getBytes.
         return "byte[]".equals(fd.typeQualifiedName());
+    }
+
+    /**
+     * Validate @Version fields (R10-R11).
+     *
+     * <p>Rules:
+     * <ul>
+     *   <li><b>R10</b> — @Version field type must be int/Integer/long/Long</li>
+     *   <li><b>R11</b> — at most one @Version field per entity</li>
+     * </ul>
+     */
+    private static void validateVersion(EntityDescriptor d, TypeElement type,
+                                        ProcessingEnvironment env,
+                                        Map<String, VariableElement> fieldElements) {
+        int versionCount = 0;
+        Set<String> allowedTypes = Set.of(
+            "int", "java.lang.Integer", "long", "java.lang.Long"
+        );
+        for (EntityDescriptor.FieldDescriptor fd : d.fields()) {
+            if (!fd.version()) continue;
+            versionCount++;
+            // R10: type must be int/Integer/long/Long
+            if (!allowedTypes.contains(fd.typeQualifiedName())) {
+                VariableElement field = fieldElements.get(fd.name());
+                env.getMessager().printMessage(
+                    Diagnostic.Kind.ERROR,
+                    "@Version field '" + fd.name() + "' must be of type int, Integer, long, or Long",
+                    field != null ? field : type
+                );
+            }
+        }
+        // R11: at most one @Version field
+        if (versionCount > 1) {
+            env.getMessager().printMessage(
+                Diagnostic.Kind.ERROR,
+                "@Entity " + d.qualifiedName() + " must have at most one @Version field",
+                type
+            );
+        }
     }
 }

@@ -156,25 +156,65 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
 
     private T update(T entity) {
         FieldMeta<?> idField = requireIdField();
+        FieldMeta<?> versionField = meta.versionField();
+
         List<String> columns = meta.fields().stream()
             .filter(FieldMeta::updatable)
             .filter(f -> !f.isId())
+            .filter(f -> !f.version())
             .map(FieldMeta::column)
             .toList();
+
         String setClause = columns.stream()
             .map(c -> c + " = ?")
             .collect(Collectors.joining(", "));
-        String sql = "UPDATE " + qualifiedTable()
-            + " SET " + setClause
-            + " WHERE " + idField.column() + " = ?";
+
+        StringBuilder sql = new StringBuilder("UPDATE ")
+            .append(qualifiedTable())
+            .append(" SET ");
+
+        List<Object> bindings = new ArrayList<>();
         Row row = mapper.toRow(entity);
-        try (PreparedStatement ps = TransactionManager.currentConnection(ctx).prepareStatement(sql)) {
-            int i = 1;
+
+        if (!columns.isEmpty()) {
+            sql.append(setClause);
             for (String col : columns) {
-                ps.setObject(i++, row.get(col));
+                bindings.add(row.get(col));
             }
-            ps.setObject(i, mapper.getId(entity));
-            ps.executeUpdate();
+        }
+
+        // Version column: SET version = version + 1
+        if (versionField != null) {
+            if (!columns.isEmpty()) {
+                sql.append(", ");
+            }
+            sql.append(versionField.column()).append(" = ").append(versionField.column()).append(" + 1");
+        }
+
+        sql.append(" WHERE ").append(idField.column()).append(" = ?");
+        bindings.add(mapper.getId(entity));
+
+        // Version check: AND version = ?
+        if (versionField != null) {
+            sql.append(" AND ").append(versionField.column()).append(" = ?");
+            bindings.add(mapper.getField(entity, versionField.name()));
+        }
+
+        try (PreparedStatement ps = TransactionManager.currentConnection(ctx)
+                .prepareStatement(sql.toString())) {
+            int i = 1;
+            for (Object val : bindings) {
+                ps.setObject(i++, val);
+            }
+            int affected = ps.executeUpdate();
+            if (versionField != null && affected == 0) {
+                throw new OptimisticLockException(
+                    "Optimistic lock failed for " + entityType.getName()
+                        + " with id=" + mapper.getId(entity));
+            }
+            if (versionField != null) {
+                mapper.incrementVersion(entity);
+            }
         } catch (SQLException e) {
             throw new HormException("Failed to update " + entityType.getName(), e);
         }
@@ -183,7 +223,33 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
 
     @Override
     public void delete(T entity) {
-        deleteById(mapper.getId(entity));
+        FieldMeta<?> versionField = meta.versionField();
+        Object id = mapper.getId(entity);
+        if (versionField != null) {
+            StringBuilder sql = new StringBuilder("DELETE FROM ")
+                .append(qualifiedTable())
+                .append(" WHERE ")
+                .append(requireIdField().column())
+                .append(" = ? AND ")
+                .append(versionField.column())
+                .append(" = ?");
+            try (PreparedStatement ps = TransactionManager.currentConnection(ctx)
+                    .prepareStatement(sql.toString())) {
+                ps.setObject(1, id);
+                ps.setObject(2, mapper.getField(entity, versionField.name()));
+                int affected = ps.executeUpdate();
+                if (affected == 0) {
+                    throw new OptimisticLockException(
+                        "Optimistic lock failed on delete for " + entityType.getName()
+                            + " with id=" + id);
+                }
+            } catch (SQLException e) {
+                throw new HormException(
+                    "Failed to delete " + entityType.getName() + " by id " + id, e);
+            }
+        } else {
+            deleteById(id);
+        }
     }
 
     @Override

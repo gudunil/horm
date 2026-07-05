@@ -13,6 +13,7 @@ import com.holo.framework.horm.meta.annotation.HasManyThrough;
 import com.holo.framework.horm.meta.annotation.HasOne;
 import com.holo.framework.horm.meta.annotation.Id;
 import com.holo.framework.horm.meta.annotation.Table;
+import com.holo.framework.horm.meta.annotation.Version;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
@@ -105,7 +106,8 @@ public final class EntityDescriptorParser {
 
             Id idAnno = field.getAnnotation(Id.class);
             Column colAnno = field.getAnnotation(Column.class);
-            if (idAnno == null && colAnno == null) {
+            Version versionAnno = field.getAnnotation(Version.class);
+            if (idAnno == null && colAnno == null && versionAnno == null) {
                 // M3: probe for relation annotations (@BelongsTo/@HasOne/@HasMany/
                 // @HasAndBelongsToMany/@HasManyThrough). A field with only a relation
                 // annotation is a relation field, not a column.
@@ -116,7 +118,7 @@ public final class EntityDescriptorParser {
                 continue;
             }
 
-            EntityDescriptor.FieldDescriptor fd = parseField(field, idAnno, colAnno);
+            EntityDescriptor.FieldDescriptor fd = parseField(field, idAnno, colAnno, versionAnno);
             builder.addField(fd);
             if (idAnno != null) {
                 builder.idField(fd);
@@ -128,7 +130,8 @@ public final class EntityDescriptorParser {
 
     private static EntityDescriptor.FieldDescriptor parseField(VariableElement field,
                                               Id idAnno,
-                                              Column colAnno) {
+                                              Column colAnno,
+                                              Version versionAnno) {
         String name = field.getSimpleName().toString();
         String column = (colAnno != null && !colAnno.name().isEmpty())
             ? colAnno.name()
@@ -156,6 +159,11 @@ public final class EntityDescriptorParser {
         boolean insertable = (colAnno == null) || colAnno.insertable();
         boolean updatable = (colAnno == null) || colAnno.updatable();
 
+        boolean isVersionField = versionAnno != null;
+        // Version fields are managed by the framework: not insertable, not updatable by user
+        boolean effectiveInsertable = isVersionField ? false : ((colAnno == null) || colAnno.insertable());
+        boolean effectiveUpdatable = isVersionField ? false : ((colAnno == null) || colAnno.updatable());
+
         boolean isBoolean = (kind == TypeKind.BOOLEAN)
             || "java.lang.Boolean".equals(typeQualifiedName);
         String getterName = (isBoolean ? "is" : "get") + capitalize(name);
@@ -174,12 +182,13 @@ public final class EntityDescriptorParser {
             length,
             precision,
             scale,
-            insertable,
-            updatable,
+            effectiveInsertable,
+            effectiveUpdatable,
             getterName,
             setterName,
             enumType,
-            enumQualifiedName
+            enumQualifiedName,
+            isVersionField
         );
     }
 

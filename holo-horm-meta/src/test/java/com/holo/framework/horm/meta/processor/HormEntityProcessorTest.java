@@ -686,6 +686,74 @@ class HormEntityProcessorTest {
     }
 
     @Test
+    void acceptsVersionFieldOnEntity() throws IOException {
+        Compilation comp = compile("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Entity;
+            import com.holo.framework.horm.meta.annotation.Id;
+            import com.holo.framework.horm.meta.annotation.Column;
+            import com.holo.framework.horm.meta.annotation.Version;
+            import com.holo.framework.horm.core.Model;
+
+            @Entity(table = "versioned_items")
+            public class VersionedItem extends Model<VersionedItem> {
+                @Id
+                private Long id;
+                @Column
+                private String name;
+                @Version
+                private Long version;
+                public Long getId() { return id; }
+                public void setId(Long id) { this.id = id; }
+                public String getName() { return name; }
+                public void setName(String name) { this.name = name; }
+                public Long getVersion() { return version; }
+                public void setVersion(Long version) { this.version = version; }
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+        assertThat(comp.errors()).isEmpty();
+
+        String metaSrc = src(generated(comp, "VersionedItemMeta.java"));
+        assertThat(metaSrc).contains(".version(true)");
+        assertThat(metaSrc).contains(".versionField(VERSION)");
+        assertThat(metaSrc).contains(".insertable(false)");
+        assertThat(metaSrc).contains(".updatable(false)");
+
+        String mapperSrc = src(generated(comp, "VersionedItemMapper.java"));
+        assertThat(mapperSrc).contains("public void incrementVersion");
+        assertThat(mapperSrc).contains("u.setVersion((Long) (u.getVersion() + 1))");
+    }
+
+    @Test
+    void rejectsVersionFieldWithWrongType() {
+        // R10: @Version field type must be int/Integer/long/Long
+        Compilation comp = compile("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Entity;
+            import com.holo.framework.horm.meta.annotation.Id;
+            import com.holo.framework.horm.meta.annotation.Version;
+            import com.holo.framework.horm.core.Model;
+
+            @Entity
+            public class Bad extends Model<Bad> {
+                @Id private Long id;
+                @Version
+                private String version;
+                public Long getId() { return id; }
+                public void setId(Long id) { this.id = id; }
+                public String getVersion() { return version; }
+                public void setVersion(String version) { this.version = version; }
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.FAILURE);
+        assertThat(comp.errors())
+            .anyMatch(d -> d.getMessage(null).contains("must be of type int, Integer, long, or Long"));
+    }
+
+    @Test
     void parsesAllFiveRelationTypes() throws IOException {
         Compilation comp = compile(USER_ALL_RELATIONS_SOURCE, ORDER_SOURCE,
             PROFILE_SOURCE, TAG_SOURCE, PRODUCT_SOURCE);

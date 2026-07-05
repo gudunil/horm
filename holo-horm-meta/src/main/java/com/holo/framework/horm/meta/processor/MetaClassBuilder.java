@@ -149,6 +149,9 @@ public final class MetaClassBuilder {
         if (!f.updatable()) {
             init.add(".updatable(false)");
         }
+        if (f.version()) {
+            init.add(".version(true)");
+        }
         init.add(".build()");
         return FieldSpec.builder(fieldMetaT, constName,
                 Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
@@ -175,8 +178,19 @@ public final class MetaClassBuilder {
             body.add(".idField($L)", constName(d.idField().name()));
         }
         body.add(".mapper(MAPPER)")
-            .add(".relations(ALL_RELATIONS)")
-            .add(".build()");
+            .add(".relations(ALL_RELATIONS)");
+        // versionField: find the field descriptor with version=true
+        EntityDescriptor.FieldDescriptor versionFd = null;
+        for (EntityDescriptor.FieldDescriptor fd : d.fields()) {
+            if (fd.version()) {
+                versionFd = fd;
+                break;
+            }
+        }
+        if (versionFd != null) {
+            body.add(".versionField($L)", constName(versionFd.name()));
+        }
+        body.add(".build()");
         return MethodSpec.methodBuilder("entityMeta")
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
             .returns(entityMetaT)
