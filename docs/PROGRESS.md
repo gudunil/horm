@@ -12,9 +12,10 @@
 | M1     | ✅ 完成 | 2026-07-04     | v1.0.0-M1  |
 | M2     | ✅ 完成 | 2026-07-04     | v1.0.0-M2  |
 | M3     | ✅ 完成 | 2026-07-05     | v1.0.0-M3  |
-| M4-M9  | 📋 规划中 | —              | —          |
+| M4     | ✅ 完成 | 2026-07-05     | v1.0.0-M4  |
+| M5-M9  | 📋 规划中 | —              | —          |
 
-**当前分支**：`feature/m3-relations`（M3 完成后待 squash merge 到 `main`）
+**当前分支**：`feature/m4-transactions`（M4 完成后待 squash merge 到 `main`）
 
 ---
 
@@ -175,16 +176,59 @@
 
 ---
 
+## M4: 事务管理 + 级联 + 批量操作 + 乐观锁（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | Commit |
+|--------|------|--------|
+| M4-1 | `DataSourceProvider` SPI + `SimpleDataSourceProvider` + `HormContext` 重构 | `9f9e92a` |
+| M4-2 | `TransactionManager`/`TransactionDefinition`/`TransactionStatus`/`TransactionException` + `@Transactional` 注解 + `Propagation`/`Isolation` 枚举 + 编程式 `Horm.tx()` | `5a87281` |
+| M4-3 | `TransactionMethodMeta` + `TransactionAdvisorBuilder`（编译期生成事务代理类） + `IndexWriter` 扩展 | `5a87281` |
+| M4-4 | `UpdateQuery`/`UpdateQueryImpl` + `DeleteQuery`/`DeleteQueryImpl` + `Model.update()`/`Model.delete()` 静态入口 | `fbe7208` |
+| M4-5 | `CascadeType` 枚举 + 5 个关联注解 `cascade()` 属性 + `RelationMeta`/`EntityDescriptor`/`EntityDescriptorParser`/`MetaClassBuilder`/`MapperBuilder` 扩展 + `Model.save()`/`saveWith()`/`delete()`/`deleteWith()` cascade 辅助 | `fbe7208` |
+| M4-6 | `@Version` 注解 + `FieldMeta.version`/`EntityMeta.versionField`/`Mapper.incrementVersion` + `OptimisticLockException` + `JdbcRepository` 乐观锁 UPDATE/DELETE + APT `EntityValidator` R10/R11 校验 | `841b899` |
+
+### 测试与覆盖率
+
+- **测试总数**：145（meta 模块 66 + core 模块 79）
+- 新增测试：
+  - `TransactionManagerTest`（22 测试）+ `TransactionIntegrationTest`（7 H2 集成测试）
+  - `UpdateQueryImplTest`（6 测试）+ `DeleteQueryImplTest`（4 测试）+ `BatchOperationIntegrationTest`（7 H2 集成测试）
+  - `OptimisticLockIntegrationTest`（5 H2 集成测试）
+  - `HormEntityProcessorTest` +2 APT compile-testing（@Version happy path + R10 错误路径）
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core -am verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **APT 编译期 AOP 织入**：`TransactionAdvisorBuilder` 在编译期为 `@Transactional` 方法生成代理类，避免运行时字节码增强依赖（如 Spring AOP / ByteBuddy）。
+2. **双重事务边界**：同时支持 `@Transactional` 声明式和 `Horm.tx()` 编程式事务。
+3. **REQUIRED + REQUIRES_NEW 传播**：REQUIRED 加入现有事务或创建新事务；REQUIRES_NEW 始终创建新事务并挂起现有事务。
+4. **注解驱动 + 显式 cascade 双模式**：`save()`/`delete()` 自动级联带 `CascadeType.PERSIST`/`REMOVE`/`ALL` 的关联；`saveWith()`/`deleteWith()` 显式指定级联关联名。
+5. **Query 风格 + Model 静态批量 API**：`Model.update(Class)`/`Model.delete(Class)` 返回 `UpdateQuery`/`DeleteQuery` 流畅 API。
+6. **@Version 乐观锁**：仅支持 int/Integer/long/Long；版本字段 `insertable=false, updatable=false`（框架管理）；UPDATE/DELETE 添加 `WHERE version = ?` + 受影响行数检测 + `OptimisticLockException`。
+7. **单数据源 + SPI 钩子**：M4 仅单数据源，`DataSourceProvider` SPI 为 M5 多数据源预留扩展点。
+
+### 已知限制（M4 范围内）
+
+- 不支持 `NESTED`/`SUPPORTS`/`NOT_SUPPORTED`/`MANDATORY`/`NEVER` 传播级别 —— 仅 REQUIRED + REQUIRES_NEW
+- 不支持 `MERGE`/`DETACH`/`REFRESH` cascade 操作 —— 仅 `PERSIST`/`REMOVE`/`ALL` 实际生效
+- `@Transactional` 仅支持类级别和方法级别，不支持接口继承
+- 乐观锁仅在 `JdbcRepository.update` 和 `delete(entity)` 中生效，`deleteById` 不检查版本
+- 不支持 `INSERT ... ON DUPLICATE KEY UPDATE` —— 留待 M5
+- 不支持批量 `IN` 参数上限校验 —— 留待后续
+
+---
+
 ## 后续里程碑概览
 
 | 里程碑 | 主题 | 预计 |
 |--------|------|------|
-| M4 | 事务管理（`@Transactional` AOP）+ cascade 级联 | 2026 Q3 |
-| M5 | 多数据源 SPI 与路由 | 2026 Q4 |
+| M5 | 多数据源 SPI 与路由 | 2026 Q3 |
 | M6 | 缓存链（L1 + L2 组合）+ batch loading | 2026 Q4 |
-| M7 | 数据库迁移（Flyway 集成） | 2027 Q1 |
+| M7 | 数据库迁移（Flyway 集成） | 2026 Q4 |
 | M8 | Spring Boot Starter | 2027 Q1 |
-| M9 | 性能基准与 GA 发布 | 2027 Q2-Q3 |
+| M9 | 性能基准与 GA 发布 | 2027 Q1-Q2 |
 
 ---
 
@@ -202,14 +246,11 @@
 
 ## 接续点（下次开发从这里开始）
 
-1. **可选**：将 `feature/m3-relations` squash merge 到 `main`：
+1. **可选**：将 `feature/m4-transactions` squash merge 到 `main`：
    ```bash
    git -C e:\project\Holo\holo-horm checkout main
-   git -C e:\project\Holo\holo-horm merge --squash feature/m3-relations
-   git -C e:\project\Holo\holo-horm commit -m "feat(m3): squash merge relation mapping (Eloquent annotations, JOIN/fetch/select)"
-   # 重新打 tag 到 main HEAD（如需）
-   git -C e:\project\Holo\holo-horm tag -d v1.0.0-M3
-   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M3 -m "M3: ..."
+   git -C e:\project\Holo\holo-horm merge --squash feature/m4-transactions
+   git -C e:\project\Holo\holo-horm commit -m "feat(m4): squash merge transaction, cascade, batch, optimistic locking"
+   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M4 -m "M4: ..."
    ```
-2. **启动 M4**：新建分支 `feature/m4-transactions`，实现 `@Transactional` AOP 事务管理 + cascade 级联（persist/merge/remove）+ `UPDATE ... WHERE` / `DELETE ... WHERE` 批量操作
-3. **可选优化**：为 `Query<T>` 增加批量 `IN` 参数上限校验、`Page<T>` 分页对象、`GROUP BY`/`HAVING`/聚合等扩展（按需）
+2. **启动 M5**：新建分支 `feature/m5-datasource`，实现多数据源 SPI 与路由
