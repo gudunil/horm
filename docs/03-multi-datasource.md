@@ -2,6 +2,8 @@
 
 > 本文档详述 HORM 数据源 SPI 设计、参考实现（SQL/NoSQL/REST/文件）、自定义数据源扩展规范、能力声明机制与多数据源切换流程。
 
+> **实现状态**：当前仅实现了基于 JDBC 的 SQL DataSource（MySQL/H2 方言）。完整的 `DataSource` SPI、`Capabilities` 能力声明、NoSQL/REST/文件数据源参考实现及动态路由计划在 M5 实现。
+
 ---
 
 ## 一、设计目标

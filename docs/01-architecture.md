@@ -47,7 +47,7 @@
 │   │ Annotations         │ APT Processor       │ Generated Classes    │    │
 │   │ @Entity/@Table/@Id  │ EntityProcessor     │ EntityMeta           │    │
 │   │ @Column/@BelongsTo  │ MapperGenerator     │ Mapper               │    │
-│   │ @HasMany/@Index     │ QueryMetaGenerator  │ FieldAccessor        │    │
+│   │ @HasMany/@HasOne    │ QueryMetaGenerator  │ FieldAccessor        │    │
 │   └─────────────────────┴─────────────────────┴──────────────────────┘    │
 └────────────────────────────────────┬────────────────────────────────────────┘
                                      │
@@ -488,12 +488,11 @@ List<User> users = User.where(STATUS.eq("active")).all();
 
 ## 九、下一步
 
-| 文档 | 内容 |
-|------|------|
-| [02-zero-reflection.md](./02-zero-reflection.md) | 零反射实现细节 |
-| [03-multi-datasource.md](./03-multi-datasource.md) | 多数据源适配 |
-| [04-cache-chain.md](./04-cache-chain.md) | 缓存链系统 |
-| [05-active-record.md](./05-active-record.md) | Active Record API |
-| [06-extension-features.md](./06-extension-features.md) | 扩展特性 |
-| [07-performance-security.md](./07-performance-security.md) | 性能与安全 |
-| [08-roadmap.md](./08-roadmap.md) | 开发计划 |
+| 文档 | 内容 | 状态 |
+|------|------|------|
+| [02-zero-reflection.md](./02-zero-reflection.md) | 零反射实现细节 | 已实现（M1-M3） |
+| [03-multi-datasource.md](./03-multi-datasource.md) | 多数据源适配 | 规划中（M5） |
+| [04-cache-chain.md](./04-cache-chain.md) | 缓存链系统 | 规划中（M6） |
+| [05-active-record.md](./05-active-record.md) | Active Record API | 部分实现（M1-M3） |
+| [06-extension-features.md](./06-extension-features.md) | 扩展特性 | 规划中 |
+| [07-performance-security.md](./07-performance-security.md) | 性能与安全 | 持续更新 |

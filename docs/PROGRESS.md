@@ -184,7 +184,7 @@
 |--------|------|--------|
 | M4-1 | `DataSourceProvider` SPI + `SimpleDataSourceProvider` + `HormContext` 重构 | `9f9e92a` |
 | M4-2 | `TransactionManager`/`TransactionDefinition`/`TransactionStatus`/`TransactionException` + `@Transactional` 注解 + `Propagation`/`Isolation` 枚举 + 编程式 `Horm.tx()` | `5a87281` |
-| M4-3 | `TransactionMethodMeta` + `TransactionAdvisorBuilder`（编译期生成事务代理类） + `IndexWriter` 扩展 | `5a87281` |
+| M4-3 | `TransactionMethodMeta` + `TransactionAdvisorBuilder`（编译期扫描 `@Transactional` 并生成事务元数据伴随类） + `IndexWriter` 扩展 | `5a87281` |
 | M4-4 | `UpdateQuery`/`UpdateQueryImpl` + `DeleteQuery`/`DeleteQueryImpl` + `Model.update()`/`Model.delete()` 静态入口 | `fbe7208` |
 | M4-5 | `CascadeType` 枚举 + 5 个关联注解 `cascade()` 属性 + `RelationMeta`/`EntityDescriptor`/`EntityDescriptorParser`/`MetaClassBuilder`/`MapperBuilder` 扩展 + `Model.save()`/`saveWith()`/`delete()`/`deleteWith()` cascade 辅助 | `fbe7208` |
 | M4-6 | `@Version` 注解 + `FieldMeta.version`/`EntityMeta.versionField`/`Mapper.incrementVersion` + `OptimisticLockException` + `JdbcRepository` 乐观锁 UPDATE/DELETE + APT `EntityValidator` R10/R11 校验 | `841b899` |
@@ -201,8 +201,8 @@
 
 ### 关键设计决策
 
-1. **APT 编译期 AOP 织入**：`TransactionAdvisorBuilder` 在编译期为 `@Transactional` 方法生成代理类，避免运行时字节码增强依赖（如 Spring AOP / ByteBuddy）。
-2. **双重事务边界**：同时支持 `@Transactional` 声明式和 `Horm.tx()` 编程式事务。
+1. **APT 编译期事务元数据扫描**：`TransactionAdvisorBuilder` 在编译期为 `@Transactional` 方法/类生成 `XxxTransactionAdvisor` 元数据伴随类并写入 `transactions.idx`，为 M8 运行时 AOP 织入做准备；M4 实际事务边界通过编程式 `Horm.tx()` 或手动 `TransactionManager` API 控制。
+2. **编程式事务 + 声明式元数据**：M4 通过 `Horm.tx()` / `TransactionManager` 提供完整编程式事务；`@Transactional` 注解在 M4 仅完成编译期元数据扫描，运行时方法拦截将在 M8 Spring Boot Starter 中实现。
 3. **REQUIRED + REQUIRES_NEW 传播**：REQUIRED 加入现有事务或创建新事务；REQUIRES_NEW 始终创建新事务并挂起现有事务。
 4. **注解驱动 + 显式 cascade 双模式**：`save()`/`delete()` 自动级联带 `CascadeType.PERSIST`/`REMOVE`/`ALL` 的关联；`saveWith()`/`deleteWith()` 显式指定级联关联名。
 5. **Query 风格 + Model 静态批量 API**：`Model.update(Class)`/`Model.delete(Class)` 返回 `UpdateQuery`/`DeleteQuery` 流畅 API。
@@ -213,6 +213,7 @@
 
 - 不支持 `NESTED`/`SUPPORTS`/`NOT_SUPPORTED`/`MANDATORY`/`NEVER` 传播级别 —— 仅 REQUIRED + REQUIRES_NEW
 - 不支持 `MERGE`/`DETACH`/`REFRESH` cascade 操作 —— 仅 `PERSIST`/`REMOVE`/`ALL` 实际生效
+- `@Transactional` 在 M4 仅完成编译期元数据扫描，运行时方法拦截/AOP 代理将在 M8 Spring Boot Starter 中实现
 - `@Transactional` 仅支持类级别和方法级别，不支持接口继承
 - 乐观锁仅在 `JdbcRepository.update` 和 `delete(entity)` 中生效，`deleteById` 不检查版本
 - 不支持 `INSERT ... ON DUPLICATE KEY UPDATE` —— 留待 M5
@@ -227,7 +228,7 @@
 | M5 | 多数据源 SPI 与路由 | 2026 Q3 |
 | M6 | 缓存链（L1 + L2 组合）+ batch loading | 2026 Q4 |
 | M7 | 数据库迁移（Flyway 集成） | 2026 Q4 |
-| M8 | Spring Boot Starter | 2027 Q1 |
+| M8 | Spring Boot Starter + `@Transactional` 运行时 AOP 代理织入 | 2027 Q1 |
 | M9 | 性能基准与 GA 发布 | 2027 Q1-Q2 |
 
 ---

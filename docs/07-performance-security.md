@@ -391,143 +391,163 @@ public class FindByIdBenchmark {
 
 ### 6.1 路线图
 
+> 更新时间：2026-07-05。M1-M3 已提前完成，后续里程碑按实际进度重新排序。
+
 ```
-   M1 基础架构 (4 周)        M2 核心功能 (6 周)          M3 高级特性 (4 周)
+   M1 基础架构 ✅            M2 查询构建器 ✅            M3 关联关系映射 ✅
    ─────────────────         ─────────────────          ─────────────────
-   2026-07 ~ 2026-08         2026-08 ~ 2026-09          2026-10 ~ 2026-11
+   2026-07-04                2026-07-04                 2026-07-05
 
-   ├─ APT 元数据生成          ├─ Active Record API        ├─ 关联关系
-   ├─ Model 基类              ├─ Query DSL                ├─ Scope
-   ├─ Mapper 接口             ├─ SQL DataSource           ├─ 验证
-   ├─ EntityMeta 注册         ├─ MySQL/PG 方言            ├─ 生命周期钩子
-   ├─ 基础 CRUD               ├─ 事务管理                 ├─ 软删除
-   ├─ 编译期校验              ├─ Spring Boot Starter      ├─ 审计日志
-   └─ 单元测试框架            └─ 基础示例                  └─ 多租户
-
-            ▼                            ▼                            ▼
-
-   M4 缓存链 (3 周)           M5 迁移与代码生成 (3 周)     M6 多数据源扩展 (4 周)
-   ──────────────             ──────────────────         ──────────────────
-   2026-11 ~ 2026-12          2027-01                    2027-02 ~ 2027-03
-
-   ├─ Cache SPI               ├─ Migration DSL            ├─ MongoDB DataSource
-   ├─ L1 Caffeine 实现        ├─ 迁移执行器               ├─ Redis DataSource
-   ├─ L2 Redis 实现           ├─ Codegen CLI              ├─ REST DataSource
-   ├─ 缓存链组合              ├─ Maven 插件               ├─ CSV DataSource
-   ├─ 失效广播                └─ DDL ↔ Entity 互转        └─ 自定义 SPI 文档
-   ├─ 防穿透/雪崩/击穿
-   └─ 监控指标
+   ├─ APT 元数据生成          ├─ 类型安全 Query DSL       ├─ Eloquent 关联注解
+   ├─ Model 基类              ├─ Condition/Conditions     ├─ RelationField / RelationType
+   ├─ Mapper 接口             ├─ QueryImpl                ├─ APT 生成关联元数据
+   ├─ EntityMeta 注册         ├─ H2 集成测试              ├─ fetch / leftJoin / innerJoin
+   ├─ 基础 CRUD               ├─ HormException 覆盖       ├─ select 投影
+   └─ H2 集成测试             └─ 错误路径测试             └─ ResultSet 关联映射
 
             ▼                            ▼                            ▼
 
-   M7 性能与稳定 (3 周)       M8 生态集成 (4 周)           M9 GA 发布 (2 周)
-   ──────────────             ──────────────              ──────────────
-   2027-04                    2027-05 ~ 2027-06           2027-07
+   M4 事务管理 (2026 Q3)      M5 多数据源 SPI (2026 Q4)   M6 缓存链 (2026 Q4)
+   ─────────────────────      ───────────────────────     ─────────────────
 
-   ├─ JMH 基准套件            ├─ Spring Data Page 集成     ├─ 文档完善
-   ├─ 性能调优                ├─ Quarkus Extension         ├─ Quickstart 模板
-   ├─ 内存优化                ├─ Helidon 集成              ├─ 迁移指南
-   ├─ AOT 兼容验证            ├─ 反应式 API（基础）        ├─ API 文档
-   ├─ 压力测试                ├─ 监控 Dashboard            ├─ 1.0.0 GA
-   └─ 长跑测试                └─ 灰度场景验证              └─ Maven Central
+   ├─ @Transactional AOP      ├─ DataSource SPI           ├─ CacheChain SPI
+   ├─ 编程式事务               ├─ SQL / NoSQL 路由         ├─ L1 Caffeine / L2 Redis
+   ├─ cascade 级联            ├─ 动态数据源切换            ├─ 失效广播
+   ├─ UPDATE ... WHERE        ├─ 能力声明 capabilities()   ├─ 防穿透/雪崩/击穿
+   ├─ DELETE ... WHERE        └─ 自定义 DataSource 扩展    ├─ batch loading
+   └─ 批量操作                 └─ 分片/读写分离（可选）     └─ 监控指标
+
+            ▼                            ▼                            ▼
+
+   M7 数据库迁移 (2027 Q1)    M8 Spring Boot Starter      M9 GA 发布 (2027 Q2-Q3)
+   ─────────────────────      ───────────────────────     ─────────────────────
+
+   ├─ Flyway 集成             ├─ 自动装配                  ├─ JMH 基准套件
+   ├─ Migration DSL           ├─ HormProperties            ├─ 性能调优报告
+   ├─ Codegen CLI             ├─ HormTransactionManager    ├─ AOT/GraalVM 验证
+   ├─ Maven 插件              ├─ Micrometer 指标           ├─ 文档完善
+   └─ DDL ↔ Entity 互转       └─ Actuator 健康检查         ├─ 1.0.0 GA
+                                                           └─ Maven Central
 ```
 
 ### 6.2 里程碑详述
 
-#### M1：基础架构（2026-07-04 ~ 2026-08-15）
+#### M1：元数据 SPI 与 APT 流水线（✅ 已完成，2026-07-04）
 
 **目标**：跑通编译期生成与基础 CRUD
 
 **交付物**：
-- `holo-horm-meta` 模块完成 APT 处理器，能解析 `@Entity` 生成 `EntityMeta` 与 `Mapper`
-- `holo-horm-core` 模块完成 `Model` 基类与基础 CRUD
-- 单元测试覆盖核心元数据生成
+- `@Entity`/`@Id`/`@Column`/`@Table` 注解与 SPI 契约
+- `EntityDescriptor` IR + `EntityDescriptorParser`
+- `HormEntityProcessor` JavaPoet 生成 `XxxMeta`/`XxxMapper`/`XxxQueryMeta`
+- `EntityValidator` 编译期校验
+- `Model<T>` 基类 + `EntityMetaRegistry` + `Horm` 入口
+- `JdbcRepository` PreparedStatement CRUD
+- H2 集成测试
 
 **验收标准**：
-- 给定 `@Entity` 类，APT 能生成 `XxxMeta` 与 `XxxMapper` 类
+- 给定 `@Entity` 类，APT 能生成 `XxxMeta`/`XxxMapper`/`XxxQueryMeta`
 - `entity.save()` 能通过 JDBC 写入数据库
-- `Entity.find(User.class, 1L)` 能从数据库读取实体
+- `User.find(User.class, 1L)` 能从数据库读取实体
 - 编译期错误（字段名错、类型不匹配）能正确报告
 
-#### M2：核心功能（2026-08-15 ~ 2026-09-30）
+#### M2：查询构建器与条件查询（✅ 已完成，2026-07-04）
 
-**目标**：Active Record 完整功能可用
+**目标**：提供类型安全 Query DSL
 
 **交付物**：
-- 完整的 Query DSL（条件、排序、分页、聚合）
-- SQL DataSource 完整实现，支持 MySQL/PG 方言
-- 事务管理（编程式 + Spring 声明式）
-- Spring Boot Starter 自动装配
-- 基础示例（CRUD、查询、事务）
+- `Condition`/`Conditions`/`CompositeCondition`
+- `TypedField` default 方法 + `ComparableField`
+- `Query<T>`/`QueryImpl`/`Order` + `Model.query()` 入口
+- `HormException` 错误路径覆盖
+- H2 Query 集成测试
 
 **验收标准**：
-- 复杂查询（多条件 + JOIN + 排序 + 分页）能在 MySQL/PG 上正确执行
-- `@Transactional` 注解工作正常
-- Spring Boot 应用启动后能直接使用 HORM
-- 集成测试覆盖主要场景
+- 复杂条件（AND/OR/NOT、like、in、between）能正确渲染 SQL
+- `orderBy`/`limit`/`offset` 工作正常
+- 错误路径（跨实体 orderBy、负数 limit/offset、SQLException）正确抛出异常
 
-#### M3：高级特性（2026-10-01 ~ 2026-11-15）
+#### M3：关联关系映射（✅ 已完成，2026-07-05）
 
-**目标**：Active Record 高级特性
-
-**交付物**：
-- 关联关系（BelongsTo / HasOne / HasMany / HasAndBelongsToMany）
-- Scope（默认 Scope、链式组合）
-- 验证（声明式 + 自定义 + 分组）
-- 生命周期钩子（方法覆盖 + 注解 + 观察者）
-- 软删除、审计日志
-- 多租户支持
-
-#### M4：缓存链（2026-11-15 ~ 2026-12-15）
-
-**目标**：完整的多级缓存链
+**目标**：实现 Active Record 风格的关联查询
 
 **交付物**：
-- Cache SPI 与 L1（Caffeine）、L2（Redis）实现
-- 缓存链组合、失效广播、防穿透/雪崩/击穿
-- 注解驱动（@Cacheable / @CacheInvalidate / @CachePut）
-- Micrometer 指标
-- Grafana Dashboard 模板
+- 5 个 Eloquent 风格关联注解：`@BelongsTo`/`@HasOne`/`@HasMany`/`@HasAndBelongsToMany`/`@HasManyThrough`
+- `RelationField` + `RelationType`
+- APT 生成 `ALL_RELATIONS`、关联字段常量、`Mapper.setRelation`
+- Query API 扩展：`fetch`/`leftJoin`/`innerJoin`/`join`/`select`
+- `buildAliasedSql`/`splitPrefixedRow` 双路径实现
+- 26 个新增测试，158 个测试全部通过
 
-#### M5：迁移与代码生成（2027-01-01 ~ 2027-01-31）
+**验收标准**：
+- `query.fetch(ORDERS)` 能渲染正确的 LEFT JOIN SQL
+- select 投影必须包含 id，否则抛 `HormException`
+- H2 关联集成测试 100% 通过
+
+#### M4：事务管理 + cascade 级联（📋 规划中，2026 Q3）
+
+**目标**：实现事务边界与级联操作
 
 **交付物**：
-- Migration DSL（Java + SQL 文件）
+- `@Transactional` AOP 支持
+- 编程式事务 API
+- cascade persist/merge/remove
+- `UPDATE ... WHERE` / `DELETE ... WHERE` 批量操作
+- 批量插入/更新/删除 API
+
+#### M5：多数据源 SPI 与路由（📋 规划中，2026 Q4）
+
+**目标**：支持 SQL / NoSQL / REST / 文件等多种数据源
+
+**交付物**：
+- `DataSource` SPI + `Session` + `Capabilities`
+- SQL DataSource 参考实现
+- 动态数据源路由（`@UseDataSource`）
+- 分片/读写分离（可选）
+- 自定义 DataSource 扩展文档
+
+#### M6：缓存链 + batch loading（📋 规划中，2026 Q4）
+
+**目标**：实现多级缓存与批量加载
+
+**交付物**：
+- `CacheChain` SPI
+- L1 Caffeine / L2 Redis 实现
+- 缓存链组合、失效广播
+- 防穿透/雪崩/击穿
+- batch loading 解决 N+1
+- Micrometer 缓存指标
+
+#### M7：数据库迁移与代码生成（📋 规划中，2027 Q1）
+
+**目标**：提供 DDL 与 Entity 互转能力
+
+**交付物**：
+- Flyway 集成（或内置 Migration DSL）
 - 迁移执行器（命令行 + 启动时自动）
 - Codegen CLI（DDL→Entity、Entity→DDL、迁移脚本生成）
 - Maven 插件
 
-#### M6：多数据源扩展（2027-02-01 ~ 2027-03-15）
+#### M8：Spring Boot Starter（📋 规划中，2027 Q1）
+
+**目标**：实现 Spring Boot 自动装配
 
 **交付物**：
-- MongoDB DataSource
-- Redis DataSource
-- REST DataSource
-- CSV DataSource
-- 自定义 SPI 完整文档与示例
+- `HormAutoConfiguration`
+- `HormProperties` 配置项
+- `HormTransactionManager` 与 `@Transactional` 兼容
+- Micrometer 指标自动注册
+- Actuator 健康检查
 
-#### M7：性能与稳定（2027-03-15 ~ 2027-04-30）
+#### M9：性能基准与 GA 发布（📋 规划中，2027 Q2-Q3）
+
+**目标**：达到 GA 发布标准
 
 **交付物**：
 - JMH 基准套件
 - 性能调优报告
 - AOT/GraalVM Native Image 验证
-- 压力测试、长跑测试
-- 内存与 GC 优化
-
-#### M8：生态集成（2027-05-01 ~ 2027-06-30）
-
-**交付物**：
-- Spring Data Page 集成
-- Quarkus Extension
-- Helidon 集成
-- 反应式 API（基础）
-- 监控 Dashboard
-
-#### M9：GA 发布（2027-07-01 ~ 2027-07-31）
-
-**交付物**：
-- 完善的文档（Quickstart、User Guide、Migration Guide）
+- 文档完善（Quickstart、User Guide、Migration Guide）
 - 1.0.0 GA 版本
 - Maven Central 发布
 
