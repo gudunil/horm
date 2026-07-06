@@ -1,5 +1,6 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.cache.CacheChain;
 import com.holo.framework.horm.core.datasource.DataSourceRegistry;
 import com.holo.framework.horm.meta.EntityMeta;
 
@@ -19,6 +20,13 @@ import java.sql.SQLException;
  * the runtime resolves the correct provider through
  * {@link #getDataSourceForEntity(Class)}.
  *
+ * <p>M6 introduces optional cache-chain integration. When a non-null
+ * {@link CacheChain} is supplied via the cache-aware constructors, the
+ * repository/query layer consults it for read-through loading and
+ * post-commit invalidation. When {@code null} (the default for all
+ * pre-M6 constructors), caching is short-circuited and behaviour matches
+ * M5 exactly.
+ *
  * <p>Backward compatibility: the single-connection and single-provider
  * constructors still work; they internally register the provider as the
  * default datasource.
@@ -35,42 +43,81 @@ public final class HormContext implements AutoCloseable {
 
     private final Connection connection;
     private final DataSourceRegistry registry;
+    private final CacheChain cacheChain;
 
     /**
      * Legacy constructor that wraps a single {@link Connection} in a
      * {@link SimpleDataSourceProvider} registered as the default datasource.
-     * Behaves identically to M1-M4.
+     * Behaves identically to M1-M4. Caching is disabled ({@link #cacheChain()}
+     * returns {@code null}).
      */
     public HormContext(Connection connection) {
+        this(connection, (CacheChain) null);
+    }
+
+    /**
+     * M6 constructor that wraps a single {@link Connection} together with a
+     * {@link CacheChain} for read-through caching and post-commit invalidation.
+     *
+     * @param connection the JDBC connection (wrapped as the default datasource)
+     * @param cacheChain the cache chain, or {@code null} to disable caching
+     */
+    public HormContext(Connection connection, CacheChain cacheChain) {
         this.connection = connection;
         this.registry = new DataSourceRegistry();
         this.registry.registerDefault(new SimpleDataSourceProvider(connection));
+        this.cacheChain = cacheChain;
     }
 
     /**
      * Creates a context backed by a single {@link DataSourceProvider},
-     * registered as the default datasource.
+     * registered as the default datasource. Caching is disabled.
      */
     public HormContext(DataSourceProvider dataSourceProvider) {
+        this(dataSourceProvider, (CacheChain) null);
+    }
+
+    /**
+     * M6 constructor that combines a single {@link DataSourceProvider} with a
+     * {@link CacheChain}.
+     *
+     * @param dataSourceProvider the datasource provider (registered as default)
+     * @param cacheChain         the cache chain, or {@code null} to disable caching
+     */
+    public HormContext(DataSourceProvider dataSourceProvider, CacheChain cacheChain) {
         this.connection = null;
         this.registry = new DataSourceRegistry();
         this.registry.registerDefault(dataSourceProvider);
+        this.cacheChain = cacheChain;
     }
 
     /**
      * Creates a context backed by a {@link DataSourceRegistry} supporting
-     * multiple named datasources.
+     * multiple named datasources. Caching is disabled.
      *
      * @param registry the datasource registry (must have a default registered)
      * @throws IllegalStateException if no default datasource is registered
      */
     public HormContext(DataSourceRegistry registry) {
+        this(registry, (CacheChain) null);
+    }
+
+    /**
+     * M6 constructor that combines a {@link DataSourceRegistry} with a
+     * {@link CacheChain}.
+     *
+     * @param registry    the datasource registry (must have a default registered)
+     * @param cacheChain  the cache chain, or {@code null} to disable caching
+     * @throws IllegalStateException if no default datasource is registered
+     */
+    public HormContext(DataSourceRegistry registry, CacheChain cacheChain) {
         this.connection = null;
         if (!registry.hasDefault()) {
             throw new IllegalStateException(
                 "DataSourceRegistry must have a default datasource registered");
         }
         this.registry = registry;
+        this.cacheChain = cacheChain;
     }
 
     /**
@@ -112,6 +159,21 @@ public final class HormContext implements AutoCloseable {
      */
     public DataSourceRegistry dataSourceRegistry() {
         return registry;
+    }
+
+    /**
+     * Returns the {@link CacheChain} installed on this context, or {@code null}
+     * when caching is disabled.
+     *
+     * <p>Repository and query code must consult this accessor (rather than
+     * assuming a chain is present) before invoking cache operations. A
+     * {@code null} return signals the M5 code path: all reads go straight to
+     * the database and no post-commit invalidation is queued.
+     *
+     * @return the cache chain, or {@code null} if caching is disabled
+     */
+    public CacheChain cacheChain() {
+        return cacheChain;
     }
 
     /**

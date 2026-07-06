@@ -1,5 +1,7 @@
 package com.holo.framework.horm.meta;
 
+import com.holo.framework.horm.meta.annotation.CacheLevel;
+
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -32,6 +34,9 @@ public final class EntityMeta<T> {
     private final Mapper<T> mapper;
     private final List<RelationMeta> relations;
     private final FieldMeta<?> versionField;
+    private final boolean cached;
+    private final CachePolicy cachePolicy;
+    private final CacheLevel[] cacheLevels;
 
     private EntityMeta(Builder<T> b) {
         this.type = Objects.requireNonNull(b.type, "type");
@@ -43,6 +48,9 @@ public final class EntityMeta<T> {
         this.mapper = b.mapper;
         this.relations = b.relations == null ? List.of() : List.copyOf(b.relations);
         this.versionField = b.versionField;
+        this.cached = b.cached;
+        this.cachePolicy = b.cachePolicy;
+        this.cacheLevels = b.cacheLevels == null ? new CacheLevel[0] : b.cacheLevels.clone();
     }
 
     public Class<T> type() { return type; }
@@ -54,6 +62,32 @@ public final class EntityMeta<T> {
     public Mapper<T> mapper() { return mapper; }
     public List<RelationMeta> relations() { return relations; }
     public FieldMeta<?> versionField() { return versionField; }
+
+    /**
+     * Whether this entity is eligible for caching. {@code false} when the
+     * entity is not annotated with {@code @Cached} (or {@code @Cached.enabled=false}).
+     * When {@code false}, {@link #cachePolicy()} is {@code null} and
+     * {@link #cacheLevels()} is an empty array; ORM cache integration code
+     * short-circuits all cache logic.
+     */
+    public boolean cached() { return cached; }
+
+    /**
+     * Cache policy descriptor for this entity, or {@code null} when
+     * {@link #cached()} is {@code false}. The descriptor is a meta-module
+     * {@link CachePolicy} instance; the ORM integration layer converts it to
+     * a runtime {@code com.holo.framework.horm.cache.CachePolicy} when
+     * invoking the cache chain.
+     */
+    public CachePolicy cachePolicy() { return cachePolicy; }
+
+    /**
+     * Cache levels declared on {@code @Cached.levels()}. Returns an empty
+     * array (never {@code null}) when {@link #cached()} is {@code false}.
+     * Callers receive a defensive copy; mutating the returned array does not
+     * affect this {@code EntityMeta} instance.
+     */
+    public CacheLevel[] cacheLevels() { return cacheLevels.clone(); }
 
     /** Looks up a field by Java property name. */
     public Optional<FieldMeta<?>> field(String name) {
@@ -92,6 +126,9 @@ public final class EntityMeta<T> {
         private Mapper<T> mapper;
         private List<RelationMeta> relations;
         private FieldMeta<?> versionField;
+        private boolean cached;
+        private CachePolicy cachePolicy;
+        private CacheLevel[] cacheLevels;
 
         public Builder<T> type(Class<T> type) { this.type = type; return this; }
         public Builder<T> tableName(String tableName) { this.tableName = tableName; return this; }
@@ -102,6 +139,9 @@ public final class EntityMeta<T> {
         public Builder<T> mapper(Mapper<T> mapper) { this.mapper = mapper; return this; }
         public Builder<T> relations(List<RelationMeta> relations) { this.relations = relations; return this; }
         public Builder<T> versionField(FieldMeta<?> versionField) { this.versionField = versionField; return this; }
+        public Builder<T> cached(boolean cached) { this.cached = cached; return this; }
+        public Builder<T> cachePolicy(CachePolicy cachePolicy) { this.cachePolicy = cachePolicy; return this; }
+        public Builder<T> cacheLevels(CacheLevel[] cacheLevels) { this.cacheLevels = cacheLevels; return this; }
 
         public EntityMeta<T> build() { return new EntityMeta<>(this); }
     }

@@ -1,7 +1,7 @@
 # HORM 开发进度
 
 > 接续点文档：记录各里程碑完成状态、关键决策、下一步计划。
-> 维护人：Holo Framework Team · 更新时间：2026-07-05
+> 维护人：Holo Framework Team · 更新时间：2026-07-06
 
 ---
 
@@ -14,9 +14,10 @@
 | M3     | ✅ 完成 | 2026-07-05     | v1.0.0-M3  |
 | M4     | ✅ 完成 | 2026-07-05     | v1.0.0-M4  |
 | M5     | ✅ 完成 | 2026-07-05     | v1.0.0-M5  |
-| M6-M9  | 📋 规划中 | —              | —          |
+| M6     | ✅ 完成 | 2026-07-06     | v1.0.0-M6  |
+| M7-M9  | 📋 规划中 | —              | —          |
 
-**当前分支**：`feature/m5-datasource`（M5 完成后待 squash merge 到 `main`）
+**当前分支**：`feature/m6-cache`（M6 完成后待 squash merge 到 `main`）
 
 ---
 
@@ -275,6 +276,62 @@
 
 ---
 
+## M6: 缓存链（L1 + L2 组合）+ batch loading（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | Commit |
+|--------|------|--------|
+| M6-1 | 缓存 SPI 契约：`Cache`/`CacheChain`/`CachePolicy`/`CacheLevel`/`WriteStrategy`/`EvictionPolicy`/`CacheEvent`/`TypeReference` | `<本 commit>` |
+| M6-2 | `DefaultCacheChain` 多级链实现（逐层查找、上层回填、批量加载、事件发布） | `<本 commit>` |
+| M6-3 | `CaffeineCache` L1 实现（零序列化、TTL/size 淘汰、事件转发） | `<本 commit>` |
+| M6-4 | `NoOpCache` 兜底实现 | `<本 commit>` |
+| M6-5 | 缓存键设计：`CacheKey`/`CacheKeyBuilder`/`QueryHash`/`SensitiveHash` | `<本 commit>` |
+| M6-额外 | `RedisCache` L2 stub + `Serializer`/`JdkSerializer` + `SingleFlightLoader` + `TtlJitter` | `<本 commit>` |
+| M6-6 | `@Cached`/`@CachePolicy` 注解 + APT 扩展（`EntityDescriptor`/`EntityValidator`/`EntityMeta`/`MetaClassBuilder`） | `<本 commit>` |
+| M6-7 | ORM 集成：`HormContext` 可选 `CacheChain`、`TransactionManager.afterCommit/afterRollback` 钩子、`Repository.findMany`/`Model.findMany` | `<本 commit>` |
+| M6-7 | `JdbcRepository` 缓存路径 + `QueryImpl` 可选查询缓存（仅 THROUGH 模式） | `<本 commit>` |
+| M6-9 | H2 集成测试（`FindManyCacheIntegrationTest`）、`JdbcRepositoryCacheTest`、全量验证与 JaCoCo 覆盖率检查 | `<本 commit>` |
+
+### 测试与覆盖率
+
+- **测试总数**：708（meta 模块 156 + cache 模块 346 + core 模块 206）
+- 新增测试：
+  - `CachedAnnotationProcessorTest`（8 测试）— `@Cached` APT 生成与 R12 校验
+  - `HormContextTest` 扩展 — cache chain 构造与访问器
+  - `TransactionManagerTest` 扩展 — afterCommit/afterRollback 钩子、嵌套事务回调传播
+  - `JdbcRepositoryCacheTest`（12 测试）— 缓存命中/未命中、write-through、afterCommit 失效
+  - `FindManyCacheIntegrationTest`（5 H2 集成测试）— 部分命中、全未命中、批量回填、Repository.findMany、absent id
+- **JaCoCo 覆盖率**：
+  - meta 模块整体：84%（> 80% 目标 ✅）
+  - cache 模块整体：87%（> 80% 目标 ✅）
+  - core 模块整体：86%（> 84% 目标 ✅）
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core,holo-horm-cache -am verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **模块依赖解耦**：`holo-horm-meta` 不依赖 `holo-horm-cache`；缓存相关枚举与 `CachePolicy` 在 meta 模块独立定义（`com.holo.framework.horm.meta.annotation`），避免 APT 阶段类加载问题。
+2. **APT 嵌套注解解析**：`EntityDescriptorParser.parseCached()` 使用 `AnnotationMirror` 手动遍历 `@Cached`/`@CachePolicy` 元素值，绕过 JVM 反射强制类型转换导致的 "Incorrectly typed data found" 错误。
+3. **JavaPoet 长整型字面量**：`MetaClassBuilder` 生成 `Duration.ofNanos(...)` 时使用 `$LL` 占位符，避免大整数被当作 int 编译失败。
+4. **缓存默认关闭**：未标注 `@Cached` 时 `EntityMeta.cached()=false`、`HormContext.cacheChain()` 默认 null，M1-M5 行为零回归。
+5. **事务边界写入**：所有缓存写入/失效通过 `TransactionManager.afterCommit()` 延迟到事务提交后执行；rollback 时执行 afterRollback 回调，保障数据一致性。
+6. **WriteStrategy 语义**：`THROUGH` 在提交后 put 并允许查询缓存；`AROUND`（默认）不写缓存、不缓存查询结果；`BEHIND` 已预留但未在 M6 实现。
+7. **批量加载**：`JdbcRepository.findMany(Collection<ID>)` 构造 `Set<CacheKey>` 调用 `CacheChain.getAll`，缺失 key 通过 `SELECT * FROM t WHERE id IN (...)` 批量回填。
+8. **查询缓存条件**：仅当 `@Cached` + `WriteStrategy.THROUGH` + 无 JOIN + 无 select 投影时启用，避免 AROUND 模式缓存污染。
+9. **循环依赖修复**：`holo-horm-cache` 原依赖 `holo-horm-core` compile scope 导致循环；将 cache→core 改为 test scope，core→cache 改为 compile scope，并移除 cache 中的 `QueryHash.hash(Query)` 方法。
+10. **并发测试确定性**：`SingleFlightLoaderTest` 使用 `AtomicInteger` 计数 + 主线程轮询替代 `Thread.sleep`，消除多核 CPU 调度导致的 flaky。
+
+### 已知限制（M6 范围内）
+
+- `RedisCache` 为 stub 实现，未启动真实 Redis 实例验证；L2 集群失效广播 Pub/Sub 未实现
+- `BEHIND` 写策略已定义但 M6 未实现异步写behind逻辑
+- 查询缓存仅支持单表、无 JOIN、无投影、THROUGH 模式
+- `CaffeineCache` 不支持 per-entry TTL，仅使用构造时全局 TTL
+- `RedisCache` 统计信息为零（Redisson 无原生 stats，M6 不实现）
+- 缓存未与数据库 schema 迁移工具集成；DDL 仍需手动维护
+
+---
+
 ## 后续里程碑概览
 
 | 里程碑 | 主题 | 预计 |
@@ -301,11 +358,11 @@
 
 ## 接续点（下次开发从这里开始）
 
-1. **可选**：将 `feature/m5-datasource` squash merge 到 `main`：
+1. **可选**：将 `feature/m6-cache` squash merge 到 `main`：
    ```bash
    git -C e:\project\Holo\holo-horm checkout main
-   git -C e:\project\Holo\holo-horm merge --squash feature/m5-datasource
-   git -C e:\project\Holo\holo-horm commit -m "feat(m5): squash merge multi-datasource SPI and routing"
-   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M5 -m "M5: ..."
+   git -C e:\project\Holo\holo-horm merge --squash feature/m6-cache
+   git -C e:\project\Holo\holo-horm commit -m "feat(m6): squash merge cache chain and batch loading"
+   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M6 -m "M6: cache chain + batch loading"
    ```
-2. **启动 M6**：新建分支 `feature/m6-cache`，实现缓存链（L1 + L2 组合）+ batch loading
+2. **启动 M7**：新建分支 `feature/m7-migration`，实现 Flyway 数据库迁移集成

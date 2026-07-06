@@ -1,5 +1,7 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.cache.CacheChain;
+import com.holo.framework.horm.core.datasource.DataSourceRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -67,5 +69,51 @@ class HormContextTest {
             .isInstanceOf(RuntimeException.class)
             .hasMessageContaining("Failed to close HormContext")
             .hasCauseInstanceOf(SQLException.class);
+    }
+
+    // ----- M6 cache-chain constructors -----
+
+    @Test
+    void cacheChainReturnsNullForLegacyConnectionConstructor() {
+        Connection conn = mock(Connection.class);
+        HormContext ctx = new HormContext(conn);
+        assertThat(ctx.cacheChain()).isNull();
+    }
+
+    @Test
+    void cacheChainReturnsInjectedChainForConnectionConstructor() {
+        Connection conn = mock(Connection.class);
+        CacheChain chain = mock(CacheChain.class);
+        HormContext ctx = new HormContext(conn, chain);
+        assertThat(ctx.cacheChain()).isSameAs(chain);
+    }
+
+    @Test
+    void cacheChainReturnsInjectedChainForProviderConstructor() {
+        DataSourceProvider provider = mock(DataSourceProvider.class);
+        CacheChain chain = mock(CacheChain.class);
+        HormContext ctx = new HormContext(provider, chain);
+        assertThat(ctx.cacheChain()).isSameAs(chain);
+    }
+
+    @Test
+    void cacheChainReturnsInjectedChainForRegistryConstructor() {
+        DataSourceProvider provider = mock(DataSourceProvider.class);
+        DataSourceRegistry registry = new DataSourceRegistry();
+        registry.registerDefault(provider);
+        CacheChain chain = mock(CacheChain.class);
+        HormContext ctx = new HormContext(registry, chain);
+        assertThat(ctx.cacheChain()).isSameAs(chain);
+    }
+
+    @Test
+    void legacyConstructorsKeepCacheChainDisabled() {
+        DataSourceProvider provider = mock(DataSourceProvider.class);
+        DataSourceRegistry registry = new DataSourceRegistry();
+        registry.registerDefault(provider);
+
+        assertThat(new HormContext(mock(Connection.class)).cacheChain()).isNull();
+        assertThat(new HormContext(provider).cacheChain()).isNull();
+        assertThat(new HormContext(registry).cacheChain()).isNull();
     }
 }

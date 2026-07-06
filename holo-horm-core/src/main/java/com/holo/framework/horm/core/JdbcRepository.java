@@ -1,5 +1,10 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.cache.CacheChain;
+import com.holo.framework.horm.cache.CachePolicy;
+import com.holo.framework.horm.cache.TypeReference;
+import com.holo.framework.horm.cache.key.CacheKey;
+import com.holo.framework.horm.cache.key.CacheKeyBuilder;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
@@ -11,7 +16,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -30,6 +40,13 @@ import java.util.stream.Collectors;
  * {@link Statement#RETURN_GENERATED_KEYS} and backfills the generated
  * primary key onto the entity via {@link Mapper#setId}.
  *
+ * <p>M6 integrates the optional {@link CacheChain} installed on the
+ * {@link HormContext}. When the entity is annotated with {@code @Cached}
+ * and a chain is present, reads go through the cache first and writes
+ * schedule invalidation or population via
+ * {@link TransactionManager#afterCommit(Runnable)}. When caching is not
+ * enabled, all cache code short-circuits and behaviour matches M5.
+ *
  * <p>All {@link SQLException}s are wrapped in {@link HormException} so
  * callers can stay block-free while still catching HORM-specific failures.
  *
@@ -42,6 +59,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     private final EntityMeta<T> meta;
     private final Mapper<T> mapper;
     private final String dataSourceName;
+    private final TypeReference<T> entityTypeRef = new TypeReference<>() {};
+    private final CachePolicy runtimeCachePolicy;
 
     public JdbcRepository(Class<T> entityType, HormContext ctx) {
         this.entityType = entityType;
@@ -53,10 +72,22 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         this.dataSourceName = (dsName == null || dsName.isEmpty())
             ? com.holo.framework.horm.core.datasource.DataSourceRegistry.DEFAULT_NAME
             : dsName;
+        this.runtimeCachePolicy = toRuntimePolicy(meta.cachePolicy());
     }
 
     @Override
     public T find(Object id) {
+        if (!cacheEnabled()) {
+            return dbFind(id);
+        }
+        CacheKey key = idKey(id);
+        return ctx.cacheChain()
+            .get(key, entityTypeRef, () -> dbFind(id), runtimeCachePolicy)
+            .orElse(null);
+    }
+
+    /** Database lookup backing {@link #find(Object)} and the cache loader. */
+    private T dbFind(Object id) {
         FieldMeta<?> idField = requireIdField();
         String sql = "SELECT * FROM " + qualifiedTable()
             + " WHERE " + idField.column() + " = ?";
@@ -173,6 +204,11 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         } finally {
             TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
+
+        if (cacheEnabled() && runtimeCachePolicy.writeStrategy() != com.holo.framework.horm.cache.WriteStrategy.AROUND) {
+            CacheKey key = idKey(mapper.getId(entity));
+            TransactionManager.afterCommit(dataSourceName, () -> ctx.cacheChain().put(key, entity, runtimeCachePolicy));
+        }
         return entity;
     }
 
@@ -247,6 +283,15 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         } finally {
             TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
+
+        if (cacheEnabled()) {
+            CacheKey key = idKey(mapper.getId(entity));
+            if (runtimeCachePolicy.writeStrategy() == com.holo.framework.horm.cache.WriteStrategy.THROUGH) {
+                TransactionManager.afterCommit(dataSourceName, () -> ctx.cacheChain().put(key, entity, runtimeCachePolicy));
+            } else {
+                TransactionManager.afterCommit(dataSourceName, () -> ctx.cacheChain().invalidate(key));
+            }
+        }
         return entity;
     }
 
@@ -278,6 +323,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             } finally {
                 TransactionManager.releaseConnection(ctx, dataSourceName, conn);
             }
+            invalidateCache(id);
         } else {
             deleteById(id);
         }
@@ -298,6 +344,127 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         } finally {
             TransactionManager.releaseConnection(ctx, dataSourceName, conn);
         }
+        invalidateCache(id);
+    }
+
+    @Override
+    public Map<Object, T> findMany(Collection<Object> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Map.of();
+        }
+        if (!cacheEnabled()) {
+            return dbFindMany(ids);
+        }
+
+        Map<CacheKey, Object> keyToId = new LinkedHashMap<>();
+        for (Object id : ids) {
+            keyToId.put(idKey(id), id);
+        }
+        Set<CacheKey> keys = keyToId.keySet();
+
+        Map<CacheKey, T> cached = ctx.cacheChain()
+            .getAll(keys, entityTypeRef, this::dbFindManyByKey, runtimeCachePolicy);
+
+        Map<Object, T> result = new LinkedHashMap<>();
+        for (Map.Entry<CacheKey, T> e : cached.entrySet()) {
+            Object id = keyToId.get(e.getKey());
+            if (id != null && e.getValue() != null) {
+                result.put(id, e.getValue());
+            }
+        }
+        return result;
+    }
+
+    /** Database batch lookup backing {@link #findMany(Collection)}. */
+    private Map<Object, T> dbFindMany(Collection<Object> ids) {
+        FieldMeta<?> idField = requireIdField();
+        String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(", "));
+        String sql = "SELECT * FROM " + qualifiedTable()
+            + " WHERE " + idField.column() + " IN (" + placeholders + ")";
+        Map<Object, T> result = new LinkedHashMap<>();
+        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            int i = 1;
+            for (Object id : ids) {
+                ps.setObject(i++, id);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    T entity = mapper.map(toRow(rs));
+                    result.put(mapper.getId(entity), entity);
+                }
+            }
+        } catch (SQLException e) {
+            throw new HormException(
+                "Failed to findMany " + entityType.getName() + " by ids " + ids, e);
+        } finally {
+            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
+        }
+        return result;
+    }
+
+    /**
+     * Batch loader used by the cache chain. The input keys are
+     * {@link CacheKey}s; the returned map must be keyed by the same keys.
+     */
+    private Map<CacheKey, T> dbFindManyByKey(Set<CacheKey> keys) {
+        if (keys == null || keys.isEmpty()) {
+            return Map.of();
+        }
+        List<Object> ids = new ArrayList<>(keys.size());
+        Map<Object, CacheKey> idToKey = new HashMap<>();
+        for (CacheKey key : keys) {
+            Object id = key.keyValue();
+            ids.add(id);
+            idToKey.put(id, key);
+        }
+        Map<Object, T> byId = dbFindMany(ids);
+        Map<CacheKey, T> result = new LinkedHashMap<>();
+        for (Map.Entry<Object, T> e : byId.entrySet()) {
+            CacheKey key = idToKey.get(String.valueOf(e.getKey()));
+            if (key != null) {
+                result.put(key, e.getValue());
+            }
+        }
+        return result;
+    }
+
+    /** Schedules cache invalidation for the given id after transaction commit. */
+    private void invalidateCache(Object id) {
+        if (!cacheEnabled()) {
+            return;
+        }
+        CacheKey key = idKey(id);
+        TransactionManager.afterCommit(dataSourceName, () -> ctx.cacheChain().invalidate(key));
+    }
+
+    /** Builds a primary-key {@link CacheKey} for this entity type. */
+    private CacheKey idKey(Object id) {
+        return new CacheKeyBuilder()
+            .entityType(entityType)
+            .idKey(id)
+            .build();
+    }
+
+    /** Returns {@code true} when caching is configured for this entity and a chain is installed. */
+    private boolean cacheEnabled() {
+        return meta.cached() && ctx.cacheChain() != null;
+    }
+
+    /** Converts the meta-module {@link com.holo.framework.horm.meta.CachePolicy} to the cache-module runtime type. */
+    private CachePolicy toRuntimePolicy(com.holo.framework.horm.meta.CachePolicy metaPolicy) {
+        if (metaPolicy == null) {
+            return null;
+        }
+        return CachePolicy.builder()
+            .ttl(metaPolicy.ttl())
+            .evictionPolicy(com.holo.framework.horm.cache.EvictionPolicy.valueOf(metaPolicy.evictionPolicy().name()))
+            .maxEntries(metaPolicy.maxEntries())
+            .maxWeight(metaPolicy.maxWeight())
+            .writeStrategy(com.holo.framework.horm.cache.WriteStrategy.valueOf(metaPolicy.writeStrategy().name()))
+            .nullable(metaPolicy.nullable())
+            .nullTtl(metaPolicy.nullTtl())
+            .build();
     }
 
     /** Materializes a {@link Row} from the current cursor position of {@code rs}. */

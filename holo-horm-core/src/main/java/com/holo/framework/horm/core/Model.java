@@ -16,6 +16,7 @@ import com.holo.framework.horm.meta.annotation.CascadeType;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -157,6 +158,21 @@ public abstract class Model<T extends Model<T>> {
     /** Fetches an entity by primary key. */
     public static <T extends Model<T>> T find(Class<T> type, Object id) {
         return Horm.repository(type).find(id);
+    }
+
+    /**
+     * Fetches multiple entities by primary key, returning a map of id → entity.
+     *
+     * <p>When caching is enabled for the entity type and a {@link CacheChain}
+     * is installed on the current {@link HormContext}, this method uses the
+     * cache chain's bulk read-through to avoid repeated per-id database
+     * round-trips. Absent ids are omitted from the returned map.
+     */
+    public static <T extends Model<T>> Map<Object, T> findMany(Class<T> type,
+                                                               Collection<?> ids) {
+        @SuppressWarnings("unchecked")
+        Collection<Object> keys = (Collection<Object>) ids;
+        return Horm.repository(type).findMany(keys);
     }
 
     /** Fetches all entities of the given type. */

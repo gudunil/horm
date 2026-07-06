@@ -1,13 +1,18 @@
 package com.holo.framework.horm.meta.processor;
 
+import com.holo.framework.horm.meta.CachePolicy;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldAccessor;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.RelationMeta;
 import com.holo.framework.horm.meta.RelationType;
+import com.holo.framework.horm.meta.annotation.CacheLevel;
 import com.holo.framework.horm.meta.annotation.CascadeType;
+import com.holo.framework.horm.meta.annotation.EvictionPolicy;
 import com.holo.framework.horm.meta.annotation.GenerationType;
+import com.holo.framework.horm.meta.annotation.WriteStrategy;
+import com.squareup.javapoet.ArrayTypeName;
 import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
@@ -21,6 +26,7 @@ import com.squareup.javapoet.WildcardTypeName;
 import javax.annotation.processing.Filer;
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -102,6 +108,12 @@ public final class MetaClassBuilder {
             .build());
 
         type.addField(buildAllRelationsConstant(d));
+
+        if (d.cached()) {
+            type.addField(buildCachedConstant(d));
+            type.addField(buildCachePolicyConstant(d));
+            type.addField(buildCacheLevelsConstant(d));
+        }
 
         type.addMethod(buildEntityMetaMethod(entityMetaCn, entity, d));
 
@@ -190,6 +202,9 @@ public final class MetaClassBuilder {
         if (versionFd != null) {
             body.add(".versionField($L)", constName(versionFd.name()));
         }
+        if (d.cached()) {
+            body.add(".cached(CACHED).cachePolicy(CACHE_POLICY).cacheLevels(CACHE_LEVELS)");
+        }
         body.add(".build()");
         return MethodSpec.methodBuilder("entityMeta")
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
@@ -256,6 +271,87 @@ public final class MetaClassBuilder {
                 Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
             .initializer(init.build())
             .build();
+    }
+
+    /**
+     * Emits the {@code CACHED} boolean constant — always {@code true} since
+     * this method is only called when {@link EntityDescriptor#cached()} is
+     * {@code true} (i.e. {@code @Cached} is present and enabled).
+     */
+    private static FieldSpec buildCachedConstant(EntityDescriptor d) {
+        return FieldSpec.builder(boolean.class, "CACHED",
+                Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+            .initializer("$L", d.cached())
+            .build();
+    }
+
+    /**
+     * Emits the {@code CACHE_POLICY} constant — a meta-module
+     * {@link CachePolicy} instance built from the {@code @CachePolicy}
+     * annotation values.
+     *
+     * <p>TTL strings ({@code ttl}/{@code nullTtl}) are parsed to
+     * {@link Duration} at code-generation time. If parsing fails (R12
+     * violation already reported by {@link EntityValidator}), the default
+     * duration (30m / 1m) is used so that the generated code still compiles;
+     * the compile error from R12 prevents the user from shipping the build.
+     */
+    private static FieldSpec buildCachePolicyConstant(EntityDescriptor d) {
+        ClassName cachePolicyCn = ClassName.get(CachePolicy.class);
+        ClassName evictionCn = ClassName.get(EvictionPolicy.class);
+        ClassName writeStrategyCn = ClassName.get(WriteStrategy.class);
+        ClassName durationCn = ClassName.get(Duration.class);
+
+        EntityDescriptor.CachePolicyDescriptor p = d.cachePolicy();
+        Duration ttl = safeParseDuration(p.ttl(), Duration.ofMinutes(30));
+        Duration nullTtl = safeParseDuration(p.nullTtl(), Duration.ofMinutes(1));
+
+        CodeBlock.Builder init = CodeBlock.builder()
+            .add("$T.builder()", cachePolicyCn)
+            .add(".ttl($T.ofNanos($LL))", durationCn, ttl.toNanos())
+            .add(".evictionPolicy($T.$L)", evictionCn, p.eviction().name())
+            .add(".maxEntries($L)", p.maxEntries())
+            .add(".writeStrategy($T.$L)", writeStrategyCn, p.writeStrategy().name())
+            .add(".nullable($L)", p.nullable())
+            .add(".nullTtl($T.ofNanos($LL))", durationCn, nullTtl.toNanos())
+            .add(".build()");
+
+        return FieldSpec.builder(cachePolicyCn, "CACHE_POLICY",
+                Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+            .initializer(init.build())
+            .build();
+    }
+
+    /**
+     * Emits the {@code CACHE_LEVELS} constant — a {@code CacheLevel[]} array
+     * built from {@link EntityDescriptor#cacheLevels()}.
+     */
+    private static FieldSpec buildCacheLevelsConstant(EntityDescriptor d) {
+        ClassName cacheLevelCn = ClassName.get(CacheLevel.class);
+        CodeBlock.Builder init = CodeBlock.builder().add("new $T[]{", cacheLevelCn);
+        CacheLevel[] levels = d.cacheLevels();
+        for (int i = 0; i < levels.length; i++) {
+            if (i > 0) init.add(", ");
+            init.add("$T.$L", cacheLevelCn, levels[i].name());
+        }
+        init.add("}");
+        return FieldSpec.builder(ArrayTypeName.of(cacheLevelCn), "CACHE_LEVELS",
+                Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
+            .initializer(init.build())
+            .build();
+    }
+
+    /**
+     * Parse a TTL string into a {@link Duration}, returning {@code fallback}
+     * on failure. This keeps the generated code compilable even when the
+     * validator has already reported an R12 error for an invalid duration.
+     */
+    private static Duration safeParseDuration(String s, Duration fallback) {
+        try {
+            return EntityDescriptorParser.parseDuration(s);
+        } catch (IllegalArgumentException e) {
+            return fallback;
+        }
     }
 
     private static String constName(String fieldName) {

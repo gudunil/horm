@@ -166,6 +166,18 @@ public final class TransactionManager {
      *
      * <p>Only commits if {@code status.isNewTransaction()} is true;
      * otherwise the commit is deferred to the outer transaction.
+     *
+     * <p>M6: after a successful commit, all registered {@code afterCommit}
+     * callbacks are executed in registration order. Exceptions from callbacks
+     * are swallowed and logged (best-effort) so that a failing cache update
+     * cannot roll back an already-committed transaction. The
+     * {@code afterRollback} callbacks are discarded — the transaction
+     * committed, so rollback hooks must not fire.
+     *
+     * <p>For joined (non-new) transactions, callbacks remain on the status
+     * and are transferred to the outer transaction by
+     * {@link #popAndResume(String, TransactionStatus)} so they fire when the
+     * outer transaction completes.
      */
     public static void commit(TransactionStatus status) {
         if (status.isNewTransaction()) {
@@ -176,6 +188,15 @@ public final class TransactionManager {
             } finally {
                 cleanup(status);
             }
+            // Run afterCommit callbacks (swallow exceptions); discard afterRollback.
+            for (Runnable r : status.consumeAfterCommitCallbacks()) {
+                try {
+                    r.run();
+                } catch (Throwable t) {
+                    System.err.println("[HORM] afterCommit callback threw: " + t);
+                }
+            }
+            status.consumeAfterRollbackCallbacks();
         }
     }
 
@@ -184,6 +205,11 @@ public final class TransactionManager {
      *
      * <p>Only rolls back if {@code status.isNewTransaction()} is true;
      * otherwise the rollback is deferred to the outer transaction.
+     *
+     * <p>M6: after rollback, all registered {@code afterRollback} callbacks
+     * are executed in registration order (exceptions swallowed and logged).
+     * The {@code afterCommit} callbacks are discarded — the transaction
+     * rolled back, so commit hooks must not fire.
      */
     public static void rollback(TransactionStatus status) {
         if (status.isNewTransaction()) {
@@ -194,7 +220,84 @@ public final class TransactionManager {
             } finally {
                 cleanup(status);
             }
+            // Run afterRollback callbacks (swallow exceptions); discard afterCommit.
+            for (Runnable r : status.consumeAfterRollbackCallbacks()) {
+                try {
+                    r.run();
+                } catch (Throwable t) {
+                    System.err.println("[HORM] afterRollback callback threw: " + t);
+                }
+            }
+            status.consumeAfterCommitCallbacks();
         }
+    }
+
+    /**
+     * Registers a callback to execute after the current transaction for the
+     * default datasource commits.
+     *
+     * <p>If no transaction is active for the default datasource, the callback
+     * runs immediately (autocommit semantics). This lets repository code call
+     * {@code afterCommit} uniformly whether or not the caller wrapped the
+     * operation in an explicit {@link #execute(HormContext, Runnable)} block.
+     *
+     * <p>When called inside a joined (non-new) transaction, the callback is
+     * transferred to the outer new transaction on {@code popAndResume} and
+     * fires when the outer transaction commits.
+     *
+     * @param callback the action to run after commit; must not be {@code null}
+     */
+    public static void afterCommit(Runnable callback) {
+        afterCommit(DataSourceRegistry.DEFAULT_NAME, callback);
+    }
+
+    /**
+     * Registers a callback to execute after the current transaction for the
+     * specified datasource commits. See {@link #afterCommit(Runnable)} for
+     * semantics.
+     *
+     * @param dataSourceName the datasource name
+     * @param callback       the action to run after commit
+     */
+    public static void afterCommit(String dataSourceName, Runnable callback) {
+        Map<String, Deque<TransactionStatus>> stacks = TRANSACTION_STACKS.get();
+        Deque<TransactionStatus> stack = stacks.get(dataSourceName);
+        if (stack != null && !stack.isEmpty()) {
+            stack.peek().addAfterCommitCallback(callback);
+        } else {
+            // No active transaction: execute immediately (autocommit path).
+            callback.run();
+        }
+    }
+
+    /**
+     * Registers a callback to execute after the current transaction for the
+     * default datasource rolls back.
+     *
+     * <p>If no transaction is active, the callback is discarded (there is
+     * nothing to roll back). When called inside a joined transaction, the
+     * callback is transferred to the outer new transaction.
+     *
+     * @param callback the action to run after rollback; must not be {@code null}
+     */
+    public static void afterRollback(Runnable callback) {
+        afterRollback(DataSourceRegistry.DEFAULT_NAME, callback);
+    }
+
+    /**
+     * Registers a callback to execute after the current transaction for the
+     * specified datasource rolls back. See {@link #afterRollback(Runnable)}.
+     *
+     * @param dataSourceName the datasource name
+     * @param callback       the action to run after rollback
+     */
+    public static void afterRollback(String dataSourceName, Runnable callback) {
+        Map<String, Deque<TransactionStatus>> stacks = TRANSACTION_STACKS.get();
+        Deque<TransactionStatus> stack = stacks.get(dataSourceName);
+        if (stack != null && !stack.isEmpty()) {
+            stack.peek().addAfterRollbackCallback(callback);
+        }
+        // No active transaction: discard (nothing to roll back).
     }
 
     /**
@@ -397,6 +500,12 @@ public final class TransactionManager {
     /**
      * Pops the current transaction status from the stack for the specified
      * datasource and resumes any suspended transaction (for REQUIRES_NEW).
+     *
+     * <p>M6: when popping a joined (non-new) transaction, its unconsumed
+     * callbacks are transferred to the new stack top (the outer transaction)
+     * so they fire when the outer transaction commits or rolls back. For a
+     * new transaction the callbacks have already been consumed by
+     * {@link #commit}/{@link #rollback}, so there is nothing to transfer.
      */
     private static void popAndResume(String dataSourceName, TransactionStatus status) {
         Map<String, Deque<TransactionStatus>> stacks = TRANSACTION_STACKS.get();
@@ -410,6 +519,12 @@ public final class TransactionManager {
                 stack = stacks.computeIfAbsent(dataSourceName, k -> new ArrayDeque<>());
             }
             stack.push(status.suspended());
+        }
+        // Transfer unconsumed callbacks to the new top (outer transaction).
+        // For a new transaction this is a no-op (callbacks already consumed).
+        // For a joined transaction this propagates them to the outer scope.
+        if (stack != null && !stack.isEmpty()) {
+            status.transferCallbacksTo(stack.peek());
         }
         // Clean up ThreadLocal if all stacks are empty
         if (stack != null && stack.isEmpty()) {

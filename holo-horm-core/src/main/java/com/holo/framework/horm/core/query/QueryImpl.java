@@ -1,5 +1,10 @@
 package com.holo.framework.horm.core.query;
 
+import com.holo.framework.horm.cache.CachePolicy;
+import com.holo.framework.horm.cache.TypeReference;
+import com.holo.framework.horm.cache.key.CacheKey;
+import com.holo.framework.horm.cache.key.CacheKeyBuilder;
+import com.holo.framework.horm.cache.key.QueryHash;
 import com.holo.framework.horm.core.HormContext;
 import com.holo.framework.horm.core.HormException;
 import com.holo.framework.horm.core.Model;
@@ -25,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Default {@link Query} implementation. SQL is composed from the
@@ -59,6 +65,8 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
     private final List<JoinKind> joinKinds = new ArrayList<>();
     private List<TypedField<T, ?>> selectFields;  // null means SELECT *
 
+    private final CachePolicy runtimeCachePolicy;
+
     private enum JoinKind { FETCH, LEFT, INNER }
 
     public QueryImpl(Class<T> entityType, HormContext ctx) {
@@ -70,6 +78,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         this.dataSourceName = (dsName == null || dsName.isEmpty())
             ? com.holo.framework.horm.core.datasource.DataSourceRegistry.DEFAULT_NAME
             : dsName;
+        this.runtimeCachePolicy = toRuntimePolicy(meta.cachePolicy());
     }
 
     @Override
@@ -210,11 +219,29 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         if (!joins.isEmpty() || selectFields != null) {
             return listWithFetch();
         }
+        if (queryCacheEnabled()) {
+            long effectiveLimit = limit == null ? Long.MAX_VALUE : limit;
+            return ctx.cacheChain()
+                .get(queryKey(effectiveLimit), listTypeRef(), () -> dbList(effectiveLimit), runtimeCachePolicy)
+                .orElse(List.of());
+        }
+        return dbList(limit == null ? Long.MAX_VALUE : limit);
+    }
+
+    /** Database execution backing {@link #list()} and the query-cache loader. */
+    private List<T> dbList(long effectiveLimit) {
         StringBuilder sql = new StringBuilder("SELECT * FROM ").append(qualifiedTable());
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
         appendOrderBy(sql);
-        appendLimitOffset(sql, bindings);
+        if (effectiveLimit != Long.MAX_VALUE) {
+            bindings.add(effectiveLimit);
+            sql.append(" LIMIT ?");
+        }
+        if (offset != null) {
+            bindings.add(offset);
+            sql.append(" OFFSET ?");
+        }
 
         List<T> result = new ArrayList<>();
         Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
@@ -239,6 +266,16 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
             List<T> all = listWithFetch();
             return all.isEmpty() ? Optional.empty() : Optional.of(all.get(0));
         }
+        if (queryCacheEnabled()) {
+            return Optional.ofNullable(ctx.cacheChain()
+                .get(queryKey(1L), new TypeReference<>() {}, () -> dbFindFirst().orElse(null), runtimeCachePolicy)
+                .orElse(null));
+        }
+        return dbFindFirst();
+    }
+
+    /** Database execution backing {@link #findFirst()} and the query-cache loader. */
+    private Optional<T> dbFindFirst() {
         StringBuilder sql = new StringBuilder("SELECT * FROM ").append(qualifiedTable());
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
@@ -389,6 +426,65 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         for (Object b : bindings) {
             ps.setObject(i++, b);
         }
+    }
+
+    // ----- M6 query-cache helpers -----
+
+    /** Returns {@code true} when this query is eligible for result caching. */
+    private boolean queryCacheEnabled() {
+        return meta.cached() && ctx.cacheChain() != null
+            && runtimeCachePolicy != null
+            && runtimeCachePolicy.writeStrategy() == com.holo.framework.horm.cache.WriteStrategy.THROUGH
+            && joins.isEmpty()
+            && selectFields == null;
+    }
+
+    /** Builds a stable {@link CacheKey} for the current query shape. */
+    private CacheKey queryKey(long effectiveLimit) {
+        long off = offset == null ? 0L : offset;
+        String hash = QueryHash.hash(conditionsSql(), ordersSql(), off, effectiveLimit);
+        return new CacheKeyBuilder()
+            .entityType(entityType)
+            .queryKey(hash)
+            .build();
+    }
+
+    private String conditionsSql() {
+        if (whereConditions.isEmpty()) {
+            return "";
+        }
+        return whereConditions.stream()
+            .map(Condition::sqlFragment)
+            .collect(Collectors.joining(" AND "));
+    }
+
+    private String ordersSql() {
+        if (orderByClauses.isEmpty()) {
+            return "";
+        }
+        return orderByClauses.stream()
+            .map(ob -> ob.column + " " + ob.direction.name())
+            .collect(Collectors.joining(", "));
+    }
+
+    private TypeReference<List<T>> listTypeRef() {
+        return new TypeReference<>() {};
+    }
+
+    /** Converts the meta-module cache policy to the cache-module runtime type. */
+    private CachePolicy toRuntimePolicy(com.holo.framework.horm.meta.CachePolicy metaPolicy) {
+        if (metaPolicy == null) {
+            return null;
+        }
+        return CachePolicy.builder()
+            .ttl(metaPolicy.ttl())
+            .evictionPolicy(com.holo.framework.horm.cache.EvictionPolicy.valueOf(metaPolicy.evictionPolicy().name()))
+            .maxEntries(metaPolicy.maxEntries())
+            .maxWeight(metaPolicy.maxWeight())
+            .writeStrategy(com.holo.framework.horm.cache.WriteStrategy.valueOf(metaPolicy.writeStrategy().name()))
+            .nullable(metaPolicy.nullable())
+            .nullTtl(metaPolicy.nullTtl())
+            .build();
     }
 
     private Row toRow(ResultSet rs) throws SQLException {
