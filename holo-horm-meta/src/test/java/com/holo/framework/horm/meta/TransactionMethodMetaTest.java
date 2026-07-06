@@ -67,6 +67,6 @@ class TransactionMethodMetaTest {
 
         String result = meta.toString();
         assertThat(result).isEqualTo(
-            "TransactionMethodMeta{createUser, REQUIRED, READ_COMMITTED, timeout=30, readOnly=true}");
+            "TransactionMethodMeta{createUser, REQUIRED, READ_COMMITTED, timeout=30, readOnly=true, rollbackFor=[], noRollbackFor=[]}");
     }
 }

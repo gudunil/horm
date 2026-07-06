@@ -28,6 +28,18 @@
             <groupId>com.holo.framework</groupId>
             <artifactId>holo-horm-cache</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.holo.framework</groupId>
+            <artifactId>holo-horm-migration</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Flyway 迁移引擎（可选） -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+            <optional>true</optional>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>
