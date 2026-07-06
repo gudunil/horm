@@ -204,7 +204,7 @@ public final class TransactionAdvisorRegistry {
      * Test hook: clears the registry. Intended for {@code @AfterEach} cleanup
      * so tests do not leak state.
      */
-    static void clear() {
+    public static void clear() {
         REGISTRY.clear();
     }
 }

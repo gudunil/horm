@@ -1,5 +1,6 @@
 package com.holo.framework.horm.starter;
 
+import com.holo.framework.horm.core.TransactionAdvisorRegistry;
 import com.holo.framework.horm.core.TransactionInterceptor;
 import com.holo.framework.horm.meta.annotation.Transactional;
 import org.springframework.beans.BeansException;
@@ -42,7 +43,8 @@ public class HormTransactionalBeanPostProcessor implements BeanPostProcessor {
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
         Class<?> beanClass = bean.getClass();
 
-        if (!hasTransactionalAnnotation(beanClass)) {
+        // 检查是否有事务元数据注册（APT 生成或手动注册）
+        if (!TransactionAdvisorRegistry.isTransactional(beanClass) && !hasTransactionalAnnotation(beanClass)) {
             return bean;
         }
 

@@ -11,6 +11,7 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
 
 import javax.annotation.processing.Filer;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
@@ -41,8 +42,8 @@ final class TransactionAdvisorBuilder {
      * @return the fully qualified name of the generated advisor, or
      *         {@code null} if the type has no transactional methods
      */
-    static String build(TypeElement type, Filer filer) {
-        List<TransactionMethodInfo> methods = collectTransactionalMethods(type);
+    static String build(TypeElement type, Filer filer, ProcessingEnvironment processingEnv) {
+        List<TransactionMethodInfo> methods = collectTransactionalMethods(type, processingEnv);
         if (methods.isEmpty()) {
             return null;
         }
@@ -65,12 +66,12 @@ final class TransactionAdvisorBuilder {
         return generatedPackage + "." + advisorName;
     }
 
-    private static List<TransactionMethodInfo> collectTransactionalMethods(TypeElement type) {
+    private static List<TransactionMethodInfo> collectTransactionalMethods(TypeElement type, ProcessingEnvironment processingEnv) {
         List<TransactionMethodInfo> result = new ArrayList<>();
         for (Element enclosed : type.getEnclosedElements()) {
             AnnotationMirror txMirror = findAnnotationMirror(enclosed, Transactional.class.getName());
             if (txMirror != null && enclosed instanceof ExecutableElement method) {
-                result.add(new TransactionMethodInfo(method.getSimpleName().toString(), txMirror));
+                result.add(new TransactionMethodInfo(method.getSimpleName().toString(), txMirror, processingEnv));
             }
         }
         // Also check class-level @Transactional
@@ -79,7 +80,7 @@ final class TransactionAdvisorBuilder {
             // Class-level annotation applies to all public methods;
             // for M4 we just record the class-level metadata as a
             // single entry with methodName = "*".
-            result.add(new TransactionMethodInfo("*", classTxMirror));
+            result.add(new TransactionMethodInfo("*", classTxMirror, processingEnv));
         }
         return result;
     }
@@ -137,9 +138,10 @@ final class TransactionAdvisorBuilder {
         final List<String> rollbackFor;
         final List<String> noRollbackFor;
 
-        TransactionMethodInfo(String methodName, AnnotationMirror txMirror) {
+        TransactionMethodInfo(String methodName, AnnotationMirror txMirror, ProcessingEnvironment processingEnv) {
             this.methodName = methodName;
-            Map<? extends ExecutableElement, ? extends AnnotationValue> values = txMirror.getElementValues();
+            Map<? extends ExecutableElement, ? extends AnnotationValue> values =
+                processingEnv.getElementUtils().getElementValuesWithDefaults(txMirror);
             this.propagation = getEnumValue(values, "propagation", Propagation.REQUIRED, Propagation.class);
             this.isolation = getEnumValue(values, "isolation", Isolation.DEFAULT, Isolation.class);
             this.timeout = getIntValue(values, "timeout", -1);

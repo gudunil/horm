@@ -125,7 +125,7 @@ public class HormEntityProcessor extends AbstractProcessor {
             TypeElement type = (TypeElement) enclosing;
             if (processedTypes.add(type)) {
                 try {
-                    String advisorName = TransactionAdvisorBuilder.build(type, processingEnv.getFiler());
+                    String advisorName = TransactionAdvisorBuilder.build(type, processingEnv.getFiler(), processingEnv);
                     if (advisorName != null) {
                         transactionAdvisorNames.add(advisorName);
                     }

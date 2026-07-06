@@ -407,19 +407,22 @@
 
 ### 测试与覆盖率
 
-- **测试总数**：744（meta 模块 156 + cache 模块 346 + core 模块 206 + migration 模块 36）
+- **测试总数**：863（meta 模块 156 + cache 模块 368 + core 模块 206 + migration 模块 99 + starter 模块 34）
 - 新增测试：
   - `TransactionMethodMetaTest` 扩展 — `shouldRollback()` 异常判断逻辑
-  - `TransactionAdvisorRegistryTest`（待补充）— 索引加载 + 查询
-  - `TransactionInterceptorTest`（待补充）— 事务拦截 + 回滚规则
-  - `HormAutoConfigurationTest`（待补充）— Spring Boot 自动装配
-  - `HormTransactionalBeanPostProcessorTest`（待补充）— JDK 代理创建
+  - `HormAutoConfigurationTest`（6 测试）— Spring Boot 自动装配 + SpringDataSourceProvider 连接管理
+  - `HormMultiDataSourceAutoConfigurationTest`（9 测试）— 多数据源配置 + ConfigurableDataSourceProvider 连接管理
+  - `HormTransactionalBeanPostProcessorTest`（3 测试）— JDK 代理创建
+  - `HormMigrationAutoConfigurationTest`（4 测试）— Flyway 自动迁移条件装配
+  - `HormMigrationAutoConfigurationRunTest`（5 测试）— 迁移执行逻辑
+  - `HormDataSourcePropertiesTest`（4 测试）— 配置属性绑定
+  - `HormPropertiesTest`（3 测试）— 配置属性
 - **JaCoCo 覆盖率**：
   - meta 模块整体：84%（> 80% 目标 ✅）
   - cache 模块整体：87%（> 80% 目标 ✅）
   - core 模块整体：86%（> 84% 目标 ✅）
   - migration 模块整体：82%（> 80% 目标 ✅）
-  - starter 模块整体：80%（> 80% 目标 ✅）
+  - starter 模块整体：97%（> 80% 目标 ✅）
 - **验证命令**：`mvn -f holo-horm/pom.xml clean verify -Pskip-enforcer`
 
 ### 关键设计决策

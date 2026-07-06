@@ -100,6 +100,9 @@ public class HormMultiDataSourceAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public HormContext hormContext(DataSourceRegistry registry) {
+        if (!registry.hasDefault()) {
+            return null;
+        }
         HormContext context = new HormContext(registry);
         Horm.install(context);
         return context;
