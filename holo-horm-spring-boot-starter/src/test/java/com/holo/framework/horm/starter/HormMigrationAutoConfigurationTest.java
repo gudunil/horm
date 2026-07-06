@@ -1,6 +1,5 @@
 package com.holo.framework.horm.starter;
 
-import com.holo.framework.horm.core.Horm;
 import com.holo.framework.horm.core.HormContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
@@ -47,12 +46,13 @@ class HormMigrationAutoConfigurationTest {
     }
 
     @Test
-    void autoOnStartupDefaultValueTrue() {
+    void autoOnStartupDefaultValueFalse() {
         contextRunner
             .withUserConfiguration(TestConfig.class)
             .run(context -> {
                 HormMigrationAutoConfiguration config = context.getBean(HormMigrationAutoConfiguration.class);
                 assertThat(config).isNotNull();
+                // 默认值由 HormProperties.Migration.autoOnStartup 决定，应为 false
             });
     }
 

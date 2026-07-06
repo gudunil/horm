@@ -2,7 +2,7 @@ package com.holo.framework.horm.starter;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -32,8 +32,11 @@ public class HormDataSourceProperties {
 
     /**
      * 数据源配置映射，key 为数据源名称，value 为数据源属性。
+     *
+     * <p>使用 {@link LinkedHashMap} 保持配置声明顺序，确保第一个配置的数据源
+     * 被注册为默认数据源时行为可预测。
      */
-    private Map<String, DataSourceConfig> datasources = new HashMap<>();
+    private Map<String, DataSourceConfig> datasources = new LinkedHashMap<>();
 
     public Map<String, DataSourceConfig> getDatasources() {
         return datasources;

@@ -53,7 +53,8 @@ public class HormMultiDataSourceAutoConfiguration {
      * 创建多数据源注册表。
      *
      * <p>从配置中读取所有数据源，为每个数据源创建 {@link DataSourceProvider}，
-     * 并注册到 {@link DataSourceRegistry}。第一个数据源会被注册为默认数据源。
+     * 并注册到 {@link DataSourceRegistry}。配置中第一个数据源会被注册为默认数据源
+     * （依赖 {@link HormDataSourceProperties} 中 {@link LinkedHashMap} 保序特性）。
      *
      * @param properties 多数据源配置属性
      * @return 配置好的 DataSourceRegistry
@@ -101,6 +102,9 @@ public class HormMultiDataSourceAutoConfiguration {
     @ConditionalOnMissingBean
     public HormContext hormContext(DataSourceRegistry registry) {
         if (!registry.hasDefault()) {
+            log.warn("No default datasource configured; HormContext bean will not be created. " +
+                "Define at least one datasource under 'spring.datasource.<name>.*' or " +
+                "provide your own HormContext bean.");
             return null;
         }
         HormContext context = new HormContext(registry);
@@ -168,7 +172,9 @@ public class HormMultiDataSourceAutoConfiguration {
             if (config.getPassword() != null) {
                 builder.password(config.getPassword());
             }
-            // driverClassName 由 DataSourceBuilder 内部通过 JDBC URL 自动处理
+            if (config.getDriverClassName() != null) {
+                builder.driverClassName(config.getDriverClassName());
+            }
 
             return builder.build();
         }

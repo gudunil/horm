@@ -5,7 +5,6 @@ import com.holo.framework.horm.core.HormContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -20,29 +19,33 @@ import static org.mockito.Mockito.mockStatic;
 class HormMigrationAutoConfigurationRunTest {
 
     private HormMigrationAutoConfiguration config;
+    private HormProperties properties;
 
     @BeforeEach
     void setUp() {
-        config = new HormMigrationAutoConfiguration();
+        properties = new HormProperties();
+        config = new HormMigrationAutoConfiguration(properties);
     }
 
     @AfterEach
     void tearDown() {
         if (HormContext.isInstalled()) {
-            HormContext.current().close();
+            HormContext ctx = HormContext.current();
+            ctx.close();
+            HormContext.install(null);
         }
     }
 
     @Test
     void runWithAutoOnStartupDisabled() throws Exception {
-        ReflectionTestUtils.setField(config, "autoOnStartup", false);
+        properties.getMigration().setAutoOnStartup(false);
         config.run();
         // Should not throw, just return early
     }
 
     @Test
     void runWithEmptyMigrationResult() throws Exception {
-        ReflectionTestUtils.setField(config, "autoOnStartup", true);
+        properties.getMigration().setAutoOnStartup(true);
 
         try (var mockedHorm = mockStatic(Horm.class)) {
             Map<String, Integer> emptyResult = new HashMap<>();
@@ -55,7 +58,7 @@ class HormMigrationAutoConfigurationRunTest {
 
     @Test
     void runWithSuccessfulMigrations() throws Exception {
-        ReflectionTestUtils.setField(config, "autoOnStartup", true);
+        properties.getMigration().setAutoOnStartup(true);
 
         try (var mockedHorm = mockStatic(Horm.class)) {
             Map<String, Integer> result = new HashMap<>();
@@ -70,7 +73,7 @@ class HormMigrationAutoConfigurationRunTest {
 
     @Test
     void runWithZeroMigrationsOnDatasource() throws Exception {
-        ReflectionTestUtils.setField(config, "autoOnStartup", true);
+        properties.getMigration().setAutoOnStartup(true);
 
         try (var mockedHorm = mockStatic(Horm.class)) {
             Map<String, Integer> result = new HashMap<>();
@@ -84,7 +87,7 @@ class HormMigrationAutoConfigurationRunTest {
 
     @Test
     void runWithMigrationException() {
-        ReflectionTestUtils.setField(config, "autoOnStartup", true);
+        properties.getMigration().setAutoOnStartup(true);
 
         try (var mockedHorm = mockStatic(Horm.class)) {
             mockedHorm.when(Horm::migrate).thenThrow(new RuntimeException("Migration failed"));

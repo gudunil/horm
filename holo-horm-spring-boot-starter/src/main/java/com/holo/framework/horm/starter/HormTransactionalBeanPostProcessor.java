@@ -64,16 +64,23 @@ public class HormTransactionalBeanPostProcessor implements BeanPostProcessor {
     /**
      * 检查指定类是否标注了 {@code @Transactional} 注解。
      *
-     * <p>检查范围包括类级别注解和所有声明方法的注解。
+     * <p>检查范围包括类级别注解和所有方法的注解（含继承自父类的方法）。
      *
      * @param clazz the class to check
      * @return true 如果类或任意方法标注了 {@code @Transactional}
      */
     private boolean hasTransactionalAnnotation(Class<?> clazz) {
-        if (clazz.isAnnotationPresent(Transactional.class)) {
-            return true;
+        Class<?> current = clazz;
+        while (current != null && current != Object.class) {
+            if (current.isAnnotationPresent(Transactional.class)) {
+                return true;
+            }
+            if (Arrays.stream(current.getDeclaredMethods())
+                .anyMatch(m -> m.isAnnotationPresent(Transactional.class))) {
+                return true;
+            }
+            current = current.getSuperclass();
         }
-        return Arrays.stream(clazz.getDeclaredMethods())
-            .anyMatch(m -> m.isAnnotationPresent(Transactional.class));
+        return false;
     }
 }
