@@ -33,6 +33,8 @@ public final class CacheKey {
     private final String keyType;
     private final String keyValue;
     private final String version;
+    /** Cached string representation for fast equals/hashCode. */
+    private final String stringForm;
 
     /**
      * Package-private constructor. Only {@link CacheKeyBuilder} is expected
@@ -45,6 +47,10 @@ public final class CacheKey {
         this.keyType = keyType;
         this.keyValue = keyValue;
         this.version = version;
+        // Compute once at construction time; equals/hashCode are called
+        // frequently in cache lookups and we want to avoid repeated
+        // string concatenation.
+        this.stringForm = entityType + ":" + partition + ":" + keyType + ":" + keyValue + ":" + version;
     }
 
     /**
@@ -96,11 +102,11 @@ public final class CacheKey {
      * Canonical string form {@code {entityType}:{partition}:{keyType}:{keyValue}:{version}}.
      *
      * <p>This is the value stored in the cache backend and the basis for
-     * {@link #equals}/{@link #hashCode}; compute it once per instance.
+     * {@link #equals}/{@link #hashCode}; computed once at construction time.
      */
     @Override
     public String toString() {
-        return entityType + ":" + partition + ":" + keyType + ":" + keyValue + ":" + version;
+        return stringForm;
     }
 
     @Override
@@ -111,11 +117,11 @@ public final class CacheKey {
         if (!(o instanceof CacheKey other)) {
             return false;
         }
-        return Objects.equals(toString(), other.toString());
+        return stringForm.equals(other.stringForm);
     }
 
     @Override
     public int hashCode() {
-        return toString().hashCode();
+        return stringForm.hashCode();
     }
 }

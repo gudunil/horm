@@ -141,7 +141,9 @@ public final class DefaultCacheChain implements CacheChain {
     public <K, V> Optional<V> get(K key, TypeReference<V> type) {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(type, "type");
-        for (int i = 0; i < levels.size(); i++) {
+        // Cache size to avoid repeated volatile reads on CopyOnWriteArrayList
+        int size = levels.size();
+        for (int i = 0; i < size; i++) {
             Cache tier = levels.get(i);
             Optional<V> cached = tier.get(key, type);
             if (cached.isPresent()) {
@@ -149,7 +151,7 @@ public final class DefaultCacheChain implements CacheChain {
                 publishEvent(CacheEvent.of(
                     CacheEventType.HIT, tier.name(), tier.level(), key, value));
                 // Back-fill tiers above this hit (indices 0..i-1).
-                backFillAbove(key, value, i);
+                backFillAbove(key, value, i, null);
                 // NullMarker hit: logical value is null, return empty.
                 if (NullMarker.isNullMarker(value)) {
                     return Optional.empty();
@@ -174,15 +176,17 @@ public final class DefaultCacheChain implements CacheChain {
         Objects.requireNonNull(loader, "loader");
         Objects.requireNonNull(policy, "policy");
 
+        // Cache size to avoid repeated volatile reads on CopyOnWriteArrayList
+        int size = levels.size();
         // Walk the chain looking for a hit.
-        for (int i = 0; i < levels.size(); i++) {
+        for (int i = 0; i < size; i++) {
             Cache tier = levels.get(i);
             Optional<V> cached = tier.get(key, type);
             if (cached.isPresent()) {
                 V value = cached.get();
                 publishEvent(CacheEvent.of(
                     CacheEventType.HIT, tier.name(), tier.level(), key, value));
-                backFillAbove(key, value, i);
+                backFillAbove(key, value, i, policy);
                 // NullMarker hit: logical value is null, do NOT invoke loader.
                 if (NullMarker.isNullMarker(value)) {
                     return Optional.empty();
@@ -273,10 +277,12 @@ public final class DefaultCacheChain implements CacheChain {
         Map<K, V> result = new LinkedHashMap<>();
         Set<K> remaining = new LinkedHashSet<>(keys);
 
+        // Cache size to avoid repeated volatile reads on CopyOnWriteArrayList
+        int size = levels.size();
         // Walk the chain collecting hits; remember per-tier hit index so
         // we can back-fill the upper tiers only with the entries that
         // actually hit at a deeper level.
-        for (int i = 0; i < levels.size(); i++) {
+        for (int i = 0; i < size; i++) {
             if (remaining.isEmpty()) break;
             Cache tier = levels.get(i);
             Map<K, V> found = tier.getAll(remaining, type);
@@ -296,7 +302,7 @@ public final class DefaultCacheChain implements CacheChain {
                 remaining.remove(k);
                 // Back-fill tiers above i with the hit value (also a
                 // NullMarker if that is what we found).
-                backFillAbove(k, v, i);
+                backFillAbove(k, v, i, policy);
             }
         }
 
@@ -475,7 +481,9 @@ public final class DefaultCacheChain implements CacheChain {
         Objects.requireNonNull(cache, "cache");
         int insertAt = 0;
         boolean found = false;
-        for (int i = 0; i < levels.size(); i++) {
+        // Cache size to avoid repeated volatile reads
+        int size = levels.size();
+        for (int i = 0; i < size; i++) {
             if (levels.get(i).level() == level) {
                 insertAt = i + 1;
                 found = true;
@@ -483,14 +491,11 @@ public final class DefaultCacheChain implements CacheChain {
             }
         }
         if (!found) {
-            // Implementation-defined: append to the tail when the target
-            // level is absent. This matches the CacheChain contract's
-            // "callers should ensure the target level is present" guidance
-            // by failing safe rather than throwing.
-            levels.add(cache);
-        } else {
-            levels.add(insertAt, cache);
+            throw new IllegalArgumentException(
+                "Target CacheLevel '" + level + "' not found in chain; "
+                    + "callers must ensure the target level is present before calling insertAfter");
         }
+        levels.add(insertAt, cache);
         return this;
     }
 
@@ -574,19 +579,22 @@ public final class DefaultCacheChain implements CacheChain {
      * value. Tiers {@code 0 .. hitIndex-1} receive a {@code put}; the
      * hit tier itself and tiers below are left untouched (they already
      * have the value).
+     *
+     * @param key the cache key
+     * @param value the value to back-fill
+     * @param hitIndex the index of the tier that had the hit
+     * @param policy the cache policy to use; if {@code null}, uses the default back-fill policy
      */
-    private <K, V> void backFillAbove(K key, V value, int hitIndex) {
+    private <K, V> void backFillAbove(K key, V value, int hitIndex, CachePolicy policy) {
         if (hitIndex <= 0) {
             return;
         }
-        // Reuse the active policy: when back-filling we do not have a
-        // caller-supplied policy, so default to the standard HORM
-        // read-through policy. This is acceptable because back-fill is
-        // an internal optimisation; callers wanting explicit control
-        // can use {@link #put} directly.
-        CachePolicy policy = defaultBackFillPolicy();
+        // Use the caller-supplied policy when available to maintain TTL/nullable
+        // consistency; fall back to the default policy for plain get() calls
+        // that don't have an explicit policy.
+        CachePolicy effectivePolicy = policy != null ? policy : defaultBackFillPolicy();
         for (int i = 0; i < hitIndex; i++) {
-            levels.get(i).put(key, value, policy);
+            levels.get(i).put(key, value, effectivePolicy);
         }
     }
 

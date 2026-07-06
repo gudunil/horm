@@ -626,10 +626,13 @@ class DefaultCacheChainTest {
         DefaultCacheChain chain = new DefaultCacheChain(l1);
         TestCache l3 = new TestCache("l3", CacheLevel.L3);
 
-        // No L2 tier exists; insertAfter(L2, ...) should append.
-        chain.insertAfter(CacheLevel.L2, l3);
+        // No L2 tier exists; insertAfter(L2, ...) should throw IllegalArgumentException.
+        assertThatThrownBy(() -> chain.insertAfter(CacheLevel.L2, l3))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Target CacheLevel 'L2' not found in chain");
 
-        assertThat(chain.levels()).containsExactly(l1, l3);
+        // Chain should remain unchanged.
+        assertThat(chain.levels()).containsExactly(l1);
     }
 
     @Test

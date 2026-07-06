@@ -1,11 +1,14 @@
 package com.holo.framework.horm.cache;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 import org.redisson.api.RBucket;
@@ -229,15 +232,38 @@ public final class RedisCache implements Cache {
     public <K, V> Map<K, V> getAll(Set<K> keys, TypeReference<V> type) {
         Objects.requireNonNull(keys, "keys");
         Objects.requireNonNull(type, "type");
-        // M6: simple loop over per-key get(). A Redisson batch or pipeline
-        // would reduce round-trips, but the loop keeps the stub transparent
-        // and the overhead is negligible for typical HORM cache-lookup
-        // cardinalities (single-digit keys per query). M7+ may switch to
-        // RBatch + MGET for bulk fetch.
-        Map<K, V> result = new HashMap<>();
-        for (K key : keys) {
-            Optional<V> value = get(key, type);
-            value.ifPresent(v -> result.put(key, v));
+        if (keys.isEmpty()) {
+            return new HashMap<>();
+        }
+        // Use RBatch for bulk retrieval to reduce Redis round-trips.
+        // Each key is fetched via a separate async command in the batch, but
+        // they are pipelined over a single connection, reducing latency from
+        // O(N) round-trips to a single round-trip.
+        Map<K, V> result = new HashMap<>(keys.size());
+        try {
+            org.redisson.api.RBatch batch = client.createBatch();
+            // Preserve insertion order so we can match responses to keys.
+            List<K> orderedKeys = new ArrayList<>(keys.size());
+            List<org.redisson.api.RFuture<byte[]>> futures = new ArrayList<>(keys.size());
+            for (K key : keys) {
+                orderedKeys.add(key);
+                org.redisson.api.RBucketAsync<byte[]> bucket = batch.getBucket(redisKey(key));
+                futures.add(bucket.getAsync());
+            }
+            batch.execute();
+            // Extract results from the completed futures.
+            for (int i = 0; i < orderedKeys.size(); i++) {
+                byte[] bytes = futures.get(i).getNow();
+                if (bytes != null) {
+                    V value = serializer.deserialize(bytes, type);
+                    if (value != null) {
+                        result.put(orderedKeys.get(i), value);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            throw new CacheException(
+                "Failed to batch read " + keys.size() + " keys from Redis cache '" + name + "'", e);
         }
         return result;
     }
@@ -246,9 +272,36 @@ public final class RedisCache implements Cache {
     public <K, V> void putAll(Map<K, V> entries, CachePolicy policy) {
         Objects.requireNonNull(entries, "entries");
         Objects.requireNonNull(policy, "policy");
-        // M6: simple loop over per-key put(). M7+ may switch to RBatch.
-        for (Map.Entry<K, V> entry : entries.entrySet()) {
-            put(entry.getKey(), entry.getValue(), policy);
+        if (entries.isEmpty()) {
+            return;
+        }
+        // Use RBatch for bulk writes to reduce Redis round-trips.
+        try {
+            org.redisson.api.RBatch batch = client.createBatch();
+            Duration ttl = policy.ttl();
+            boolean hasTtl = ttl != null && !ttl.isZero() && !ttl.isNegative();
+            for (Map.Entry<K, V> entry : entries.entrySet()) {
+                K key = entry.getKey();
+                V value = entry.getValue();
+                if (value == null) {
+                    // M6: null sentinels are not cached in L2
+                    continue;
+                }
+                byte[] bytes = serializer.serialize(value);
+                if (bytes == null) {
+                    continue;
+                }
+                org.redisson.api.RBucketAsync<byte[]> bucket = batch.getBucket(redisKey(key));
+                if (hasTtl) {
+                    bucket.setAsync(bytes, ttl.toMillis(), TimeUnit.MILLISECONDS);
+                } else {
+                    bucket.setAsync(bytes);
+                }
+            }
+            batch.execute();
+        } catch (Exception e) {
+            throw new CacheException(
+                "Failed to batch write " + entries.size() + " entries to Redis cache '" + name + "'", e);
         }
     }
 

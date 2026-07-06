@@ -297,11 +297,6 @@ public final class CaffeineCache implements Cache {
             loaded = loader.get();
         } catch (RuntimeException ex) {
             throw new CacheLoadException(ex);
-        } catch (Exception ex) {
-            // Supplier#get doesn't declare checked exceptions, but a
-            // loader that wraps a CacheLoader might rethrow via
-            // sneaky throws; defend against that here.
-            throw new CacheLoadException(ex);
         }
 
         if (loaded == null) {

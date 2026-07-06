@@ -411,17 +411,24 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         if (keys == null || keys.isEmpty()) {
             return Map.of();
         }
+        // Build a mapping from the string representation of the id (as it
+        // appears in CacheKey.keyValue()) to the CacheKey itself. We use
+        // String.valueOf() on the database-returned id to match the key
+        // lookup, since CacheKey stores the id as a string.
         List<Object> ids = new ArrayList<>(keys.size());
-        Map<Object, CacheKey> idToKey = new HashMap<>();
+        Map<String, CacheKey> idStringToKey = new HashMap<>();
         for (CacheKey key : keys) {
             Object id = key.keyValue();
             ids.add(id);
-            idToKey.put(id, key);
+            idStringToKey.put(String.valueOf(id), key);
         }
         Map<Object, T> byId = dbFindMany(ids);
         Map<CacheKey, T> result = new LinkedHashMap<>();
         for (Map.Entry<Object, T> e : byId.entrySet()) {
-            CacheKey key = idToKey.get(String.valueOf(e.getKey()));
+            // Normalize the database-returned id to its string form to match
+            // the CacheKey's keyValue() representation. This handles cases
+            // where the id type differs (e.g., Long from DB vs String in key).
+            CacheKey key = idStringToKey.get(String.valueOf(e.getKey()));
             if (key != null) {
                 result.put(key, e.getValue());
             }

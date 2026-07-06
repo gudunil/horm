@@ -14,6 +14,15 @@ import java.util.List;
  * cleanup on rollback). Callbacks are queued on the innermost active
  * transaction regardless of whether it is new or joined; only the outermost
  * new transaction's commit/rollback triggers them.
+ *
+ * <p><b>Thread safety.</b> Instances of this class are <b>NOT</b> thread-safe.
+ * The callback lists use plain {@link ArrayList} because transaction operations
+ * (begin, commit, rollback, callback registration) are expected to occur on a
+ * single thread — the thread that owns the transaction via the
+ * {@link TransactionManager}'s ThreadLocal. If callback registration from
+ * multiple threads is required in the future, the lists should be changed to
+ * {@link java.util.concurrent.CopyOnWriteArrayList} or synchronized access
+ * should be added.
  */
 public final class TransactionStatus {
 
@@ -23,6 +32,9 @@ public final class TransactionStatus {
     private final DataSourceProvider connectionProvider;
     private final String dataSourceName;
 
+    // NOTE: These lists are NOT thread-safe. See class-level Javadoc for
+    // the thread-confinement rationale. All callback registration and
+    // consumption must occur on the transaction-owning thread.
     private List<Runnable> afterCommitCallbacks;
     private List<Runnable> afterRollbackCallbacks;
 
