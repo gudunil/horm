@@ -2,8 +2,10 @@ package com.holo.framework.horm.core.datasource;
 
 import com.holo.framework.horm.core.DataSourceProvider;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -118,5 +120,12 @@ public final class DataSourceRegistry {
      */
     public int size() {
         return providers.size();
+    }
+
+    /**
+     * Returns an unmodifiable view of all registered datasource entries.
+     */
+    public Set<Map.Entry<String, DataSourceProvider>> entries() {
+        return Collections.unmodifiableSet(providers.entrySet());
     }
 }

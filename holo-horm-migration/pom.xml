@@ -20,9 +20,11 @@
             <groupId>com.holo.framework</groupId>
             <artifactId>holo-horm-core</artifactId>
         </dependency>
+
+        <!-- Flyway 迁移引擎 -->
         <dependency>
-            <groupId>com.holo.framework</groupId>
-            <artifactId>holo-horm-datasource</artifactId>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
         </dependency>
 
         <dependency>
@@ -43,6 +45,11 @@
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

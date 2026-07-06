@@ -3,6 +3,9 @@ package com.holo.framework.horm.core;
 import com.holo.framework.horm.core.datasource.DataSourceRegistry;
 import com.holo.framework.horm.meta.annotation.Propagation;
 
+import java.util.Map;
+import java.util.ServiceLoader;
+
 /**
  * Process-wide entrypoint for the HORM runtime.
  *
@@ -190,5 +193,48 @@ public final class Horm {
                            java.util.concurrent.Callable<T> action) {
         return TransactionManager.execute(HormContext.current(), dataSourceName,
             TransactionDefinition.builder().propagation(propagation).build(), action);
+    }
+
+    // ===== Migration API =====
+
+    /**
+     * Executes database migrations on all registered datasources.
+     *
+     * <p>This method discovers a {@link MigrationExecutor} implementation via
+     * {@link ServiceLoader} and delegates migration execution to it. Each
+     * datasource maintains its own migration history table.
+     *
+     * @return a map from datasource name to the number of migrations applied
+     * @throws IllegalStateException if no {@link HormContext} is installed
+     * @throws IllegalStateException if no {@link MigrationExecutor} implementation is found
+     */
+    public static Map<String, Integer> migrate() {
+        MigrationExecutor executor = loadMigrationExecutor();
+        return executor.migrateAll();
+    }
+
+    /**
+     * Executes database migrations on the specified datasource.
+     *
+     * <p>This method discovers a {@link MigrationExecutor} implementation via
+     * {@link ServiceLoader} and delegates migration execution to it.
+     *
+     * @param dataSourceName the target datasource name
+     * @return the number of migrations applied
+     * @throws IllegalStateException if no {@link HormContext} is installed
+     * @throws IllegalStateException if no {@link MigrationExecutor} implementation is found
+     * @throws IllegalStateException if the specified datasource is not registered
+     */
+    public static int migrate(String dataSourceName) {
+        MigrationExecutor executor = loadMigrationExecutor();
+        return executor.migrate(dataSourceName);
+    }
+
+    private static MigrationExecutor loadMigrationExecutor() {
+        ServiceLoader<MigrationExecutor> loader = ServiceLoader.load(MigrationExecutor.class);
+        return loader.findFirst().orElseThrow(() ->
+            new IllegalStateException(
+                "No MigrationExecutor implementation found. " +
+                "Ensure holo-horm-migration module is on the classpath."));
     }
 }
