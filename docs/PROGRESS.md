@@ -15,9 +15,10 @@
 | M4     | ✅ 完成 | 2026-07-05     | v1.0.0-M4  |
 | M5     | ✅ 完成 | 2026-07-05     | v1.0.0-M5  |
 | M6     | ✅ 完成 | 2026-07-06     | v1.0.0-M6  |
-| M7-M9  | 📋 规划中 | —              | —          |
+| M7     | ✅ 完成 | 2026-07-06     | v1.0.0-M7  |
+| M8-M9  | 📋 规划中 | —              | —          |
 
-**当前分支**：`feature/m6-cache`（M6 完成后待 squash merge 到 `main`）
+**当前分支**：`feature/m7-migration`（M7 完成后待 squash merge 到 `main`）
 
 ---
 
@@ -332,13 +333,66 @@
 
 ---
 
+## M7: 数据库迁移（Flyway 集成）（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | Commit |
+|--------|------|--------|
+| M7-1 | 创建 `holo-horm-migration` 模块 + pom.xml（Flyway core 依赖） | `<本 commit>` |
+| M7-2 | 定义 Migration SPI：`Migration` 抽象类 + `Schema` 接口 + `TableBuilder` + `ColumnBuilder` DSL | `<本 commit>` |
+| M7-3 | 实现 `Schema` 渲染器：`H2SchemaRenderer` / `MySQLSchemaRenderer` 将 DSL 转为 DDL SQL | `<本 commit>` |
+| M7-4 | 集成 Flyway：`FlywayMigrationRunner` 封装 Flyway 引擎，支持 Java + SQL 双格式迁移 | `<本 commit>` |
+| M7-5 | 多数据源迁移：`MultiDataSourceMigrationRunner` + `DataSourceRegistry` 分组执行 | `<本 commit>` |
+| M7-6 | 校验和验证：`MigrationChecksum` CRC32 校验 + `MigrationChecksumException` | `<本 commit>` |
+| M7-7 | Horm 集成：`Horm.migrate()` / `Horm.migrate(String)` 入口 + `MigrationExecutor` SPI | `<本 commit>` |
+| M7-8 | 命令行 stub：`MigrationCommand` 接口 + `MigrateCommand`/`RollbackCommand`/`StatusCommand`/`MakeCommand` | `<本 commit>` |
+| M7-9 | H2 集成测试 + 覆盖率检查 + PROGRESS.md + tag v1.0.0-M7 | `<本 commit>` |
+
+### 测试与覆盖率
+
+- **测试总数**：744（meta 模块 156 + cache 模块 346 + core 模块 206 + migration 模块 36）
+- 新增测试：
+  - `MigrationDslIntegrationTest`（4 H2 集成测试）— DSL 创建表、多语句迁移、状态查询、校验和
+  - `MigrationChecksumTest`（5 测试）— CRC32 校验和计算
+  - `MigrationCommandsTest`（5 测试）— 命令查找与执行
+  - `H2SchemaRendererTest`（10 测试）— H2 DDL 渲染
+  - `MySQLSchemaRendererTest`（6 测试）— MySQL DDL 渲染
+  - `DdlSchemaTest`（6 测试）— Schema DSL 语句收集
+- **JaCoCo 覆盖率**：
+  - meta 模块整体：84%（> 80% 目标 ✅）
+  - cache 模块整体：87%（> 80% 目标 ✅）
+  - core 模块整体：86%（> 84% 目标 ✅）
+  - migration 模块整体：82%（> 80% 目标 ✅）
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core,holo-horm-cache,holo-horm-migration -am verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **Flyway 作为迁移引擎**：M7 采用 Flyway 作为迁移引擎核心（成熟、生产级、Spring Boot 原生集成），在其上层提供 HORM 风格的 DSL 包装。不重新实现迁移版本管理、checksum、baseline 等 Flyway 已有的能力。
+2. **Migration DSL vs 纯 SQL**：优先支持 Flyway 原生的 Java/SQL 迁移格式；HORM 的 `Migration` + `Schema` DSL 作为便捷 API 封装在 Flyway `JavaMigration` 之上，生成 SQL 交由 Flyway 执行。
+3. **模块边界**：`holo-horm-migration` 为新模块，依赖 `holo-horm-core`（获取 DataSourceRegistry）+ `flyway-core`（迁移引擎）。不依赖 cache/meta 模块。
+4. **H2 兼容性**：Migration DSL 生成的 DDL 需同时兼容 H2（MODE=MySQL）和真实 MySQL；类型映射由 `SchemaRenderer` 处理。
+5. **baseline 支持**：首次在已有数据库上启用迁移时，Flyway baseline 避免重复执行历史迁移。
+6. **多数据源隔离**：每个数据源独立的 Flyway 实例 + `flyway_schema_history` 表；默认数据源无需指定名称。
+7. **rollback 范围**：Flyway 社区版不支持 undo migration；M7 的 `down()` 仅在测试中使用，生产环境 rollback 需 Flyway Pro/Enterprise 或手动 SQL。
+8. **MigrationExecutor SPI**：`Horm.migrate()` 通过 `ServiceLoader` 发现 `MigrationExecutor` 实现，避免 core 模块直接依赖 migration 模块，保持模块解耦。
+9. **NonCloseableConnection 包装**：`ConnectionDataSource` 返回不可关闭的连接包装器，防止 Flyway 关闭底层连接后影响后续操作。
+
+### 已知限制（M7 范围内）
+
+- `down()` 方法仅在测试中使用，生产环境 rollback 需 Flyway Pro/Enterprise 或手动 SQL
+- 不支持运行时动态添加迁移脚本 — 仅启动时扫描 classpath
+- 不支持迁移脚本热重载 — 需重启应用
+- 命令行工具为 stub 实现，M8 Spring Boot Starter 完整集成
+- 不支持迁移脚本版本冲突检测 — 由 Flyway 内部处理
+- 不支持跨数据源事务迁移 — 每个数据源独立迁移
+
+---
+
 ## 后续里程碑概览
 
 | 里程碑 | 主题 | 预计 |
 |--------|------|------|
-| M5 | 多数据源 SPI 与路由 | 2026 Q3 |
-| M6 | 缓存链（L1 + L2 组合）+ batch loading | 2026 Q4 |
-| M7 | 数据库迁移（Flyway 集成） | 2026 Q4 |
 | M8 | Spring Boot Starter + `@Transactional` 运行时 AOP 代理织入 | 2027 Q1 |
 | M9 | 性能基准与 GA 发布 | 2027 Q1-Q2 |
 
