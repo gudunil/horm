@@ -10,6 +10,7 @@ import com.holo.framework.horm.core.HormException;
 import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.core.EntityMetaRegistry;
 import com.holo.framework.horm.core.TransactionManager;
+import com.holo.framework.horm.core.dialect.Dialect;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
@@ -234,13 +235,10 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
         appendOrderBy(sql);
-        if (effectiveLimit != Long.MAX_VALUE) {
-            bindings.add(effectiveLimit);
-            sql.append(" LIMIT ?");
-        }
-        if (offset != null) {
-            bindings.add(offset);
-            sql.append(" OFFSET ?");
+        Dialect dialect = ctx.dialect(dataSourceName);
+        if (effectiveLimit != Long.MAX_VALUE || offset != null) {
+            long off = offset != null ? offset : 0L;
+            dialect.paginate(sql, bindings, off, effectiveLimit);
         }
 
         List<T> result = new ArrayList<>();
@@ -280,12 +278,9 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
         appendOrderBy(sql);
-        sql.append(" LIMIT ?");
-        bindings.add(1L);
-        if (offset != null) {
-            sql.append(" OFFSET ?");
-            bindings.add(offset);
-        }
+        Dialect dialect = ctx.dialect(dataSourceName);
+        long off = offset != null ? offset : 0L;
+        dialect.paginate(sql, bindings, off, 1L);
 
         Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -330,7 +325,8 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         StringBuilder sql = new StringBuilder("SELECT 1 FROM ").append(qualifiedTable());
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
-        sql.append(" LIMIT 1");
+        Dialect dialect = ctx.dialect(dataSourceName);
+        dialect.paginate(sql, bindings, 0L, 1L);
 
         Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
@@ -411,13 +407,11 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
     }
 
     private void appendLimitOffset(StringBuilder sql, List<Object> bindings) {
-        if (limit != null) {
-            sql.append(" LIMIT ?");
-            bindings.add(limit);
-        }
-        if (offset != null) {
-            sql.append(" OFFSET ?");
-            bindings.add(offset);
+        if (limit != null || offset != null) {
+            Dialect dialect = ctx.dialect(dataSourceName);
+            long lim = limit != null ? limit : Long.MAX_VALUE;
+            long off = offset != null ? offset : 0L;
+            dialect.paginate(sql, bindings, off, lim);
         }
     }
 

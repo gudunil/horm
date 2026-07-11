@@ -5,6 +5,7 @@ import com.holo.framework.horm.cache.CachePolicy;
 import com.holo.framework.horm.cache.TypeReference;
 import com.holo.framework.horm.cache.key.CacheKey;
 import com.holo.framework.horm.cache.key.CacheKeyBuilder;
+import com.holo.framework.horm.core.dialect.Dialect;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
@@ -146,13 +147,19 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     @Override
     public boolean exists(Object id) {
         FieldMeta<?> idField = requireIdField();
-        // H2 MODE=MySQL and MySQL both accept LIMIT 1; other dialects tolerate
-        // the redundant row and rely on rs.next() short-circuiting.
-        String sql = "SELECT 1 FROM " + qualifiedTable()
-            + " WHERE " + idField.column() + " = ? LIMIT 1";
+        StringBuilder sqlBuilder = new StringBuilder("SELECT 1 FROM ").append(qualifiedTable())
+            .append(" WHERE ").append(idField.column()).append(" = ?");
+        List<Object> bindings = new ArrayList<>();
+        bindings.add(id);
+        Dialect dialect = ctx.dialect(dataSourceName);
+        dialect.paginate(sqlBuilder, bindings, 0L, 1L);
+        String sql = sqlBuilder.toString();
         Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, id);
+            int i = 1;
+            for (Object b : bindings) {
+                ps.setObject(i++, b);
+            }
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }

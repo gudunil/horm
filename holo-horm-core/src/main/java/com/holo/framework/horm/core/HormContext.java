@@ -2,10 +2,13 @@ package com.holo.framework.horm.core;
 
 import com.holo.framework.horm.cache.CacheChain;
 import com.holo.framework.horm.core.datasource.DataSourceRegistry;
+import com.holo.framework.horm.core.dialect.Dialect;
+import com.holo.framework.horm.core.dialect.MySqlDialect;
 import com.holo.framework.horm.meta.EntityMeta;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.Map;
 
 /**
  * Ambient runtime context holding the active datasource registry and
@@ -44,6 +47,7 @@ public final class HormContext implements AutoCloseable {
     private final Connection connection;
     private final DataSourceRegistry registry;
     private final CacheChain cacheChain;
+    private final Map<String, Dialect> dialects;
 
     /**
      * Legacy constructor that wraps a single {@link Connection} in a
@@ -67,6 +71,7 @@ public final class HormContext implements AutoCloseable {
         this.registry = new DataSourceRegistry();
         this.registry.registerDefault(new SimpleDataSourceProvider(connection));
         this.cacheChain = cacheChain;
+        this.dialects = Map.of();
     }
 
     /**
@@ -89,6 +94,7 @@ public final class HormContext implements AutoCloseable {
         this.registry = new DataSourceRegistry();
         this.registry.registerDefault(dataSourceProvider);
         this.cacheChain = cacheChain;
+        this.dialects = Map.of();
     }
 
     /**
@@ -118,6 +124,27 @@ public final class HormContext implements AutoCloseable {
         }
         this.registry = registry;
         this.cacheChain = cacheChain;
+        this.dialects = Map.of();
+    }
+
+    /**
+     * M8.5 constructor that combines a {@link DataSourceRegistry} with a
+     * {@link CacheChain} and a dialect map.
+     *
+     * @param registry    the datasource registry (must have a default registered)
+     * @param cacheChain  the cache chain, or {@code null} to disable caching
+     * @param dialects    map of datasource name to dialect, may be empty
+     * @throws IllegalStateException if no default datasource is registered
+     */
+    public HormContext(DataSourceRegistry registry, CacheChain cacheChain, Map<String, Dialect> dialects) {
+        this.connection = null;
+        if (!registry.hasDefault()) {
+            throw new IllegalStateException(
+                "DataSourceRegistry must have a default datasource registered");
+        }
+        this.registry = registry;
+        this.cacheChain = cacheChain;
+        this.dialects = dialects != null ? dialects : Map.of();
     }
 
     /**
@@ -174,6 +201,18 @@ public final class HormContext implements AutoCloseable {
      */
     public CacheChain cacheChain() {
         return cacheChain;
+    }
+
+    /**
+     * Returns the {@link Dialect} for the given datasource name.
+     * Falls back to {@link MySqlDialect} when no dialect is explicitly
+     * registered for the requested name.
+     *
+     * @param dataSourceName the datasource name
+     * @return the dialect for the datasource, or MySqlDialect as fallback
+     */
+    public Dialect dialect(String dataSourceName) {
+        return dialects.getOrDefault(dataSourceName, new MySqlDialect());
     }
 
     /**
