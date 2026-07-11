@@ -108,6 +108,9 @@ public interface Row {
             if (v == null) return null;
             if (v instanceof Instant i) return i;
             if (v instanceof java.sql.Timestamp t) return t.toInstant();
+            if (v instanceof java.time.LocalDateTime ldt) return ldt.atZone(java.time.ZoneOffset.UTC).toInstant();
+            if (v instanceof java.time.OffsetDateTime odt) return odt.toInstant();
+            if (v instanceof java.time.ZonedDateTime zdt) return zdt.toInstant();
             if (v instanceof Long l) return Instant.ofEpochMilli(l);
             if (v instanceof String s) return Instant.parse(s);
             throw new ClassCastException("Cannot cast " + v.getClass() + " to Instant for column " + column);

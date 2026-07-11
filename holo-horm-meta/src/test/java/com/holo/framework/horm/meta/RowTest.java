@@ -192,6 +192,30 @@ class RowTest {
     }
 
     @Test
+    void getInstantFromLocalDateTime() {
+        var ldt = java.time.LocalDateTime.of(2026, 7, 4, 10, 0, 0);
+        Row row = Row.create("t");
+        row.set("col", ldt);
+        assertThat(row.getInstant("col")).isEqualTo(ldt.atZone(java.time.ZoneOffset.UTC).toInstant());
+    }
+
+    @Test
+    void getInstantFromOffsetDateTime() {
+        var odt = java.time.OffsetDateTime.parse("2026-07-04T10:00:00+08:00");
+        Row row = Row.create("t");
+        row.set("col", odt);
+        assertThat(row.getInstant("col")).isEqualTo(odt.toInstant());
+    }
+
+    @Test
+    void getInstantFromZonedDateTime() {
+        var zdt = java.time.ZonedDateTime.parse("2026-07-04T10:00:00+08:00[Asia/Shanghai]");
+        Row row = Row.create("t");
+        row.set("col", zdt);
+        assertThat(row.getInstant("col")).isEqualTo(zdt.toInstant());
+    }
+
+    @Test
     void getInstantThrowsForUnsupportedType() {
         Row row = Row.create("t");
         row.set("col", 3.14);

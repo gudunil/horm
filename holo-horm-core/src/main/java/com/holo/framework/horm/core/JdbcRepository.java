@@ -94,7 +94,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             + " WHERE " + idField.column() + " = ?";
         Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, id);
+            bindParam(ps, 1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     return null;
@@ -158,7 +158,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             int i = 1;
             for (Object b : bindings) {
-                ps.setObject(i++, b);
+                bindParam(ps, i++, b);
             }
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
@@ -197,7 +197,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
                 sql, Statement.RETURN_GENERATED_KEYS)) {
             int i = 1;
             for (String col : columns) {
-                ps.setObject(i++, row.get(col));
+                bindParam(ps, i++, row.get(col));
             }
             ps.executeUpdate();
             try (ResultSet genKeys = ps.getGeneratedKeys()) {
@@ -274,7 +274,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             int i = 1;
             for (Object val : bindings) {
-                ps.setObject(i++, val);
+                bindParam(ps, i++, val);
             }
             int affected = ps.executeUpdate();
             if (versionField != null && affected == 0) {
@@ -316,8 +316,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
                 .append(" = ?");
             Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
             try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-                ps.setObject(1, id);
-                ps.setObject(2, mapper.getField(entity, versionField.name()));
+                bindParam(ps, 1, id);
+                bindParam(ps, 2, mapper.getField(entity, versionField.name()));
                 int affected = ps.executeUpdate();
                 if (affected == 0) {
                     throw new OptimisticLockException(
@@ -343,7 +343,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             + " WHERE " + idField.column() + " = ?";
         Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, id);
+            bindParam(ps, 1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new HormException(
@@ -393,7 +393,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             int i = 1;
             for (Object id : ids) {
-                ps.setObject(i++, id);
+                bindParam(ps, i++, id);
             }
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -504,5 +504,13 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             throw new HormException("Entity " + entityType.getName() + " has no @Id field");
         }
         return idField;
+    }
+
+    private static void bindParam(PreparedStatement ps, int index, Object value) throws SQLException {
+        if (value instanceof java.time.Instant instant) {
+            ps.setObject(index, java.sql.Timestamp.from(instant));
+        } else {
+            ps.setObject(index, value);
+        }
     }
 }

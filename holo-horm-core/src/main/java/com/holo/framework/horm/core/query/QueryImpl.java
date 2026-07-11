@@ -418,7 +418,11 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
     private void bind(PreparedStatement ps, List<Object> bindings) throws SQLException {
         int i = 1;
         for (Object b : bindings) {
-            ps.setObject(i++, b);
+            if (b instanceof java.time.Instant instant) {
+                ps.setObject(i++, java.sql.Timestamp.from(instant));
+            } else {
+                ps.setObject(i++, b);
+            }
         }
     }
 
