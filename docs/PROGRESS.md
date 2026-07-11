@@ -17,10 +17,10 @@
 | M6     | ✅ 完成 | 2026-07-06     | v1.0.0-M6  |
 | M7     | ✅ 完成 | 2026-07-06     | v1.0.0-M7  |
 | M8     | ✅ 完成 | 2026-07-06     | v1.0.0-M8  |
-| M8.5   | 🚧 开发中 | —              | —          |
+| M8.5   | ✅ 完成 | 2026-07-11     | —          |
 | M9     | 📋 规划中 | —              | —          |
 
-**当前分支**：`feature/m8.5-dialect`（M8.5 数据库方言适配开发中）
+**当前分支**：`feature/m8.5-dialect`（M8.5 已完成，待 squash merge 到 `main`）
 
 ---
 
@@ -450,30 +450,30 @@
 
 ---
 
-## M8.5: 数据库方言适配（MySQL/PostgreSQL/H2）（开发中）
+## M8.5: 数据库方言适配（MySQL/PostgreSQL/H2）（已完成）
 
 ### 交付清单
 
 | 子任务 | 描述 | 状态 |
 |--------|------|------|
-| D1 | `Dialect` 接口 + `IdentityStrategy` + `BatchInsertSyntax` 枚举 | 📋 待开发 |
-| D2 | `MySqlDialect` 实现（默认方言） | 📋 待开发 |
-| D3 | `PostgresDialect` 实现 | 📋 待开发 |
-| D4 | `H2Dialect` 实现（MySQL/PostgreSQL 兼容模式） | 📋 待开发 |
-| D5 | `DialectDetector` JDBC URL 自动检测 | 📋 待开发 |
-| D6 | `HormContext` 增加 Dialect 映射 | 📋 待开发 |
-| D7 | `QueryImpl` 分页改用 `Dialect.paginate()` | 📋 待开发 |
-| D8 | `JdbcRepository` exists/save 改用 `Dialect` | 📋 待开发 |
-| D9 | `UpdateQueryImpl`/`DeleteQueryImpl` 分页改用 `Dialect` | 📋 待开发 |
-| D10 | `SchemaRenderer` 对齐 `Dialect` 接口 | 📋 待开发 |
-| D11 | `PostgresSchemaRenderer` 实现 | 📋 待开发 |
-| D12 | `H2SchemaRenderer` 支持 PostgreSQL 模式 | 📋 待开发 |
-| D13 | Starter 多数据源 Dialect 自动检测 | 📋 待开发 |
-| D14 | Starter 默认数据源 Dialect 自动检测 | 📋 待开发 |
-| D15 | `DialectTest` — 各方言方法单元测试 | 📋 待开发 |
-| D16 | `DialectDetectorTest` — URL 检测测试 | 📋 待开发 |
-| D17 | H2 MODE=PostgreSQL 集成测试 | 📋 待开发 |
-| D18 | 现有测试回归验证 | 📋 待开发 |
+| D1 | `Dialect` 接口 + `IdentityStrategy` + `BatchInsertSyntax` 枚举 | ✅ 完成 |
+| D2 | `MySqlDialect` 实现（默认方言） | ✅ 完成 |
+| D3 | `PostgresDialect` 实现 | ✅ 完成 |
+| D4 | `H2Dialect` 实现（MySQL/PostgreSQL 兼容模式） | ✅ 完成 |
+| D5 | `DialectDetector` JDBC URL 自动检测 | ✅ 完成 |
+| D6 | `HormContext` 增加 Dialect 映射 | ✅ 完成 |
+| D7 | `QueryImpl` 分页改用 `Dialect.paginate()` | ✅ 完成 |
+| D8 | `JdbcRepository` exists/save 改用 `Dialect` | ✅ 完成 |
+| D9 | `UpdateQueryImpl`/`DeleteQueryImpl` 分页改用 `Dialect` | ✅ 完成 |
+| D10 | `SchemaRenderer` 对齐 `Dialect` 接口 | ✅ 完成 |
+| D11 | `PostgresSchemaRenderer` 实现 | ✅ 完成 |
+| D12 | `H2SchemaRenderer` 支持 PostgreSQL 模式 | ✅ 完成 |
+| D13 | Starter 多数据源 Dialect 自动检测 | ✅ 完成 |
+| D14 | Starter 默认数据源 Dialect 自动检测 | ✅ 完成 |
+| D15 | `DialectTest` — 各方言方法单元测试 | ✅ 完成 |
+| D16 | `DialectDetectorTest` — URL 检测测试 | ✅ 完成 |
+| D17 | H2 MODE=PostgreSQL 集成测试 | ✅ 完成 |
+| D18 | 现有测试回归验证 | ✅ 完成 |
 
 ### 分批实施计划
 
