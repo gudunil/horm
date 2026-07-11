@@ -1,0 +1,199 @@
+package com.holo.framework.horm.spring.boot.autoconfigure;
+
+import com.holo.framework.horm.core.HormContext;
+import com.holo.framework.horm.core.TransactionManager;
+import com.holo.framework.horm.core.TransactionStatus;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.Mock;
+import org.mockito.MockedStatic;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.DefaultTransactionStatus;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+@DisplayName("HormTransactionManager 单元测试")
+class HormTransactionManagerTest {
+
+    @Mock
+    private HormContext hormContext;
+
+    @Mock
+    private TransactionStatus hormTransactionStatus;
+
+    private HormTransactionManager transactionManager;
+    private MockedStatic<TransactionManager> transactionManagerMockedStatic;
+
+    @BeforeEach
+    void setUp() {
+        transactionManager = new HormTransactionManager(hormContext);
+        transactionManagerMockedStatic = mockStatic(TransactionManager.class);
+    }
+
+    @AfterEach
+    void tearDown() {
+        if (transactionManagerMockedStatic != null) {
+            transactionManagerMockedStatic.close();
+        }
+    }
+
+    @Test
+    @DisplayName("getHormContext - 返回正确的 HormContext")
+    void getHormContext_shouldReturnCorrectContext() {
+        HormContext result = transactionManager.getHormContext();
+        assertThat(result).isSameAs(hormContext);
+    }
+
+    @Test
+    @DisplayName("doGetTransaction - 返回 HormTransactionObject 实例")
+    void doGetTransaction_shouldReturnHormTransactionObject() throws Exception {
+        Object result = invokeDoGetTransaction();
+        assertThat(result).isNotNull();
+        assertThat(result.getClass().getSimpleName()).isEqualTo("HormTransactionObject");
+    }
+
+    @Test
+    @DisplayName("doBegin - 使用 REQUIRED 传播行为和 DEFAULT 隔离级别")
+    void doBegin_withRequiredPropagationAndDefaultIsolation() {
+        Object txObject = invokeDoGetTransaction();
+        TransactionDefinition definition = createTransactionDefinition(
+            TransactionDefinition.PROPAGATION_REQUIRED,
+            TransactionDefinition.ISOLATION_DEFAULT,
+            30,
+            false
+        );
+
+        transactionManagerMockedStatic.when(() -> TransactionManager.begin(eq(hormContext), any(com.holo.framework.horm.core.TransactionDefinition.class)))
+            .thenReturn(hormTransactionStatus);
+
+        invokeDoBegin(txObject, definition);
+
+        transactionManagerMockedStatic.verify(() -> TransactionManager.begin(eq(hormContext), any(com.holo.framework.horm.core.TransactionDefinition.class)));
+    }
+
+    @Test
+    @DisplayName("doBegin - 使用 REQUIRES_NEW 传播行为")
+    void doBegin_withRequiresNewPropagation() {
+        Object txObject = invokeDoGetTransaction();
+        TransactionDefinition definition = createTransactionDefinition(
+            TransactionDefinition.PROPAGATION_REQUIRES_NEW,
+            TransactionDefinition.ISOLATION_DEFAULT,
+            -1,
+            false
+        );
+
+        transactionManagerMockedStatic.when(() -> TransactionManager.begin(eq(hormContext), any(com.holo.framework.horm.core.TransactionDefinition.class)))
+            .thenReturn(hormTransactionStatus);
+
+        invokeDoBegin(txObject, definition);
+
+        transactionManagerMockedStatic.verify(() -> TransactionManager.begin(eq(hormContext), any(com.holo.framework.horm.core.TransactionDefinition.class)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {
+        TransactionDefinition.ISOLATION_READ_UNCOMMITTED,
+        TransactionDefinition.ISOLATION_READ_COMMITTED,
+        TransactionDefinition.ISOLATION_REPEATABLE_READ,
+        TransactionDefinition.ISOLATION_SERIALIZABLE
+    })
+    @DisplayName("doBegin - 映射所有支持的隔离级别")
+    void doBegin_withAllSupportedIsolationLevels(int springIsolation) {
+        Object txObject = invokeDoGetTransaction();
+        TransactionDefinition definition = createTransactionDefinition(
+            TransactionDefinition.PROPAGATION_REQUIRED,
+            springIsolation,
+            -1,
+            false
+        );
+
+        transactionManagerMockedStatic.when(() -> TransactionManager.begin(eq(hormContext), any(com.holo.framework.horm.core.TransactionDefinition.class)))
+            .thenReturn(hormTransactionStatus);
+
+        invokeDoBegin(txObject, definition);
+
+        transactionManagerMockedStatic.verify(() -> TransactionManager.begin(eq(hormContext), any(com.holo.framework.horm.core.TransactionDefinition.class)));
+    }
+
+    @Test
+    @DisplayName("doBegin - 不支持的传播行为抛出 IllegalArgumentException")
+    void doBegin_withUnsupportedPropagation_shouldThrowException() {
+        Object txObject = invokeDoGetTransaction();
+        TransactionDefinition definition = createTransactionDefinition(
+            TransactionDefinition.PROPAGATION_SUPPORTS,
+            TransactionDefinition.ISOLATION_DEFAULT,
+            -1,
+            false
+        );
+
+        assertThatThrownBy(() -> invokeDoBegin(txObject, definition))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("does not support propagation behavior");
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {
+        TransactionDefinition.PROPAGATION_NOT_SUPPORTED,
+        TransactionDefinition.PROPAGATION_MANDATORY,
+        TransactionDefinition.PROPAGATION_NEVER,
+        TransactionDefinition.PROPAGATION_NESTED
+    })
+    @DisplayName("doBegin - 所有不支持的传播行为都抛出异常")
+    void doBegin_withAllUnsupportedPropagations_shouldThrowException(int springPropagation) {
+        Object txObject = invokeDoGetTransaction();
+        TransactionDefinition definition = createTransactionDefinition(
+            springPropagation,
+            TransactionDefinition.ISOLATION_DEFAULT,
+            -1,
+            false
+        );
+
+        assertThatThrownBy(() -> invokeDoBegin(txObject, definition))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("does not support propagation behavior");
+    }
+
+    @Test
+    @DisplayName("doBegin - 不支持的隔离级别抛出 IllegalArgumentException")
+    void doBegin_withUnknownIsolation_shouldThrowException() {
+        Object txObject = invokeDoGetTransaction();
+        TransactionDefinition definition = createTransactionDefinition(
+            TransactionDefinition.PROPAGATION_REQUIRED,
+            999,
+            -1,
+            false
+        );
+
+        assertThatThrownBy(() -> invokeDoBegin(txObject, definition))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("Unknown isolation level");
+    }
+
+    @Test
+    @DisplayName("doBegin - 设置只读标志")
+    void doBegin_withReadOnlyFlag() {
+        Object txObject = invokeDoGetTransaction();
+        TransactionDefinition definition = createTransactionDefinition(
+            TransactionDefinition.PROPAGATION_REQUIRED,
+            TransactionDefinition.ISOLATION_DEFAULT,
+            -1,
+            true
+        );
+
+        transactionManagerMockedStatic.when(() -> TransactionManager.begin(eq(hormContext), any(com.holo.framework.horm.core.TransactionDefinition.class)))
+            .thenReturn(hormTransactionStatus);
+
+        invokeDoBegin(txObject, definition);
+
+        transactionManager

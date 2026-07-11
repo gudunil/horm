@@ -1,0 +1,3 @@
+com.holo.framework.horm.starter.HormAutoConfiguration
+com.holo.framework.horm.starter.HormMultiDataSourceAutoConfiguration
+com.holo.framework.horm.starter.HormMigrationAutoConfiguration

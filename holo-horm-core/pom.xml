@@ -22,6 +22,12 @@
             <artifactId>holo-horm-meta</artifactId>
         </dependency>
 
+        <!-- 缓存链（M6 可选依赖；当 HormContext 未注入 CacheChain 时短路） -->
+        <dependency>
+            <groupId>com.holo.framework</groupId>
+            <artifactId>holo-horm-cache</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
@@ -69,6 +75,20 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Caffeine is optional in holo-horm-cache; declare it explicitly for
+             M6 cache integration tests that need a real L1 cache. -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

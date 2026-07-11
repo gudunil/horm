@@ -170,7 +170,8 @@ List<User> actives = User.where(User.class, UserQueryMeta.EMAIL.like("%@b.com"))
 ## 版本与状态
 
 - **当前版本**：1.0.0-SNAPSHOT
-- **状态**：设计阶段
+- **状态**：开发中（M3 已完成）
+- **已发布 Tag**：v1.0.0-M1 / v1.0.0-M2 / v1.0.0-M3
 - **预计 GA**：2027-07
 
 详见 [07-performance-security.md 第六章](./07-performance-security.md#六开发计划与里程碑)。
