@@ -5,6 +5,7 @@ import com.holo.framework.horm.cache.CachePolicy;
 import com.holo.framework.horm.cache.TypeReference;
 import com.holo.framework.horm.cache.key.CacheKey;
 import com.holo.framework.horm.cache.key.CacheKeyBuilder;
+import com.holo.framework.horm.core.SqlBinding;
 import com.holo.framework.horm.core.dialect.Dialect;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
@@ -94,7 +95,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             + " WHERE " + idField.column() + " = ?";
         Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            bindParam(ps, 1, id);
+            SqlBinding.bindParam(ps, 1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 if (!rs.next()) {
                     return null;
@@ -158,7 +159,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             int i = 1;
             for (Object b : bindings) {
-                bindParam(ps, i++, b);
+                SqlBinding.bindParam(ps, i++, b);
             }
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
@@ -197,7 +198,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
                 sql, Statement.RETURN_GENERATED_KEYS)) {
             int i = 1;
             for (String col : columns) {
-                bindParam(ps, i++, row.get(col));
+                SqlBinding.bindParam(ps, i++, row.get(col));
             }
             ps.executeUpdate();
             try (ResultSet genKeys = ps.getGeneratedKeys()) {
@@ -274,7 +275,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             int i = 1;
             for (Object val : bindings) {
-                bindParam(ps, i++, val);
+                SqlBinding.bindParam(ps, i++, val);
             }
             int affected = ps.executeUpdate();
             if (versionField != null && affected == 0) {
@@ -316,8 +317,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
                 .append(" = ?");
             Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
             try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-                bindParam(ps, 1, id);
-                bindParam(ps, 2, mapper.getField(entity, versionField.name()));
+                SqlBinding.bindParam(ps, 1, id);
+                SqlBinding.bindParam(ps, 2, mapper.getField(entity, versionField.name()));
                 int affected = ps.executeUpdate();
                 if (affected == 0) {
                     throw new OptimisticLockException(
@@ -343,7 +344,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             + " WHERE " + idField.column() + " = ?";
         Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            bindParam(ps, 1, id);
+            SqlBinding.bindParam(ps, 1, id);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new HormException(
@@ -393,7 +394,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             int i = 1;
             for (Object id : ids) {
-                bindParam(ps, i++, id);
+                SqlBinding.bindParam(ps, i++, id);
             }
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -506,11 +507,4 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         return idField;
     }
 
-    private static void bindParam(PreparedStatement ps, int index, Object value) throws SQLException {
-        if (value instanceof java.time.Instant instant) {
-            ps.setObject(index, java.sql.Timestamp.from(instant));
-        } else {
-            ps.setObject(index, value);
-        }
-    }
 }

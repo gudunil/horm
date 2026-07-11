@@ -24,7 +24,7 @@ public final class PostgresSchemaRenderer implements SchemaRenderer {
     @Override
     public String renderCreateTable(TableDefinition table) {
         StringBuilder sb = new StringBuilder("CREATE TABLE ");
-        sb.append(table.getName()).append(" (\n");
+        sb.append(quote(table.getName())).append(" (\n");
 
         StringJoiner joiner = new StringJoiner(",\n");
         for (ColumnDefinition col : table.getColumns()) {
@@ -44,67 +44,62 @@ public final class PostgresSchemaRenderer implements SchemaRenderer {
 
     @Override
     public String renderAddColumn(String tableName, ColumnDefinition column) {
-        return "ALTER TABLE " + tableName + " ADD COLUMN " + renderColumnDefinition(column);
+        return "ALTER TABLE " + quote(tableName) + " ADD COLUMN " + renderColumnDefinition(column);
     }
 
     @Override
     public String renderDropColumn(String tableName, String columnName) {
-        return "ALTER TABLE " + tableName + " DROP COLUMN " + columnName;
+        return "ALTER TABLE " + quote(tableName) + " DROP COLUMN " + quote(columnName);
     }
 
     @Override
     public String renderModifyColumn(String tableName, ColumnDefinition column) {
-        return "ALTER TABLE " + tableName + " ALTER COLUMN " + column.getName() +
+        return "ALTER TABLE " + quote(tableName) + " ALTER COLUMN " + quote(column.getName()) +
             " TYPE " + renderColumnType(column);
     }
 
     @Override
     public String renderDropTable(String tableName) {
-        return "DROP TABLE " + tableName;
+        return "DROP TABLE " + quote(tableName);
     }
 
     @Override
     public String renderCreateIndex(String indexName, String tableName, String... columns) {
         StringJoiner joiner = new StringJoiner(", ");
         for (String col : columns) {
-            joiner.add(col);
+            joiner.add(quote(col));
         }
-        return "CREATE INDEX " + indexName + " ON " + tableName + " (" + joiner + ")";
+        return "CREATE INDEX " + quote(indexName) + " ON " + quote(tableName) + " (" + joiner + ")";
     }
 
     @Override
     public String renderDropIndex(String indexName, String tableName) {
-        return "DROP INDEX " + indexName;
+        return "DROP INDEX " + quote(indexName);
     }
 
     @Override
     public String renderRenameTable(String oldName, String newName) {
-        return "ALTER TABLE " + oldName + " RENAME TO " + newName;
+        return "ALTER TABLE " + quote(oldName) + " RENAME TO " + quote(newName);
     }
 
     @Override
     public String renderRenameColumn(String tableName, String oldName, String newName) {
-        return "ALTER TABLE " + tableName + " RENAME COLUMN " + oldName + " TO " + newName;
+        return "ALTER TABLE " + quote(tableName) + " RENAME COLUMN " + quote(oldName) + " TO " + quote(newName);
     }
 
     @Override
     public String renderForeignKey(ForeignKeyDefinition fk) {
-        return "FOREIGN KEY (" + fk.getColumnName() + ") REFERENCES " +
-            fk.getReferencedTable() + "(" + fk.getReferencedColumn() + ")";
+        return "FOREIGN KEY (" + quote(fk.getColumnName()) + ") REFERENCES " +
+            quote(fk.getReferencedTable()) + "(" + quote(fk.getReferencedColumn()) + ")";
     }
 
     @Override
     public String renderColumnDefinition(ColumnDefinition column) {
-        StringBuilder sb = new StringBuilder(column.getName());
+        StringBuilder sb = new StringBuilder(quote(column.getName()));
         sb.append(" ").append(renderColumnType(column));
 
         if (!column.isNullable()) {
             sb.append(" NOT NULL");
-        }
-
-        if (column.isAutoIncrement()) {
-            // PostgreSQL uses BIGSERIAL which already implies NOT NULL and auto-increment
-            // BIGSERIAL is handled in renderColumnType, so we don't add AUTO_INCREMENT here
         }
 
         if (column.getDefaultValue() != null) {
@@ -155,5 +150,9 @@ public final class PostgresSchemaRenderer implements SchemaRenderer {
             return type + "(" + column.getPrecision() + "," + column.getScale() + ")";
         }
         return type;
+    }
+
+    private static String quote(String identifier) {
+        return '"' + identifier + '"';
     }
 }

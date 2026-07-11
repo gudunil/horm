@@ -123,7 +123,7 @@ public interface SchemaRenderer {
         if (dialect instanceof PostgresDialect) {
             return new PostgresSchemaRenderer();
         }
-        if (dialect instanceof H2Dialect h2 && "h2-postgresql".equals(h2.name())) {
+        if (dialect instanceof H2Dialect h2 && h2.isPostgresqlMode()) {
             return new PostgresSchemaRenderer();
         }
         return new MySQLSchemaRenderer();

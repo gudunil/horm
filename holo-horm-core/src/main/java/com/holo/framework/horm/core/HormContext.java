@@ -212,7 +212,11 @@ public final class HormContext implements AutoCloseable {
      * @return the dialect for the datasource, or MySqlDialect as fallback
      */
     public Dialect dialect(String dataSourceName) {
-        return dialects.getOrDefault(dataSourceName, new MySqlDialect());
+        return dialects.getOrDefault(dataSourceName, DefaultDialectHolder.INSTANCE);
+    }
+
+    private static final class DefaultDialectHolder {
+        static final Dialect INSTANCE = new MySqlDialect();
     }
 
     /**

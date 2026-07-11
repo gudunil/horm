@@ -55,13 +55,13 @@ class SchemaRendererForDialectTest {
 
         // Verify the rendered DDL matches PostgreSQL syntax, not MySQL
         String dropIndex = renderer.renderDropIndex("idx_test", "users");
-        assertThat(dropIndex).isEqualTo("DROP INDEX idx_test");
+        assertThat(dropIndex).isEqualTo("DROP INDEX \"idx_test\"");
 
         String renameTable = renderer.renderRenameTable("old", "new");
-        assertThat(renameTable).isEqualTo("ALTER TABLE old RENAME TO new");
+        assertThat(renameTable).isEqualTo("ALTER TABLE \"old\" RENAME TO \"new\"");
 
         String renameColumn = renderer.renderRenameColumn("users", "old_col", "new_col");
-        assertThat(renameColumn).isEqualTo("ALTER TABLE users RENAME COLUMN old_col TO new_col");
+        assertThat(renameColumn).isEqualTo("ALTER TABLE \"users\" RENAME COLUMN \"old_col\" TO \"new_col\"");
     }
 
     @Test

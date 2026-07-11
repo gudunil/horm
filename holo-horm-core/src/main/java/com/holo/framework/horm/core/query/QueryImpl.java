@@ -9,6 +9,7 @@ import com.holo.framework.horm.core.HormContext;
 import com.holo.framework.horm.core.HormException;
 import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.core.EntityMetaRegistry;
+import com.holo.framework.horm.core.SqlBinding;
 import com.holo.framework.horm.core.TransactionManager;
 import com.holo.framework.horm.core.dialect.Dialect;
 import com.holo.framework.horm.meta.EntityMeta;
@@ -418,11 +419,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
     private void bind(PreparedStatement ps, List<Object> bindings) throws SQLException {
         int i = 1;
         for (Object b : bindings) {
-            if (b instanceof java.time.Instant instant) {
-                ps.setObject(i++, java.sql.Timestamp.from(instant));
-            } else {
-                ps.setObject(i++, b);
-            }
+            SqlBinding.bindParam(ps, i++, b);
         }
     }
 

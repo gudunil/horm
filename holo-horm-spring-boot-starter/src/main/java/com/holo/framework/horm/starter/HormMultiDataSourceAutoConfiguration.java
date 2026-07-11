@@ -134,12 +134,23 @@ public class HormMultiDataSourceAutoConfiguration {
         Map<String, Dialect> dialects = new LinkedHashMap<>();
         Map<String, HormDataSourceProperties.DataSourceConfig> datasources = properties.getDatasources();
 
+        Dialect defaultDialect = null;
         for (Map.Entry<String, HormDataSourceProperties.DataSourceConfig> entry : datasources.entrySet()) {
             String name = entry.getKey();
             HormDataSourceProperties.DataSourceConfig config = entry.getValue();
             Dialect dialect = resolveDialect(config);
             dialects.put(name, dialect);
+            if (defaultDialect == null) {
+                defaultDialect = dialect;
+            }
             log.info("Detected dialect '{}' for datasource '{}'", dialect.name(), name);
+        }
+
+        // The first configured datasource is registered as the default datasource
+        // under the reserved name "default"; mirror its dialect so that
+        // unqualified entity lookups resolve to the correct dialect.
+        if (defaultDialect != null) {
+            dialects.put(com.holo.framework.horm.core.datasource.DataSourceRegistry.DEFAULT_NAME, defaultDialect);
         }
 
         return dialects;

@@ -17,10 +17,18 @@ public class H2Dialect implements Dialect {
 
     @Override
     public String name() {
-        if ("postgresql".equalsIgnoreCase(mode)) {
+        if (isPostgresqlMode()) {
             return "h2-postgresql";
         }
         return "h2";
+    }
+
+    /**
+     * Returns {@code true} when this H2 dialect is configured for PostgreSQL
+     * compatibility mode.
+     */
+    public boolean isPostgresqlMode() {
+        return "postgresql".equalsIgnoreCase(mode);
     }
 
     @Override

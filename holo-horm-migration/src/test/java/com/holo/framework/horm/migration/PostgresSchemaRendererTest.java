@@ -27,9 +27,9 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderCreateTable(table);
 
-        assertThat(ddl).contains("CREATE TABLE users");
-        assertThat(ddl).contains("id BIGSERIAL NOT NULL PRIMARY KEY");
-        assertThat(ddl).contains("email VARCHAR(128) NOT NULL UNIQUE");
+        assertThat(ddl).contains("CREATE TABLE \"users\"");
+        assertThat(ddl).contains("\"id\" BIGSERIAL NOT NULL PRIMARY KEY");
+        assertThat(ddl).contains("\"email\" VARCHAR(128) NOT NULL UNIQUE");
         assertThat(ddl).doesNotContain("ENGINE=InnoDB");
         assertThat(ddl).doesNotContain("DEFAULT CHARSET=utf8mb4");
     }
@@ -58,8 +58,8 @@ class PostgresSchemaRendererTest {
         String ddl = renderer.renderCreateTable(table);
 
         // DATETIME should be rendered as TIMESTAMP in PostgreSQL
-        assertThat(ddl).contains("created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
-        assertThat(ddl).contains("updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+        assertThat(ddl).contains("\"created_at\" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
+        assertThat(ddl).contains("\"updated_at\" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP");
     }
 
     @Test
@@ -72,7 +72,7 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderCreateTable(table);
 
-        assertThat(ddl).contains("FOREIGN KEY (user_id) REFERENCES users(id)");
+        assertThat(ddl).contains("FOREIGN KEY (\"user_id\") REFERENCES \"users\"(\"id\")");
     }
 
     @Test
@@ -84,7 +84,7 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderCreateTable(table);
 
-        assertThat(ddl).contains("active BOOLEAN");
+        assertThat(ddl).contains("\"active\" BOOLEAN");
     }
 
     @Test
@@ -95,7 +95,7 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderCreateTable(table);
 
-        assertThat(ddl).contains("price DECIMAL(10,2) NOT NULL");
+        assertThat(ddl).contains("\"price\" DECIMAL(10,2) NOT NULL");
     }
 
     // --- renderAddColumn ---
@@ -107,7 +107,7 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderAddColumn("users", col);
 
-        assertThat(ddl).isEqualTo("ALTER TABLE users ADD COLUMN phone VARCHAR(20)");
+        assertThat(ddl).isEqualTo("ALTER TABLE \"users\" ADD COLUMN \"phone\" VARCHAR(20)");
     }
 
     // --- renderDropColumn ---
@@ -116,7 +116,7 @@ class PostgresSchemaRendererTest {
     void renderDropColumn() {
         String ddl = renderer.renderDropColumn("users", "phone");
 
-        assertThat(ddl).isEqualTo("ALTER TABLE users DROP COLUMN phone");
+        assertThat(ddl).isEqualTo("ALTER TABLE \"users\" DROP COLUMN \"phone\"");
     }
 
     // --- renderModifyColumn ---
@@ -129,7 +129,7 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderModifyColumn("users", col);
 
-        assertThat(ddl).isEqualTo("ALTER TABLE users ALTER COLUMN email TYPE VARCHAR(256)");
+        assertThat(ddl).isEqualTo("ALTER TABLE \"users\" ALTER COLUMN \"email\" TYPE VARCHAR(256)");
     }
 
     @Test
@@ -140,7 +140,7 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderModifyColumn("products", col);
 
-        assertThat(ddl).isEqualTo("ALTER TABLE products ALTER COLUMN price TYPE DECIMAL(12,4)");
+        assertThat(ddl).isEqualTo("ALTER TABLE \"products\" ALTER COLUMN \"price\" TYPE DECIMAL(12,4)");
     }
 
     // --- renderDropTable ---
@@ -149,7 +149,7 @@ class PostgresSchemaRendererTest {
     void renderDropTable() {
         String ddl = renderer.renderDropTable("users");
 
-        assertThat(ddl).isEqualTo("DROP TABLE users");
+        assertThat(ddl).isEqualTo("DROP TABLE \"users\"");
     }
 
     // --- renderCreateIndex ---
@@ -158,14 +158,14 @@ class PostgresSchemaRendererTest {
     void renderCreateIndex() {
         String ddl = renderer.renderCreateIndex("idx_users_email", "users", "email");
 
-        assertThat(ddl).isEqualTo("CREATE INDEX idx_users_email ON users (email)");
+        assertThat(ddl).isEqualTo("CREATE INDEX \"idx_users_email\" ON \"users\" (\"email\")");
     }
 
     @Test
     void renderCreateIndexMultipleColumns() {
         String ddl = renderer.renderCreateIndex("idx_users_name_email", "users", "name", "email");
 
-        assertThat(ddl).isEqualTo("CREATE INDEX idx_users_name_email ON users (name, email)");
+        assertThat(ddl).isEqualTo("CREATE INDEX \"idx_users_name_email\" ON \"users\" (\"name\", \"email\")");
     }
 
     // --- renderDropIndex ---
@@ -175,7 +175,7 @@ class PostgresSchemaRendererTest {
         String ddl = renderer.renderDropIndex("idx_users_email", "users");
 
         // PostgreSQL: DROP INDEX does NOT include ON tableName
-        assertThat(ddl).isEqualTo("DROP INDEX idx_users_email");
+        assertThat(ddl).isEqualTo("DROP INDEX \"idx_users_email\"");
     }
 
     // --- renderRenameTable ---
@@ -185,7 +185,7 @@ class PostgresSchemaRendererTest {
         String ddl = renderer.renderRenameTable("users", "user_accounts");
 
         // PostgreSQL: ALTER TABLE ... RENAME TO ...
-        assertThat(ddl).isEqualTo("ALTER TABLE users RENAME TO user_accounts");
+        assertThat(ddl).isEqualTo("ALTER TABLE \"users\" RENAME TO \"user_accounts\"");
     }
 
     // --- renderRenameColumn ---
@@ -195,7 +195,7 @@ class PostgresSchemaRendererTest {
         String ddl = renderer.renderRenameColumn("users", "email", "email_address");
 
         // PostgreSQL: RENAME COLUMN ... TO ...
-        assertThat(ddl).isEqualTo("ALTER TABLE users RENAME COLUMN email TO email_address");
+        assertThat(ddl).isEqualTo("ALTER TABLE \"users\" RENAME COLUMN \"email\" TO \"email_address\"");
     }
 
     // --- renderForeignKey ---
@@ -206,7 +206,7 @@ class PostgresSchemaRendererTest {
         String ddl = renderer.renderForeignKey(fk);
 
         // PostgreSQL: no CONSTRAINT fk_xxx prefix (unlike MySQL)
-        assertThat(ddl).isEqualTo("FOREIGN KEY (user_id) REFERENCES users(id)");
+        assertThat(ddl).isEqualTo("FOREIGN KEY (\"user_id\") REFERENCES \"users\"(\"id\")");
     }
 
     // --- renderColumnDefinition ---
@@ -245,7 +245,7 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderColumnDefinition(col);
 
-        assertThat(ddl).contains("active BOOLEAN");
+        assertThat(ddl).contains("\"active\" BOOLEAN");
     }
 
     @Test
@@ -257,7 +257,7 @@ class PostgresSchemaRendererTest {
         String ddl = renderer.renderColumnDefinition(col);
 
         // DATETIME should be rendered as TIMESTAMP
-        assertThat(ddl).contains("created_at TIMESTAMP");
+        assertThat(ddl).contains("\"created_at\" TIMESTAMP");
         assertThat(ddl).contains("NOT NULL");
         assertThat(ddl).contains("DEFAULT CURRENT_TIMESTAMP");
     }
@@ -306,7 +306,7 @@ class PostgresSchemaRendererTest {
         String ddl = renderer.renderColumnDefinition(col);
 
         // Non-auto-increment BIGINT should stay as BIGINT, not BIGSERIAL
-        assertThat(ddl).contains("count BIGINT NOT NULL");
+        assertThat(ddl).contains("\"count\" BIGINT NOT NULL");
         assertThat(ddl).doesNotContain("BIGSERIAL");
     }
 
@@ -326,6 +326,6 @@ class PostgresSchemaRendererTest {
 
         String ddl = renderer.renderColumnDefinition(col);
 
-        assertThat(ddl).contains("event_time TIMESTAMP");
+        assertThat(ddl).contains("\"event_time\" TIMESTAMP");
     }
 }
