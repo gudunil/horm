@@ -250,7 +250,7 @@ class H2DialectTest {
                 new String[]{"name"});
             assertThat(result).isEqualTo(
                 "INSERT INTO \"user\" (\"id\", \"name\") VALUES (?, ?)"
-                    + " ON DUPLICATE KEY UPDATE \"name\"=VALUES(\"name\")");
+                    + " ON CONFLICT (\"id\") DO UPDATE SET \"name\"=EXCLUDED.\"name\"");
         }
 
         @Test
@@ -261,13 +261,13 @@ class H2DialectTest {
         @Test
         void dropIndex() {
             assertThat(dialect.dropIndex("idx_name", "user"))
-                .isEqualTo("DROP INDEX \"idx_name\" ON \"user\"");
+                .isEqualTo("DROP INDEX \"idx_name\"");
         }
 
         @Test
         void renameTable() {
             assertThat(dialect.renameTable("old_table", "new_table"))
-                .isEqualTo("RENAME TABLE \"old_table\" TO \"new_table\"");
+                .isEqualTo("ALTER TABLE \"old_table\" RENAME TO \"new_table\"");
         }
 
         @Test

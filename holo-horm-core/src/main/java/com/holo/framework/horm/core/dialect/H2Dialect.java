@@ -81,11 +81,22 @@ public class H2Dialect implements Dialect {
         for (var ignored : columns) sj.add("?");
         var placeholders = sj.toString();
 
+        if ("postgresql".equalsIgnoreCase(mode)) {
+            var uniqueJoin = new StringJoiner(", ");
+            for (var col : uniqueColumns) uniqueJoin.add(quoteIdentifier(col));
+            var updateClause = new StringJoiner(", ");
+            for (var col : updateColumns) {
+                updateClause.add(quoteIdentifier(col) + "=EXCLUDED." + quoteIdentifier(col));
+            }
+            return "INSERT INTO " + quoteIdentifier(table)
+                + " (" + insertCols + ") VALUES (" + placeholders + ")"
+                + " ON CONFLICT (" + uniqueJoin + ") DO UPDATE SET " + updateClause;
+        }
+
         var updateClause = new StringJoiner(", ");
         for (var col : updateColumns) {
             updateClause.add(quoteIdentifier(col) + "=VALUES(" + quoteIdentifier(col) + ")");
         }
-
         return "INSERT INTO " + quoteIdentifier(table)
             + " (" + insertCols + ") VALUES (" + placeholders + ")"
             + " ON DUPLICATE KEY UPDATE " + updateClause;
@@ -98,11 +109,17 @@ public class H2Dialect implements Dialect {
 
     @Override
     public String dropIndex(String indexName, String tableName) {
+        if ("postgresql".equalsIgnoreCase(mode)) {
+            return "DROP INDEX " + quoteIdentifier(indexName);
+        }
         return "DROP INDEX " + quoteIdentifier(indexName) + " ON " + quoteIdentifier(tableName);
     }
 
     @Override
     public String renameTable(String oldName, String newName) {
+        if ("postgresql".equalsIgnoreCase(mode)) {
+            return "ALTER TABLE " + quoteIdentifier(oldName) + " RENAME TO " + quoteIdentifier(newName);
+        }
         return "RENAME TABLE " + quoteIdentifier(oldName) + " TO " + quoteIdentifier(newName);
     }
 
