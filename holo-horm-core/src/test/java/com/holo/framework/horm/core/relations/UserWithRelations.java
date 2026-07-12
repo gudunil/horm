@@ -1,17 +1,17 @@
 package com.holo.framework.horm.core.relations;
 
+import java.util.List;
+
 import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.meta.annotation.CascadeType;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
+import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
 import com.holo.framework.horm.meta.annotation.HasMany;
 import com.holo.framework.horm.meta.annotation.HasManyThrough;
 import com.holo.framework.horm.meta.annotation.HasOne;
-import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.holo.framework.horm.meta.annotation.Id;
-
-import java.util.List;
 
 /**
  * M3 integration-test entity exercising all four parent-side relation
@@ -78,4 +78,5 @@ public class UserWithRelations extends Model<UserWithRelations> {
 
     public List<Product> getProducts() { return products; }
     public void setProducts(List<Product> products) { this.products = products; }
+
 }

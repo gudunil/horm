@@ -1,5 +1,11 @@
 package com.holo.framework.horm.core;
 
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
 import com.holo.framework.horm.core.query.DeleteQuery;
 import com.holo.framework.horm.core.query.DeleteQueryImpl;
 import com.holo.framework.horm.core.query.Query;
@@ -12,12 +18,6 @@ import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.RelationMeta;
 import com.holo.framework.horm.meta.RelationType;
 import com.holo.framework.horm.meta.annotation.CascadeType;
-
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Active Record base class for HORM entities.
@@ -161,6 +161,17 @@ public abstract class Model<T extends Model<T>> {
     }
 
     /**
+     * Active Record fallback stub. ByteBuddy build-time instrumentation hides
+     * this method with a type-safe overload such as
+     * {@code public static User find(Object id)}.
+     */
+    public static <T extends Model<T>> T find(Object id) {
+        throw new UnsupportedOperationException(
+            "Active Record helper not generated for this entity; "
+                + "run 'mvn generate-sources'");
+    }
+
+    /**
      * Fetches multiple entities by primary key, returning a map of id → entity.
      *
      * <p>When caching is enabled for the entity type and a {@link CacheChain}
@@ -175,14 +186,47 @@ public abstract class Model<T extends Model<T>> {
         return Horm.repository(type).findMany(keys);
     }
 
+    /**
+     * Active Record fallback stub. ByteBuddy build-time instrumentation hides
+     * this method with a type-safe overload such as
+     * {@code public static Map<Object, User> findMany(Collection<?> ids)}.
+     */
+    public static <T extends Model<T>> Map<Object, T> findMany(Collection<?> ids) {
+        throw new UnsupportedOperationException(
+            "Active Record helper not generated for this entity; "
+                + "run 'mvn generate-sources'");
+    }
+
     /** Fetches all entities of the given type. */
     public static <T extends Model<T>> List<T> all(Class<T> type) {
         return Horm.repository(type).all();
     }
 
+    /**
+     * Active Record fallback stub. ByteBuddy build-time instrumentation hides
+     * this method with a type-safe overload such as
+     * {@code public static List<User> all()}.
+     */
+    public static <T extends Model<T>> List<T> all() {
+        throw new UnsupportedOperationException(
+            "Active Record helper not generated for this entity; "
+                + "run 'mvn generate-sources'");
+    }
+
     /** Returns the total number of persisted entities of the given type. */
     public static <T extends Model<T>> long count(Class<T> type) {
         return Horm.repository(type).count();
+    }
+
+    /**
+     * Active Record fallback stub. ByteBuddy build-time instrumentation hides
+     * this method with a type-safe overload such as
+     * {@code public static long count()}.
+     */
+    public static long count() {
+        throw new UnsupportedOperationException(
+            "Active Record helper not generated for this entity; "
+                + "run 'mvn generate-sources'");
     }
 
     /**
@@ -196,11 +240,33 @@ public abstract class Model<T extends Model<T>> {
     }
 
     /**
+     * Active Record fallback stub. ByteBuddy build-time instrumentation hides
+     * this method with a type-safe overload such as
+     * {@code public static Query<User> query()}.
+     */
+    public static <T extends Model<T>> Query<T> query() {
+        throw new UnsupportedOperationException(
+            "Active Record helper not generated for this entity; "
+                + "run 'mvn generate-sources'");
+    }
+
+    /**
      * Returns a fluent {@link UpdateQuery} for batch-updating entities of the
      * given type.
      */
     public static <T extends Model<T>> UpdateQuery<T> update(Class<T> type) {
         return new UpdateQueryImpl<>(type, HormContext.current());
+    }
+
+    /**
+     * Active Record fallback stub. ByteBuddy build-time instrumentation hides
+     * this method with a type-safe overload such as
+     * {@code public static UpdateQuery<User> update()}.
+     */
+    public static <T extends Model<T>> UpdateQuery<T> update() {
+        throw new UnsupportedOperationException(
+            "Active Record helper not generated for this entity; "
+                + "run 'mvn generate-sources'");
     }
 
     /**

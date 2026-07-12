@@ -21,6 +21,7 @@
     <modules>
         <module>holo-horm-bom</module>
         <module>holo-horm-meta</module>
+        <module>holo-horm-maven-plugin</module>
         <module>holo-horm-core</module>
         <module>holo-horm-datasource</module>
         <module>holo-horm-cache</module>
@@ -35,6 +36,8 @@
         <holo-horm.version>${project.version}</holo-horm.version>
         <!-- 以下属性需与 holo-dependency-bom 中保持一致，便于子模块引用 -->
         <spring-boot.version>3.2.5</spring-boot.version>
+        <!-- Lombok 版本需在聚合 POM 中暴露，否则子模块无法在 annotationProcessorPaths 中引用 -->
+        <lombok.version>1.18.32</lombok.version>
         <!-- JavaPoet 版本统一管理（meta/codegen 直接声明，避免版本漂移） -->
         <javapoet.version>1.13.0</javapoet.version>
         <!-- JaCoCo 配置（parent-pom 未提供，由本聚合 pom 统一管理） -->
@@ -61,6 +64,11 @@
             <dependency>
                 <groupId>com.holo.framework</groupId>
                 <artifactId>holo-horm-meta</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-maven-plugin</artifactId>
                 <version>${holo-horm.version}</version>
             </dependency>
             <dependency>
@@ -97,6 +105,15 @@
     </dependencyManagement>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>com.holo.framework</groupId>
+                    <artifactId>holo-horm-maven-plugin</artifactId>
+                    <version>${holo-horm.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

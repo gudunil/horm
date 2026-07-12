@@ -1,24 +1,6 @@
 package com.holo.framework.horm.core.datasource;
 
-import com.holo.framework.horm.core.EntityMetaRegistry;
-import com.holo.framework.horm.core.Horm;
-import com.holo.framework.horm.core.HormContext;
-import com.holo.framework.horm.core.Model;
-import com.holo.framework.horm.core.SimpleDataSourceProvider;
-import com.holo.framework.horm.core.TransactionManager;
-import com.holo.framework.horm.core.datasource.generated.PrimaryUserMeta;
-import com.holo.framework.horm.core.datasource.generated.PrimaryUserQueryMeta;
-import com.holo.framework.horm.core.datasource.generated.SecondaryProductMeta;
-import com.holo.framework.horm.core.datasource.generated.SecondaryProductQueryMeta;
-import com.holo.framework.horm.meta.annotation.Column;
-import com.holo.framework.horm.meta.annotation.Entity;
-import com.holo.framework.horm.meta.annotation.GeneratedValue;
-import com.holo.framework.horm.meta.annotation.Id;
-import com.holo.framework.horm.meta.annotation.Table;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -26,7 +8,23 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import com.holo.framework.horm.core.EntityMetaRegistry;
+import com.holo.framework.horm.core.Horm;
+import com.holo.framework.horm.core.HormContext;
+import com.holo.framework.horm.core.Model;
+import com.holo.framework.horm.core.SimpleDataSourceProvider;
+import com.holo.framework.horm.core.TransactionManager;
+import com.holo.framework.horm.core.datasource.generated.PrimaryUserQueryMeta;
+import com.holo.framework.horm.core.datasource.generated.SecondaryProductQueryMeta;
+import com.holo.framework.horm.meta.annotation.Column;
+import com.holo.framework.horm.meta.annotation.Entity;
+import com.holo.framework.horm.meta.annotation.GeneratedValue;
+import com.holo.framework.horm.meta.annotation.Id;
 
 /**
  * Integration test for M5 multi-datasource routing.
@@ -245,6 +243,7 @@ public class MultiDatasourceIntegrationTest {
         public void setName(String name) { this.name = name; }
         public String getEmail() { return email; }
         public void setEmail(String email) { this.email = email; }
+
     }
 
     @Entity(table = "secondary_product", dataSource = "secondary")
@@ -265,5 +264,6 @@ public class MultiDatasourceIntegrationTest {
         public void setName(String name) { this.name = name; }
         public BigDecimal getPrice() { return price; }
         public void setPrice(BigDecimal price) { this.price = price; }
+
     }
 }

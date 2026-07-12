@@ -1,12 +1,12 @@
 package com.holo.framework.horm.core.transaction;
 
+import java.math.BigDecimal;
+
 import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.holo.framework.horm.meta.annotation.Id;
-
-import java.math.BigDecimal;
 
 /**
  * Integration-test entity for verifying transaction commit/rollback behavior
@@ -32,4 +32,5 @@ public class Account extends Model<Account> {
 
     public BigDecimal getBalance() { return balance; }
     public void setBalance(BigDecimal balance) { this.balance = balance; }
+
 }

@@ -1,13 +1,12 @@
 package com.holo.framework.horm.core.batch;
 
+import java.math.BigDecimal;
+
+import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
-import com.holo.framework.horm.meta.annotation.GeneratedValue;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.holo.framework.horm.meta.annotation.Id;
-import com.holo.framework.horm.core.Model;
-
-import java.math.BigDecimal;
 
 @Entity(table = "products")
 public class Product extends Model<Product> {
@@ -28,4 +27,5 @@ public class Product extends Model<Product> {
     public void setCategory(String category) { this.category = category; }
     public BigDecimal getPrice() { return price; }
     public void setPrice(BigDecimal price) { this.price = price; }
+
 }

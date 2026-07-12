@@ -1,14 +1,14 @@
 package com.holo.framework.horm.core.relations;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.meta.annotation.BelongsTo;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.holo.framework.horm.meta.annotation.Id;
-
-import java.math.BigDecimal;
-import java.util.List;
 
 /**
  * M3 integration-test entity. Plays three roles:
@@ -56,4 +56,5 @@ public class Order extends Model<Order> {
 
     public List<UserWithRelations> getParentUsers() { return parentUsers; }
     public void setParentUsers(List<UserWithRelations> parentUsers) { this.parentUsers = parentUsers; }
+
 }

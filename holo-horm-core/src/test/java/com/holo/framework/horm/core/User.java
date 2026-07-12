@@ -1,11 +1,11 @@
 package com.holo.framework.horm.core;
 
+import java.time.Instant;
+
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
-import com.holo.framework.horm.meta.annotation.Id;
 import com.holo.framework.horm.meta.annotation.GenerationType;
-
-import java.time.Instant;
+import com.holo.framework.horm.meta.annotation.Id;
 
 /**
  * Integration-test entity exercising the full APT → registry → JDBC pipeline
@@ -39,4 +39,5 @@ public class User extends Model<User> {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
 }
