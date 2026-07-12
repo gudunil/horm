@@ -76,6 +76,24 @@ public interface Cache extends AutoCloseable {
     <K, V> Optional<V> get(K key, TypeReference<V> type);
 
     /**
+     * Fetches the value associated with {@code key}, if present and live.
+     *
+     * <p>Convenience overload for simple (non-generic) value types that
+     * avoids the need for a {@link TypeReference} anonymous subclass.
+     * Equivalent to {@code get(key, TypeReference.of(type))}.
+     *
+     * @param key  the cache key; must not be {@code null}
+     * @param type the expected value class; must not be {@code null}
+     * @param <K>  key type
+     * @param <V>  value type
+     * @return the cached value wrapped in {@link Optional}, or
+     *         {@link Optional#empty()} if absent
+     */
+    default <K, V> Optional<V> get(K key, Class<V> type) {
+        return get(key, TypeReference.of(type));
+    }
+
+    /**
      * Stores {@code value} under {@code key} using the rules of {@code policy}.
      *
      * <p>Whether the value is also propagated to a backing store depends

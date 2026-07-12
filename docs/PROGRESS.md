@@ -18,7 +18,7 @@
 | M7     | ✅ 完成 | 2026-07-06     | v1.0.0-M7  |
 | M8     | ✅ 完成 | 2026-07-06     | v1.0.0-M8  |
 | M8.5   | ✅ 完成 | 2026-07-11     | —          |
-| M8.7   | 📋 规划中 | —              | —          |
+| M8.7   | ✅ 完成 | 2026-07-12     | —          |
 | M9     | 📋 规划中 | —              | —          |
 
 **当前分支**：`feature/m8.5-dialect`（M8.5 已完成，待 squash merge 到 `main`）
@@ -506,7 +506,7 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 
 ---
 
-## M8.7: 零反射优化 — 编译期代理生成与反射消除（进行中）
+## M8.7: 零反射优化 — 编译期代理生成与反射消除（已完成）
 
 ### 交付清单
 
@@ -532,11 +532,11 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 | P2-6 | 改造 `TransactionAdvisorRegistry`（ServiceLoader + transactions.idx 兼容回退） | core | ✅ |
 | P2-7 | 兼容性测试 | meta (test) | ✅ |
 | **Phase 3: 清理冗余反射（消除 R4 + R5 + 优化 R6）** | | | |
-| P3-1 | 移除 CaffeineCache Class.forName（改用工厂方法 + NoClassDefFoundError） | cache | 📋 |
-| P3-2 | 移除 RedisCache Class.forName（改用工厂方法 + NoClassDefFoundError） | cache | 📋 |
-| P3-3 | TypeReference 增加 `of(Class)` 工厂方法 | cache | 📋 |
-| P3-4 | Cache 接口增加 `Class<V>` 重载 | cache | 📋 |
-| P3-5 | 回归测试 | all (test) | 📋 |
+| P3-1 | 移除 CaffeineCache Class.forName（改用工厂方法 + NoClassDefFoundError） | cache | ✅ |
+| P3-2 | 移除 RedisCache Class.forName（改用工厂方法 + NoClassDefFoundError） | cache | ✅ |
+| P3-3 | TypeReference 增加 `of(Class)` 工厂方法 | cache | ✅ |
+| P3-4 | Cache 接口增加 `Class<V>` 重载 | cache | ✅ |
+| P3-5 | 回归测试 | all (test) | ✅ |
 
 ### 反射消除目标
 

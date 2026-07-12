@@ -68,11 +68,9 @@ public final class RedisCache implements Cache {
     /**
      * Constructs a {@code RedisCache}.
      *
-     * <p>This constructor verifies that Redisson is on the classpath via
-     * {@code Class.forName("org.redisson.Redisson")}; if the dependency
-     * is absent (e.g. the application uses only L1 caching), an
-     * {@link IllegalStateException} is thrown with a message indicating
-     * which dependency to add.
+     * <p>When Redisson is absent from the classpath, the class itself fails
+     * to load with {@link NoClassDefFoundError}. Callers that prefer a
+     * no-op fallback should catch the error and substitute a {@code NoOpCache}.
      *
      * @param name          logical cache name; used as the Redis key prefix
      * @param client        the Redisson client; lifecycle owned by the caller.
@@ -84,7 +82,7 @@ public final class RedisCache implements Cache {
      *                      {@link NullPointerException} if the client is null.
      * @param serializer    the value serializer; must not be {@code null}
      * @param defaultPolicy default cache policy; must not be {@code null}
-     * @throws IllegalStateException if Redisson is not on the classpath
+     * @throws NoClassDefFoundError if Redisson is not on the classpath
      */
     public RedisCache(String name,
                       RedissonClient client,
@@ -94,16 +92,10 @@ public final class RedisCache implements Cache {
         this.client = client;
         this.serializer = Objects.requireNonNull(serializer, "serializer");
         this.defaultPolicy = Objects.requireNonNull(defaultPolicy, "defaultPolicy");
-        ensureRedissonAvailable();
     }
 
     /**
-     * Static factory that constructs a {@code RedisCache} and translates
-     * any classpath-detection failure into a clear {@link IllegalStateException}.
-     *
-     * <p>This is the recommended construction path for application code:
-     * it surfaces the "Redisson missing" failure at a single, documented
-     * call site rather than relying on the constructor's unchecked throw.
+     * Static factory that constructs a {@code RedisCache}.
      *
      * @param name       logical cache name
      * @param client     the Redisson client; may be {@code null} for
@@ -111,31 +103,13 @@ public final class RedisCache implements Cache {
      * @param serializer the value serializer
      * @param policy     default cache policy
      * @return a non-null {@code RedisCache}
-     * @throws IllegalStateException if Redisson is not on the classpath
+     * @throws NoClassDefFoundError if Redisson is not on the classpath
      */
     public static RedisCache create(String name,
                                     RedissonClient client,
                                     Serializer serializer,
                                     CachePolicy policy) {
         return new RedisCache(name, client, serializer, policy);
-    }
-
-    /**
-     * Verifies that the Redisson runtime is reachable on the classpath.
-     * The check uses {@code Class.forName} on the concrete {@code Redisson}
-     * class (rather than the {@link RedissonClient} interface) so that a
-     * partial classpath — interface present but implementation jar missing
-     * — is still detected.
-     */
-    private static void ensureRedissonAvailable() {
-        try {
-            Class.forName("org.redisson.Redisson");
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException(
-                "Redisson is not on the classpath. Add the 'org.redisson:redisson' "
-                    + "dependency to enable Redis-backed L2 caching.",
-                e);
-        }
     }
 
     @Override

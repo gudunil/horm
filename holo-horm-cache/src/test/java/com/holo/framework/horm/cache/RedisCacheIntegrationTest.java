@@ -298,7 +298,7 @@ class RedisCacheIntegrationTest {
 
     @Test
     void get_nullType_throwsNullPointerException() {
-        assertThatThrownBy(() -> cache.get("key", null))
+        assertThatThrownBy(() -> cache.get("key", (TypeReference<String>) null))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("type");
     }

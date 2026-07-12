@@ -33,16 +33,15 @@ import com.github.benmanes.caffeine.cache.RemovalListener;
  *
  * <p>Caffeine is declared {@code <optional>true</optional>} in the cache
  * module's POM, so downstream consumers that want L1 support must declare
- * the dependency explicitly. The constructor performs a
- * {@code Class.forName} probe and throws {@link IllegalStateException}
- * when Caffeine is absent; callers that prefer a no-op fallback should
- * catch the exception and substitute a {@code NoOpCache}:
+ * the dependency explicitly. When Caffeine is absent, the class itself
+ * fails to load with {@link NoClassDefFoundError}; callers that prefer a
+ * no-op fallback should catch the error and substitute a {@code NoOpCache}:
  *
  * <pre>{@code
  * Cache l1;
  * try {
- *     l1 = CaffeineCache.create("users-l1", policy);
- * } catch (IllegalStateException e) {
+ *     l1 = new CaffeineCache("users-l1", policy);
+ * } catch (NoClassDefFoundError e) {
  *     l1 = new NoOpCache("users-l1", CacheLevel.L1);
  * }
  * }</pre>
@@ -113,7 +112,7 @@ public final class CaffeineCache implements Cache {
      * @param name          logical cache name; must not be {@code null} or blank
      * @param defaultPolicy policy used to configure the underlying Caffeine
      *                      builder (TTL, max entries); must not be {@code null}
-     * @throws IllegalStateException     if Caffeine is not on the classpath
+     * @throws NoClassDefFoundError       if Caffeine is not on the classpath
      * @throws IllegalArgumentException if {@code name} is blank
      * @throws NullPointerException     if {@code defaultPolicy} is {@code null}
      */
@@ -123,16 +122,6 @@ public final class CaffeineCache implements Cache {
         }
         this.name = name;
         this.defaultPolicy = Objects.requireNonNull(defaultPolicy, "defaultPolicy");
-        // Probe Caffeine availability eagerly so a missing dependency is
-        // surfaced at construction rather than on first use.
-        try {
-            Class.forName("com.github.benmanes.caffeine.cache.Cache");
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException(
-                "Caffeine is not on the classpath; add the "
-                    + "com.github.ben-manes.caffeine:caffeine dependency "
-                    + "or fall back to NoOpCache", e);
-        }
         this.caffeine = buildCaffeine(this.name, this.defaultPolicy, this.listeners);
     }
 
@@ -220,7 +209,7 @@ public final class CaffeineCache implements Cache {
      * @param name   logical cache name
      * @param policy default policy for the underlying Caffeine builder
      * @return a non-null, ready-to-use {@code CaffeineCache}
-     * @throws IllegalStateException if Caffeine is unavailable on the classpath
+     * @throws NoClassDefFoundError if Caffeine is unavailable on the classpath
      */
     public static CaffeineCache create(String name, CachePolicy policy) {
         return new CaffeineCache(name, policy);
