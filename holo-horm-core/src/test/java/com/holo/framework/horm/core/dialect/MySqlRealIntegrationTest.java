@@ -11,6 +11,7 @@ import com.holo.framework.horm.core.datasource.DataSourceRegistry;
 import com.holo.framework.horm.core.query.Order;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -45,7 +46,13 @@ class MySqlRealIntegrationTest {
     @BeforeAll
     void setup() throws SQLException {
         EntityMetaRegistry.reload();
-        adminConn = DriverManager.getConnection(URL, USER, PASS);
+        try {
+            adminConn = DriverManager.getConnection(URL, USER, PASS);
+        } catch (SQLException e) {
+            Assumptions.assumeTrue(false,
+                "MySQL not available at localhost:3306 — skipping integration tests: " + e.getMessage());
+            return;
+        }
         try (Statement st = adminConn.createStatement()) {
             st.execute("DROP TABLE IF EXISTS users");
             st.execute(

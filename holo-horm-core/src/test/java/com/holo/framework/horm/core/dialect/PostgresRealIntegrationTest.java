@@ -11,6 +11,7 @@ import com.holo.framework.horm.core.datasource.DataSourceRegistry;
 import com.holo.framework.horm.core.query.Order;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
@@ -46,13 +47,25 @@ class PostgresRealIntegrationTest {
     void setup() throws SQLException {
         EntityMetaRegistry.reload();
 
-        // Create database if not exists (connect to default 'postgres' db first)
-        try (Connection c = DriverManager.getConnection("jdbc:postgresql://localhost:5432/postgres", USER, PASS);
-             Statement st = c.createStatement()) {
-            st.execute("CREATE DATABASE horm_test_pg");
+        // Connect to the default 'postgres' database; skip suite when PostgreSQL is unavailable.
+        Connection setupConn;
+        try {
+            setupConn = DriverManager.getConnection(
+                "jdbc:postgresql://localhost:5432/postgres", USER, PASS);
         } catch (SQLException e) {
-            // 42P04 = database already exists, ignore
-            if (!e.getSQLState().equals("42P04")) throw e;
+            Assumptions.assumeTrue(false,
+                "PostgreSQL not available at localhost:5432 — skipping integration tests: " + e.getMessage());
+            return;
+        }
+        try (setupConn) {
+            try (Statement st = setupConn.createStatement()) {
+                st.execute("CREATE DATABASE horm_test_pg");
+            } catch (SQLException e) {
+                // 42P04 = database already exists on repeat runs — safe to continue
+                if (!"42P04".equals(e.getSQLState())) {
+                    throw e;
+                }
+            }
         }
 
         adminConn = DriverManager.getConnection(URL, USER, PASS);
