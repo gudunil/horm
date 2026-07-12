@@ -1,0 +1,9 @@
+{
+  "resources": {
+    "includes": [
+      {"pattern": "META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports"},
+      {"pattern": "META-INF/services/com.holo.framework.horm.meta.TransactionProxyFactory"},
+      {"pattern": "META-INF/services/com.holo.framework.horm.meta.TransactionAdvisorProvider"}
+    ]
+  }
+}

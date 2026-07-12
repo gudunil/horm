@@ -1,0 +1,12 @@
+{
+  "resources": {
+    "includes": [
+      {"pattern": "META-INF/horm/entities.idx"},
+      {"pattern": "META-INF/horm/transactions.idx"},
+      {"pattern": "META-INF/services/com.holo.framework.horm.meta.EntityMetaProvider"},
+      {"pattern": "META-INF/services/com.holo.framework.horm.meta.TransactionAdvisorProvider"},
+      {"pattern": "META-INF/services/com.holo.framework.horm.meta.TransactionProxyFactory"},
+      {"pattern": "META-INF/services/com.holo.framework.horm.core.MigrationExecutor"}
+    ]
+  }
+}

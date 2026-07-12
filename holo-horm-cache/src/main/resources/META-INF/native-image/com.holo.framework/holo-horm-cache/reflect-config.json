@@ -1,0 +1,8 @@
+[
+  {
+    "name": "com.holo.framework.horm.cache.TypeReference",
+    "methods": [
+      {"name": "<init>", "parameterTypes": []}
+    ]
+  }
+]
