@@ -52,6 +52,35 @@ public abstract class TypeReference<T> {
     }
 
     /**
+     * Private constructor for simple (non-generic) types.
+     * Used by the {@link #of(Class)} factory method.
+     */
+    private TypeReference(Class<T> type) {
+        this.type = type;
+    }
+
+    /**
+     * Factory method for simple (non-generic) types. Avoids the need for
+     * an anonymous subclass when the value type is a plain class:
+     *
+     * <pre>{@code
+     * TypeReference<User> type = TypeReference.of(User.class);
+     * // equivalent to: new TypeReference<User>() {}
+     * }</pre>
+     *
+     * <p>For parameterised types (e.g. {@code List<User>}), the anonymous
+     * subclass idiom must still be used:
+     * {@code new TypeReference<List<User>>() {}}
+     *
+     * @param type the class representing the value type
+     * @param <T>  the value type
+     * @return a TypeReference capturing the given class
+     */
+    public static <T> TypeReference<T> of(Class<T> type) {
+        return new StaticTypeReference<>(type);
+    }
+
+    /**
      * Returns the captured type. For a bare class parameter (e.g.
      * {@code new TypeReference<User>() {}}), this returns the
      * {@link Class} object for {@code User}. For a parameterised
@@ -62,5 +91,11 @@ public abstract class TypeReference<T> {
      */
     public Type getType() {
         return type;
+    }
+
+    private static final class StaticTypeReference<T> extends TypeReference<T> {
+        StaticTypeReference(Class<T> type) {
+            super(type);
+        }
     }
 }

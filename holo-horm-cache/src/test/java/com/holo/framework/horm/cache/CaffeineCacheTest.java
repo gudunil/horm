@@ -125,7 +125,7 @@ class CaffeineCacheTest {
     @Test
     void getRejectsNullType() {
         CaffeineCache cache = newCache();
-        assertThatThrownBy(() -> cache.get("k", null))
+        assertThatThrownBy(() -> cache.get("k", (TypeReference<String>) null))
             .isInstanceOf(NullPointerException.class)
             .hasMessageContaining("type");
     }

@@ -133,12 +133,12 @@ class EntityMetaRegistryTest {
     @Test
     void loadIndexFromUrlSwallowsIoErrors() throws Exception {
         Method m = EntityMetaRegistry.class.getDeclaredMethod(
-            "loadIndexFromUrl", URL.class, ClassLoader.class);
+            "loadIndexFromUrl", URL.class, ClassLoader.class, java.util.Set.class);
         m.setAccessible(true);
         // file:/// URL pointing at a path that does not exist — openStream()
         // throws FileNotFoundException (an IOException), exercising the catch.
         URL badUrl = new URL("file:///this/path/does/not/exist/entities.idx");
-        m.invoke(null, badUrl, getClass().getClassLoader());
+        m.invoke(null, badUrl, getClass().getClassLoader(), new java.util.HashSet<>());
         // No exception propagated == pass; the catch block ran and returned.
     }
 

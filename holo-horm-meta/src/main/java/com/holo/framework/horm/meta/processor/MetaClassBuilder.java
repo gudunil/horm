@@ -2,6 +2,7 @@ package com.holo.framework.horm.meta.processor;
 
 import com.holo.framework.horm.meta.CachePolicy;
 import com.holo.framework.horm.meta.EntityMeta;
+import com.holo.framework.horm.meta.EntityMetaProvider;
 import com.holo.framework.horm.meta.FieldAccessor;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
@@ -56,7 +57,8 @@ public final class MetaClassBuilder {
         ClassName genTypeCn = ClassName.get(GenerationType.class);
 
         TypeSpec.Builder type = TypeSpec.classBuilder(meta)
-            .addModifiers(Modifier.PUBLIC, Modifier.FINAL);
+            .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+            .addSuperinterface(ClassName.get(EntityMetaProvider.class));
 
         type.addField(FieldSpec.builder(String.class, "TABLE_NAME",
                 Modifier.PUBLIC, Modifier.STATIC, Modifier.FINAL)
@@ -116,6 +118,7 @@ public final class MetaClassBuilder {
         }
 
         type.addMethod(buildEntityMetaMethod(entityMetaCn, entity, d));
+        type.addMethod(buildProvideMethod(entityMetaCn, entity));
 
         JavaFile.builder(d.generatedPackage(), type.build())
             .indent("    ")
@@ -210,6 +213,18 @@ public final class MetaClassBuilder {
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
             .returns(entityMetaT)
             .addStatement(body.build())
+            .build();
+    }
+
+    private static MethodSpec buildProvideMethod(ClassName entityMetaCn, ClassName entity) {
+        TypeName entityMetaT = ParameterizedTypeName.get(entityMetaCn, entity);
+        TypeName wildcardEntityMetaT = ParameterizedTypeName.get(entityMetaCn,
+            WildcardTypeName.subtypeOf(Object.class));
+        return MethodSpec.methodBuilder("provide")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(wildcardEntityMetaT)
+            .addStatement("return entityMeta()")
             .build();
     }
 

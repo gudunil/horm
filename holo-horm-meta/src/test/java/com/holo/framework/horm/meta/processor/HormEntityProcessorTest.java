@@ -44,6 +44,68 @@ class HormEntityProcessorTest {
         }
         """;
 
+    /**
+     * Stub classes needed by M8.7 TransactionProxyBuilder generated code.
+     * The generated proxy references core classes that are not on the meta
+     * test classpath, so we provide minimal stubs for compile-testing.
+     */
+    private static final String CORE_STUBS = """
+        package com.holo.framework.horm.core;
+        public final class TransactionDefinition {
+            public TransactionDefinition() {}
+            public static Builder builder() { return new Builder(); }
+            public static final class Builder {
+                public Builder propagation(Object p) { return this; }
+                public Builder isolation(Object i) { return this; }
+                public Builder timeout(int t) { return this; }
+                public Builder readOnly(boolean r) { return this; }
+                public TransactionDefinition build() { return new TransactionDefinition(); }
+            }
+        }
+        """;
+
+    private static final String CORE_STUBS2 = """
+        package com.holo.framework.horm.core;
+        public final class HormContext {
+            public HormContext() {}
+            public static HormContext current() { return new HormContext(); }
+        }
+        """;
+
+    private static final String CORE_STUBS3 = """
+        package com.holo.framework.horm.core;
+        public final class TransactionStatus {
+            public TransactionStatus() {}
+        }
+        """;
+
+    private static final String CORE_STUBS4 = """
+        package com.holo.framework.horm.core;
+        public final class TransactionManager {
+            private TransactionManager() {}
+            public static TransactionStatus begin(HormContext ctx, String ds, TransactionDefinition def) { return new TransactionStatus(); }
+            public static void commit(TransactionStatus s) {}
+            public static void rollback(TransactionStatus s) {}
+            public static void popAndResume(String ds, TransactionStatus s) {}
+        }
+        """;
+
+    private static final String CORE_STUBS5 = """
+        package com.holo.framework.horm.core.datasource;
+        public final class DataSourceRegistry {
+            public static final String DEFAULT_NAME = "default";
+            private DataSourceRegistry() {}
+        }
+        """;
+
+    private static final String CORE_STUBS6 = """
+        package com.holo.framework.horm.core;
+        public class TransactionException extends RuntimeException {
+            public TransactionException(String m) { super(m); }
+            public TransactionException(String m, Throwable c) { super(m, c); }
+        }
+        """;
+
     private static final String USER_SOURCE = """
         package test;
         import com.holo.framework.horm.meta.annotation.Entity;
@@ -773,6 +835,219 @@ class HormEntityProcessorTest {
         assertThat(queryMetaSrc).contains("RelationField<UserAll, Order> ORDERS");
         assertThat(queryMetaSrc).contains("RelationField<UserAll, Tag> TAGS");
         assertThat(queryMetaSrc).contains("RelationField<UserAll, Product> PRODUCTS");
+    }
+
+    @Test
+    void generatesTransactionalProxyClass() throws IOException {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public class OrderService {
+                @Transactional
+                public String createOrder(String productId, int quantity) {
+                    return "order-" + productId;
+                }
+            }
+            """);
+
+        if (comp.status() != Compilation.Status.SUCCESS) {
+            comp.errors().forEach(d -> {
+                System.err.println("COMPILE ERROR: " + d.getMessage(null));
+                d.getMessage(null).lines().forEach(System.err::println);
+            });
+            // Print all generated files for diagnosis
+            comp.generatedSourceFiles().forEach(f -> {
+                try {
+                    System.err.println("=== Generated: " + f.getName() + " ===");
+                    System.err.println(f.getCharContent(true).toString().substring(0, Math.min(500, f.getCharContent(true).length())));
+                } catch (IOException e) { }
+            });
+        }
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String proxySrc = src(generated(comp, "OrderService_TransactionalProxy.java"));
+        assertThat(proxySrc).contains("class OrderService_TransactionalProxy extends OrderService");
+        assertThat(proxySrc).contains("private final OrderService delegate");
+        assertThat(proxySrc).contains("private final Object ctx");
+        assertThat(proxySrc).contains("CREATE_ORDER_META");
+        assertThat(proxySrc).contains("TransactionManager.begin");
+        assertThat(proxySrc).contains("delegate.createOrder(productId, quantity)");
+    }
+
+    @Test
+    void generatesTransactionalProxyFactoryClass() throws IOException {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public class PaymentService {
+                @Transactional
+                public void processPayment(String orderId) {}
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String factorySrc = src(generated(comp, "PaymentService_TransactionalProxyFactory.java"));
+        assertThat(factorySrc).contains("implements TransactionProxyFactory");
+        assertThat(factorySrc).contains("return new PaymentService_TransactionalProxy((PaymentService) delegate, context)");
+        assertThat(factorySrc).contains("return PaymentService.class");
+    }
+
+    @Test
+    void generatesServiceLoaderConfigForProxyFactory() throws IOException {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public class ReportService {
+                @Transactional(readOnly = true)
+                public String generate() { return "report"; }
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String config = comp.generatedFiles().stream()
+            .filter(f -> f.getName().contains("META-INF/services/"))
+            .filter(f -> f.getName().contains("TransactionProxyFactory"))
+            .findFirst().orElseThrow(() -> new AssertionError("no TransactionProxyFactory service config"))
+            .getCharContent(true).toString();
+
+        assertThat(config).contains("test.generated.ReportService_TransactionalProxyFactory");
+    }
+
+    @Test
+    void warnsOnFinalTransactionalClass() {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public final class FinalService {
+                @Transactional
+                public void doWork() {}
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+        assertThat(comp.warnings())
+            .anyMatch(d -> d.getMessage(null).contains("final class"));
+    }
+
+    @Test
+    void skipsFinalTransactionalMethod() throws IOException {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public class MixedService {
+                @Transactional
+                public final void finalMethod() {}
+
+                @Transactional
+                public void normalMethod() {}
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String proxySrc = src(generated(comp, "MixedService_TransactionalProxy.java"));
+        // final method should NOT be overridden in proxy
+        assertThat(proxySrc).doesNotContain("finalMethod");
+        // normal method should be overridden
+        assertThat(proxySrc).contains("NORMAL_METHOD_META");
+    }
+
+    @Test
+    void generatesEntityMetaProviderImplementation() throws IOException {
+        Compilation comp = compile(USER_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String src = src(generated(comp, "UserMeta.java"));
+        assertThat(src).contains("implements EntityMetaProvider");
+        assertThat(src).contains("public EntityMeta<?> provide()");
+        assertThat(src).contains("return entityMeta()");
+    }
+
+    @Test
+    void generatesServiceLoaderConfigForEntityMetaProvider() throws IOException {
+        Compilation comp = compile(USER_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String config = comp.generatedFiles().stream()
+            .filter(f -> f.getName().contains("META-INF/services/"))
+            .filter(f -> f.getName().contains("EntityMetaProvider"))
+            .findFirst().orElseThrow(() -> new AssertionError("no EntityMetaProvider service config"))
+            .getCharContent(true).toString();
+
+        assertThat(config).contains("test.generated.UserMeta");
+    }
+
+    @Test
+    void generatesTransactionAdvisorProviderImplementation() throws IOException {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public class InvoiceService {
+                @Transactional
+                public void createInvoice(String invoiceNo) {}
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String advisorSrc = src(generated(comp, "InvoiceServiceTransactionAdvisor.java"));
+        assertThat(advisorSrc).contains("implements TransactionAdvisorProvider");
+        assertThat(advisorSrc).contains("public List<TransactionMethodMeta> methods()");
+        assertThat(advisorSrc).contains("return METHODS");
+        assertThat(advisorSrc).contains("public String targetClassName()");
+        assertThat(advisorSrc).contains("return \"test.InvoiceService\"");
+    }
+
+    @Test
+    void generatesServiceLoaderConfigForTransactionAdvisorProvider() throws IOException {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public class ShippingService {
+                @Transactional(readOnly = true)
+                public String ship(String orderId) { return "shipped"; }
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String config = comp.generatedFiles().stream()
+            .filter(f -> f.getName().contains("META-INF/services/"))
+            .filter(f -> f.getName().contains("TransactionAdvisorProvider"))
+            .findFirst().orElseThrow(() -> new AssertionError("no TransactionAdvisorProvider service config"))
+            .getCharContent(true).toString();
+
+        assertThat(config).contains("test.generated.ShippingServiceTransactionAdvisor");
+    }
+
+    private static Compilation compileWithStubs(String... sources) {
+        String[] all = new String[sources.length + 7];
+        all[0] = MODEL_SOURCE;
+        all[1] = CORE_STUBS;
+        all[2] = CORE_STUBS2;
+        all[3] = CORE_STUBS3;
+        all[4] = CORE_STUBS4;
+        all[5] = CORE_STUBS5;
+        all[6] = CORE_STUBS6;
+        System.arraycopy(sources, 0, all, 7, sources.length);
+        JavaFileObject[] files = new JavaFileObject[all.length];
+        for (int i = 0; i < all.length; i++) {
+            String packageName = extractPackageName(all[i]);
+            String className = extractClassName(all[i]);
+            files[i] = JavaFileObjects.forSourceString(packageName + "." + className, all[i]);
+        }
+        return javac()
+            .withProcessors(new HormEntityProcessor())
+            .compile(files);
     }
 
     private static Compilation compile(String... sources) {

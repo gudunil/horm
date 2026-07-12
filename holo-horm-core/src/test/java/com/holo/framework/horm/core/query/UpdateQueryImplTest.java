@@ -94,9 +94,9 @@ class UpdateQueryImplTest {
             .contains("updated_at = ?")
             .contains("WHERE (id = ?)");
 
-        // 验证参数绑定顺序
+        // 验证参数绑定顺序；Instant 经 SqlBinding 规范化为 Timestamp 以统一时区写入路径
         verify(mockPs).setObject(1, "multi@test.com");
-        verify(mockPs).setObject(2, java.time.Instant.parse("2026-01-01T00:00:00Z"));
+        verify(mockPs).setObject(2, java.sql.Timestamp.from(java.time.Instant.parse("2026-01-01T00:00:00Z")));
         verify(mockPs).setObject(3, 2L);
     }
 

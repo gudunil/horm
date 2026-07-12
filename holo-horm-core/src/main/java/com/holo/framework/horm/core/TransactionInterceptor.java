@@ -5,35 +5,20 @@ import com.holo.framework.horm.meta.TransactionMethodMeta;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
 import java.util.Optional;
 
 /**
  * Runtime transaction interceptor that applies transactional semantics
  * based on APT-generated {@link TransactionMethodMeta} metadata.
  *
- * <p>This class is the runtime counterpart to the compile-time
- * {@code TransactionAdvisorBuilder}. When a method annotated with
- * {@code @Transactional} is invoked through a proxy (e.g. Spring AOP),
- * the interceptor:
- * <ol>
- *   <li>Looks up the transaction metadata from {@link TransactionAdvisorRegistry}</li>
- *   <li>If found, constructs a {@link TransactionDefinition} and begins a transaction</li>
- *   <li>Invokes the target method</li>
- *   <li>Commits on success, rolls back on exception (subject to rollback rules)</li>
- * </ol>
+ * <p>M8.7 改造：此类作为 APT 代理的降级路径保留。当目标类无法生成 APT 代理
+ * （final 类、第三方类）时，使用 {@link MethodBridgeFactory} 替代
+ * {@link Method#invoke}，减少反射开销。
  *
- * <p>If no transaction metadata is registered for the method, the interceptor
- * simply invokes the target method directly without transactional wrapping.
- *
- * <p>Rollback rules are evaluated by {@link TransactionMethodMeta#shouldRollback(Throwable)}:
- * <ul>
- *   <li>{@code noRollbackFor} exceptions never trigger rollback</li>
- *   <li>If {@code rollbackFor} is specified, only matching exceptions trigger rollback</li>
- *   <li>By default, {@link RuntimeException} (and subclasses) trigger rollback</li>
- * </ul>
- *
- * <p>This class is intended for use by the Spring Boot Starter (M8) or other
- * AOP frameworks. It is not called directly by application code.
+ * <p>主路径（APT 代理子类）不使用此类——代理子类直接内联事务边界逻辑，
+ * 零反射调用。此类的 {@link #createProxy(Object)} 方法仅用于无法生成 APT
+ * 代理的降级场景。
  */
 public final class TransactionInterceptor {
 
@@ -41,16 +26,42 @@ public final class TransactionInterceptor {
     }
 
     /**
+     * Creates a JDK dynamic proxy for the given target that intercepts
+     * transactional method calls. This is the fallback path for classes
+     * that cannot have an APT-generated proxy subclass (e.g. final classes).
+     *
+     * <p>The proxy uses {@link MethodBridgeFactory} internally to reduce
+     * reflection overhead compared to raw {@link Method#invoke}.
+     *
+     * @param target the target bean to wrap
+     * @return a JDK dynamic proxy that intercepts transactional methods
+     */
+    @SuppressWarnings("unchecked")
+    public static <T> T createProxy(T target) {
+        Class<?> targetClass = target.getClass();
+        Class<?>[] interfaces = targetClass.getInterfaces();
+        if (interfaces.length == 0) {
+            // Cannot create JDK proxy without interfaces
+            System.err.println("[HORM] WARNING: Cannot create transaction proxy for "
+                + targetClass.getName() + " — no interfaces implemented. "
+                + "Transaction semantics will NOT be applied. "
+                + "Consider implementing an interface or using APT proxy generation.");
+            return target;
+        }
+        return (T) Proxy.newProxyInstance(
+            targetClass.getClassLoader(),
+            interfaces,
+            (proxy, method, args) -> invoke(target, method, args)
+        );
+    }
+
+    /**
      * Intercepts a method invocation and applies transactional semantics
      * if metadata is registered for the target class and method.
      *
      * <p>If transaction metadata is found, the method is invoked within a
-     * transaction boundary. The transaction is committed on successful return;
-     * it is rolled back if the method throws an exception that matches the
-     * rollback rules.
-     *
-     * <p>If no metadata is found, the method is invoked directly without
-     * transactional wrapping.
+     * transaction boundary using {@link MethodBridgeFactory} for reduced
+     * reflection overhead.
      *
      * @param target the target object on which the method is invoked
      * @param method the method being invoked
@@ -63,7 +74,6 @@ public final class TransactionInterceptor {
             TransactionAdvisorRegistry.lookup(target.getClass(), method.getName());
 
         if (metaOpt.isEmpty()) {
-            // No transaction metadata — invoke directly
             return invokeTarget(target, method, args);
         }
 
@@ -88,24 +98,22 @@ public final class TransactionInterceptor {
             if (shouldRollback(ex, meta)) {
                 TransactionManager.rollback(status);
             } else {
-                // Exception does not match rollback rules — commit anyway
                 TransactionManager.commit(status);
             }
-            // Re-throw the original exception
             rethrow(ex);
-            return null; // unreachable
+            return null;
         } finally {
             popAndResume(dataSourceName, status);
         }
     }
 
     /**
-     * Invokes the target method, unwrapping {@link InvocationTargetException}
-     * to expose the underlying exception.
+     * Invokes the target method using {@link MethodBridgeFactory} for
+     * reduced reflection overhead compared to raw {@link Method#invoke}.
      */
     private static Object invokeTarget(Object target, Method method, Object[] args) throws Exception {
         try {
-            return method.invoke(target, args);
+            return MethodBridgeFactory.bridge(method).invoke(target, args);
         } catch (InvocationTargetException e) {
             Throwable cause = e.getCause();
             if (cause instanceof Exception ex) {
@@ -115,22 +123,21 @@ public final class TransactionInterceptor {
                 throw err;
             }
             throw new TransactionException("Method invocation threw non-Exception Throwable", cause);
+        } catch (Throwable t) {
+            if (t instanceof Exception ex) {
+                throw ex;
+            }
+            if (t instanceof Error err) {
+                throw err;
+            }
+            throw new TransactionException("Method bridge invocation failed", t);
         }
     }
 
-    /**
-     * Determines whether the given exception should trigger a rollback
-     * according to the transaction metadata.
-     */
     private static boolean shouldRollback(Throwable ex, TransactionMethodMeta meta) {
         return meta.shouldRollback(ex);
     }
 
-    /**
-     * Re-throws the exception, preserving its original type.
-     * Checked exceptions are wrapped in {@link TransactionException} if they
-     * are not declared by the method signature.
-     */
     private static void rethrow(Throwable ex) throws Exception {
         if (ex instanceof Exception exception) {
             throw exception;
@@ -141,13 +148,6 @@ public final class TransactionInterceptor {
         throw new TransactionException("Unexpected Throwable", ex);
     }
 
-    /**
-     * Pops the transaction status from the stack and resumes any suspended
-     * transaction (for REQUIRES_NEW propagation).
-     *
-     * <p>Delegates to {@link TransactionManager#popAndResume(String, TransactionStatus)}
-     * which is package-private for this purpose.
-     */
     private static void popAndResume(String dataSourceName, TransactionStatus status) {
         TransactionManager.popAndResume(dataSourceName, status);
     }

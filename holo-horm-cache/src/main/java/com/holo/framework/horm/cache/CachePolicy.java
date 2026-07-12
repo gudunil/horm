@@ -17,11 +17,12 @@ import java.util.Objects;
  *   <li>negative caching ({@link #nullable()}).</li>
  * </ul>
  *
- * <p>Instances are created exclusively through {@link #builder()} (which
- * supplies sensible defaults). All fields are non-null where indicated;
- * the class is {@code final} and every accessor returns a primitive or an
- * immutable reference, so {@code CachePolicy} is safe to share across
- * threads without defensive copies.
+ * <p>Instances are created through {@link #builder()} (which supplies sensible
+ * defaults) or directly via the canonical record constructor. The compact
+ * constructor enforces the same null and cross-field invariants the builder
+ * does, so bypassing the builder cannot yield an inconsistent policy. Every
+ * component is a primitive or an immutable reference, so {@code CachePolicy}
+ * is safe to share across threads without defensive copies.
  *
  * <p>The defaults are tuned for the common HORM read-through scenario:
  * a 30-minute TTL with LRU eviction of 10 000 entries, write-around
@@ -29,7 +30,15 @@ import java.util.Objects;
  * caching of absent keys for one minute to absorb cache-penetration
  * attempts.
  */
-public final class CachePolicy {
+public record CachePolicy(
+    Duration ttl,
+    EvictionPolicy evictionPolicy,
+    int maxEntries,
+    long maxWeight,
+    WriteStrategy writeStrategy,
+    boolean nullable,
+    Duration nullTtl
+) {
 
     /** Default TTL applied when the builder omits {@code ttl(...)}. */
     public static final Duration DEFAULT_TTL = Duration.ofMinutes(30);
@@ -46,92 +55,21 @@ public final class CachePolicy {
     /** Default TTL for cached null sentinels. */
     public static final Duration DEFAULT_NULL_TTL = Duration.ofMinutes(1);
 
-    private final Duration ttl;
-    private final EvictionPolicy evictionPolicy;
-    private final int maxEntries;
-    private final long maxWeight;
-    private final WriteStrategy writeStrategy;
-    private final boolean nullable;
-    private final Duration nullTtl;
-
-    /**
-     * Package-private constructor; the only sanctioned creation path is
-     * {@link #builder()}. The {@link CachePolicyBuilder} lives in the same
-     * package and validates inputs before delegating here.
-     */
-    CachePolicy(Duration ttl,
-                EvictionPolicy evictionPolicy,
-                int maxEntries,
-                long maxWeight,
-                WriteStrategy writeStrategy,
-                boolean nullable,
-                Duration nullTtl) {
-        this.ttl = Objects.requireNonNull(ttl, "ttl");
-        this.evictionPolicy = Objects.requireNonNull(evictionPolicy, "evictionPolicy");
-        this.maxEntries = maxEntries;
-        this.maxWeight = maxWeight;
-        this.writeStrategy = Objects.requireNonNull(writeStrategy, "writeStrategy");
-        this.nullable = nullable;
-        this.nullTtl = Objects.requireNonNull(nullTtl, "nullTtl");
+    public CachePolicy {
+        Objects.requireNonNull(ttl, "ttl");
+        Objects.requireNonNull(evictionPolicy, "evictionPolicy");
+        Objects.requireNonNull(writeStrategy, "writeStrategy");
+        Objects.requireNonNull(nullTtl, "nullTtl");
+        if (nullable && nullTtl.compareTo(ttl) > 0) {
+            throw new IllegalArgumentException(
+                "nullTtl (" + nullTtl + ") must not exceed ttl (" + ttl
+                    + ") when nullable is true");
+        }
     }
 
     /** Returns a fresh {@link CachePolicyBuilder} pre-seeded with defaults. */
     public static CachePolicyBuilder builder() {
         return new CachePolicyBuilder();
-    }
-
-    /** Time-to-live for non-null entries. Never {@code null}. */
-    public Duration ttl() {
-        return ttl;
-    }
-
-    /** Eviction policy. Never {@code null}. */
-    public EvictionPolicy evictionPolicy() {
-        return evictionPolicy;
-    }
-
-    /** Maximum number of entries before eviction kicks in. */
-    public int maxEntries() {
-        return maxEntries;
-    }
-
-    /** Maximum total weight ({@code -1} = unbounded). */
-    public long maxWeight() {
-        return maxWeight;
-    }
-
-    /** Write propagation strategy. Never {@code null}. */
-    public WriteStrategy writeStrategy() {
-        return writeStrategy;
-    }
-
-    /** Whether {@code null} values may be cached as sentinels. */
-    public boolean nullable() {
-        return nullable;
-    }
-
-    /** TTL for cached null sentinels. Only consulted when {@link #nullable()} is {@code true}. */
-    public Duration nullTtl() {
-        return nullTtl;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (!(o instanceof CachePolicy that)) return false;
-        return nullable == that.nullable
-            && maxEntries == that.maxEntries
-            && maxWeight == that.maxWeight
-            && ttl.equals(that.ttl)
-            && evictionPolicy == that.evictionPolicy
-            && writeStrategy == that.writeStrategy
-            && nullTtl.equals(that.nullTtl);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(ttl, evictionPolicy, maxEntries, maxWeight,
-            writeStrategy, nullable, nullTtl);
     }
 
     @Override

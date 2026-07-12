@@ -1,6 +1,7 @@
 package com.holo.framework.horm.core;
 
 import com.holo.framework.horm.meta.EntityMeta;
+import com.holo.framework.horm.meta.EntityMetaProvider;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -9,10 +10,18 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.ServiceLoader;
+import java.util.Set;
 
 /**
- * Runtime registry of {@link EntityMeta} instances, populated at class-init
- * by scanning {@code META-INF/horm/entities.idx} on the classpath.
+ * Runtime registry of {@link EntityMeta} instances.
+ *
+ * <p>Populated at class-init by first attempting to discover
+ * {@link EntityMetaProvider} implementations via {@link ServiceLoader}
+ * (the preferred, zero-reflection path). If no ServiceLoader configuration
+ * is found, falls back to scanning {@code META-INF/horm/entities.idx} on
+ * the classpath (the legacy, reflection-based path).
  *
  * <p>The index file is written by the {@code holo-horm-meta} annotation
  * processor at compile time — one fully-qualified {@code XxxMeta} class name
@@ -45,23 +54,57 @@ public final class EntityMetaRegistry {
     }
 
     /**
-     * Scans every {@code META-INF/horm/entities.idx} on the classpath and
-     * registers the corresponding {@link EntityMeta} instances.
+     * Scans for entity metadata using ServiceLoader first, then falls back
+     * to the legacy {@code META-INF/horm/entities.idx} classpath index.
      *
-     * <p>Multiple jars may each contribute their own index file; the
-     * classloader's {@link ClassLoader#getResources(String)} enumeration
-     * merges them transparently.
+     * <p>The ServiceLoader path calls {@link EntityMetaProvider#provide()}
+     * directly — no reflection. The legacy path uses {@code Class.forName}
+     * + {@code Method.invoke} as a backward-compatible fallback.
+     *
+     * <p>To avoid duplicate loading, entities already loaded via ServiceLoader
+     * are skipped during legacy index processing.
      */
     private static void loadIndex() {
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         if (loader == null) {
             loader = EntityMetaRegistry.class.getClassLoader();
         }
+
+        // Preferred path: ServiceLoader<EntityMetaProvider> (zero-reflection)
+        Set<Class<?>> loadedTypes = loadFromServiceLoader(loader);
+
+        // Fallback path: legacy entities.idx (reflection-based)
+        // Skip entities already loaded via ServiceLoader to avoid duplicate work
+        loadLegacyIndex(loader, loadedTypes);
+    }
+
+    private static Set<Class<?>> loadFromServiceLoader(ClassLoader loader) {
+        Set<Class<?>> loadedTypes = new HashSet<>();
+        try {
+            for (EntityMetaProvider provider : ServiceLoader.load(EntityMetaProvider.class, loader)) {
+                try {
+                    EntityMeta<?> meta = provider.provide();
+                    if (meta != null) {
+                        REGISTRY.put(meta.type(), meta);
+                        loadedTypes.add(meta.type());
+                    }
+                } catch (Exception e) {
+                    System.err.println("[HORM] Failed to load entity from provider "
+                        + provider.getClass().getName() + ": " + e);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[HORM] Failed to enumerate EntityMetaProvider services: " + e);
+        }
+        return loadedTypes;
+    }
+
+    private static void loadLegacyIndex(ClassLoader loader, Set<Class<?>> alreadyLoadedTypes) {
         try {
             Enumeration<URL> urls = loader.getResources(INDEX_RESOURCE);
             while (urls.hasMoreElements()) {
                 URL url = urls.nextElement();
-                loadIndexFromUrl(url, loader);
+                loadIndexFromUrl(url, loader, alreadyLoadedTypes);
             }
         } catch (Exception e) {
             // Defensive: never fail class-init because of an I/O error.
@@ -69,29 +112,28 @@ public final class EntityMetaRegistry {
         }
     }
 
-    private static void loadIndexFromUrl(URL url, ClassLoader loader) {
+    private static void loadIndexFromUrl(URL url, ClassLoader loader, Set<Class<?>> alreadyLoadedTypes) {
         try (InputStream in = url.openStream();
              BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                    continue;
-                }
-                registerByMetaClassName(trimmed, loader);
-            }
+            reader.lines()
+                .map(String::trim)
+                .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                .forEach(line -> registerByMetaClassName(line, loader, alreadyLoadedTypes));
         } catch (Exception e) {
             System.err.println("[HORM] Failed to read entity index " + url + ": " + e);
         }
     }
 
-    private static void registerByMetaClassName(String metaClassName, ClassLoader loader) {
+    private static void registerByMetaClassName(String metaClassName, ClassLoader loader, Set<Class<?>> alreadyLoadedTypes) {
         try {
             Class<?> clazz = Class.forName(metaClassName, true, loader);
             Method factory = clazz.getMethod("entityMeta");
             Object meta = factory.invoke(null);
             if (meta instanceof EntityMeta<?> em) {
-                REGISTRY.put(em.type(), em);
+                // Skip if already loaded via ServiceLoader
+                if (!alreadyLoadedTypes.contains(em.type())) {
+                    REGISTRY.put(em.type(), em);
+                }
             } else {
                 System.err.println("[HORM] " + metaClassName + ".entityMeta() returned non-EntityMeta: " + meta);
             }
