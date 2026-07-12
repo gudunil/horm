@@ -1,6 +1,7 @@
 package com.holo.framework.horm.cache;
 
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -58,13 +59,15 @@ class RedisCacheIntegrationTest {
 
         redissonClient = Redisson.create(config);
 
-        // Verify Redis is accessible
+        // Skip test suite gracefully when Redis is unavailable (CI without Redis)
         try {
             redissonClient.getKeys().count();
         } catch (Exception e) {
-            throw new IllegalStateException(
-                "Cannot connect to Redis at " + REDIS_HOST + ":" + REDIS_PORT +
-                ". Please ensure Redis is running and accessible.", e);
+            redissonClient.shutdown();
+            redissonClient = null;
+            Assumptions.assumeTrue(false,
+                "Redis not available at " + REDIS_HOST + ":" + REDIS_PORT
+                    + " — skipping integration tests: " + e.getMessage());
         }
     }
 

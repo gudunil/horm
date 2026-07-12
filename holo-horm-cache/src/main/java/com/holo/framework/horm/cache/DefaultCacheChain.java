@@ -252,11 +252,8 @@ public final class DefaultCacheChain implements CacheChain {
                     publishEvent(CacheEvent.of(
                         CacheEventType.HIT, tier.name(), tier.level(), k, v));
                     // NullMarker hit: logical value is null.
-                    if (NullMarker.isNullMarker(v)) {
-                        result.put(k, null);
-                    } else {
-                        result.put(k, v);
-                    }
+                    V normalized = NullMarker.isNullMarker(v) ? null : v;
+                    result.put(k, normalized);
                     remaining.remove(k);
                 }
             }
@@ -621,21 +618,15 @@ public final class DefaultCacheChain implements CacheChain {
     /**
      * Lazily-cached default policy for back-fill operations. The policy
      * is the {@link CachePolicy#builder()} default, which is tuned for
-     * the common HORM read-through scenario.
+     * the common HORM read-through scenario. Held in a static nested class
+     * so the JVM class-loading guarantee provides thread-safe lazy init
+     * without explicit synchronization.
      */
-    private static volatile CachePolicy DEFAULT_BACK_FILL_POLICY;
+    private static final class DefaultBackFillPolicyHolder {
+        static final CachePolicy INSTANCE = CachePolicy.builder().build();
+    }
 
     private static CachePolicy defaultBackFillPolicy() {
-        CachePolicy p = DEFAULT_BACK_FILL_POLICY;
-        if (p == null) {
-            synchronized (DefaultCacheChain.class) {
-                p = DEFAULT_BACK_FILL_POLICY;
-                if (p == null) {
-                    p = CachePolicy.builder().build();
-                    DEFAULT_BACK_FILL_POLICY = p;
-                }
-            }
-        }
-        return p;
+        return DefaultBackFillPolicyHolder.INSTANCE;
     }
 }

@@ -5,16 +5,13 @@ import com.holo.framework.horm.cache.CachePolicy;
 import com.holo.framework.horm.cache.TypeReference;
 import com.holo.framework.horm.cache.key.CacheKey;
 import com.holo.framework.horm.cache.key.CacheKeyBuilder;
+import com.holo.framework.horm.core.dialect.Dialect;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.Row;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -67,12 +64,8 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         this.ctx = ctx;
         this.meta = EntityMetaRegistry.lookup(entityType);
         this.mapper = meta.mapper();
-        // Resolve datasource name from entity metadata; empty/null defaults to "default"
-        String dsName = meta.dataSource();
-        this.dataSourceName = (dsName == null || dsName.isEmpty())
-            ? com.holo.framework.horm.core.datasource.DataSourceRegistry.DEFAULT_NAME
-            : dsName;
-        this.runtimeCachePolicy = toRuntimePolicy(meta.cachePolicy());
+        this.dataSourceName = MetaSupport.resolveDataSourceName(meta);
+        this.runtimeCachePolicy = MetaSupport.toRuntimePolicy(meta.cachePolicy());
     }
 
     @Override
@@ -89,79 +82,47 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     /** Database lookup backing {@link #find(Object)} and the cache loader. */
     private T dbFind(Object id) {
         FieldMeta<?> idField = requireIdField();
-        String sql = "SELECT * FROM " + qualifiedTable()
+        String sql = "SELECT * FROM " + MetaSupport.qualifiedTable(meta)
             + " WHERE " + idField.column() + " = ?";
-        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (!rs.next()) {
-                    return null;
-                }
-                return mapper.map(toRow(rs));
-            }
-        } catch (SQLException e) {
-            throw new HormException(
-                "Failed to find " + entityType.getName() + " by id " + id, e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
-        }
+        return JdbcOperations.query(ctx, dataSourceName, sql, List.of(id),
+            rs -> rs.next() ? mapper.map(MetaSupport.toRow(rs, meta)) : null,
+            "find " + entityType.getName() + " by id " + id);
     }
 
     @Override
     public List<T> all() {
-        String sql = "SELECT * FROM " + qualifiedTable();
-        List<T> result = new ArrayList<>();
-        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                result.add(mapper.map(toRow(rs)));
-            }
-        } catch (SQLException e) {
-            throw new HormException("Failed to fetch all " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
-        }
-        return result;
+        String sql = "SELECT * FROM " + MetaSupport.qualifiedTable(meta);
+        return JdbcOperations.query(ctx, dataSourceName, sql, List.of(),
+            rs -> {
+                List<T> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapper.map(MetaSupport.toRow(rs, meta)));
+                }
+                return result;
+            },
+            "fetch all " + entityType.getName());
     }
 
     @Override
     public long count() {
-        String sql = "SELECT COUNT(*) FROM " + qualifiedTable();
-        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-        try (PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return rs.getLong(1);
-            }
-            return 0L;
-        } catch (SQLException e) {
-            throw new HormException("Failed to count " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
-        }
+        String sql = "SELECT COUNT(*) FROM " + MetaSupport.qualifiedTable(meta);
+        return JdbcOperations.query(ctx, dataSourceName, sql, List.of(),
+            rs -> rs.next() ? rs.getLong(1) : 0L,
+            "count " + entityType.getName());
     }
 
     @Override
     public boolean exists(Object id) {
         FieldMeta<?> idField = requireIdField();
-        // H2 MODE=MySQL and MySQL both accept LIMIT 1; other dialects tolerate
-        // the redundant row and rely on rs.next() short-circuiting.
-        String sql = "SELECT 1 FROM " + qualifiedTable()
-            + " WHERE " + idField.column() + " = ? LIMIT 1";
-        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            throw new HormException(
-                "Failed to check existence of " + entityType.getName() + " by id " + id, e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
-        }
+        StringBuilder sqlBuilder = new StringBuilder("SELECT 1 FROM ").append(MetaSupport.qualifiedTable(meta))
+            .append(" WHERE ").append(idField.column()).append(" = ?");
+        List<Object> bindings = new ArrayList<>();
+        bindings.add(id);
+        Dialect dialect = ctx.dialect(dataSourceName);
+        dialect.paginate(sqlBuilder, bindings, 0L, 1L);
+        return JdbcOperations.query(ctx, dataSourceName, sqlBuilder.toString(), bindings,
+            ResultSet::next,
+            "check existence of " + entityType.getName() + " by id " + id);
     }
 
     @Override
@@ -179,31 +140,16 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             .filter(f -> !f.isId())
             .map(FieldMeta::column)
             .toList();
-        String sql = "INSERT INTO " + qualifiedTable() + " ("
+        String sql = "INSERT INTO " + MetaSupport.qualifiedTable(meta) + " ("
             + String.join(", ", columns)
             + ") VALUES ("
             + columns.stream().map(c -> "?").collect(Collectors.joining(", "))
             + ")";
         Row row = mapper.toRow(entity);
-        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-        try (PreparedStatement ps = conn.prepareStatement(
-                sql, Statement.RETURN_GENERATED_KEYS)) {
-            int i = 1;
-            for (String col : columns) {
-                ps.setObject(i++, row.get(col));
-            }
-            ps.executeUpdate();
-            try (ResultSet genKeys = ps.getGeneratedKeys()) {
-                if (genKeys.next()) {
-                    long generatedId = genKeys.getLong(1);
-                    mapper.setId(entity, generatedId);
-                }
-            }
-        } catch (SQLException e) {
-            throw new HormException("Failed to insert " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
-        }
+        List<Object> bindings = columns.stream().map(row::get).toList();
+        JdbcOperations.insert(ctx, dataSourceName, sql, bindings,
+            generatedId -> mapper.setId(entity, generatedId),
+            "insert " + entityType.getName());
 
         if (cacheEnabled() && runtimeCachePolicy.writeStrategy() != com.holo.framework.horm.cache.WriteStrategy.AROUND) {
             CacheKey key = idKey(mapper.getId(entity));
@@ -228,7 +174,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             .collect(Collectors.joining(", "));
 
         StringBuilder sql = new StringBuilder("UPDATE ")
-            .append(qualifiedTable())
+            .append(MetaSupport.qualifiedTable(meta))
             .append(" SET ");
 
         List<Object> bindings = new ArrayList<>();
@@ -263,25 +209,15 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             bindings.add(mapper.getField(entity, versionField.name()));
         }
 
-        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            int i = 1;
-            for (Object val : bindings) {
-                ps.setObject(i++, val);
-            }
-            int affected = ps.executeUpdate();
-            if (versionField != null && affected == 0) {
-                throw new OptimisticLockException(
-                    "Optimistic lock failed for " + entityType.getName()
-                        + " with id=" + mapper.getId(entity));
-            }
-            if (versionField != null) {
-                mapper.incrementVersion(entity);
-            }
-        } catch (SQLException e) {
-            throw new HormException("Failed to update " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
+        int affected = JdbcOperations.update(ctx, dataSourceName, sql.toString(), bindings,
+            "update " + entityType.getName());
+        if (versionField != null && affected == 0) {
+            throw new OptimisticLockException(
+                "Optimistic lock failed for " + entityType.getName()
+                    + " with id=" + mapper.getId(entity));
+        }
+        if (versionField != null) {
+            mapper.incrementVersion(entity);
         }
 
         if (cacheEnabled()) {
@@ -300,28 +236,16 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         FieldMeta<?> versionField = meta.versionField();
         Object id = mapper.getId(entity);
         if (versionField != null) {
-            StringBuilder sql = new StringBuilder("DELETE FROM ")
-                .append(qualifiedTable())
-                .append(" WHERE ")
-                .append(requireIdField().column())
-                .append(" = ? AND ")
-                .append(versionField.column())
-                .append(" = ?");
-            Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-            try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-                ps.setObject(1, id);
-                ps.setObject(2, mapper.getField(entity, versionField.name()));
-                int affected = ps.executeUpdate();
-                if (affected == 0) {
-                    throw new OptimisticLockException(
-                        "Optimistic lock failed on delete for " + entityType.getName()
-                            + " with id=" + id);
-                }
-            } catch (SQLException e) {
-                throw new HormException(
-                    "Failed to delete " + entityType.getName() + " by id " + id, e);
-            } finally {
-                TransactionManager.releaseConnection(ctx, dataSourceName, conn);
+            String sql = "DELETE FROM " + MetaSupport.qualifiedTable(meta)
+                + " WHERE " + requireIdField().column() + " = ? AND "
+                + versionField.column() + " = ?";
+            List<Object> bindings = List.of(id, mapper.getField(entity, versionField.name()));
+            int affected = JdbcOperations.update(ctx, dataSourceName, sql, bindings,
+                "delete " + entityType.getName() + " by id " + id);
+            if (affected == 0) {
+                throw new OptimisticLockException(
+                    "Optimistic lock failed on delete for " + entityType.getName()
+                        + " with id=" + id);
             }
             invalidateCache(id);
         } else {
@@ -332,18 +256,10 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     @Override
     public void deleteById(Object id) {
         FieldMeta<?> idField = requireIdField();
-        String sql = "DELETE FROM " + qualifiedTable()
+        String sql = "DELETE FROM " + MetaSupport.qualifiedTable(meta)
             + " WHERE " + idField.column() + " = ?";
-        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setObject(1, id);
-            ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new HormException(
-                "Failed to delete " + entityType.getName() + " by id " + id, e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
-        }
+        JdbcOperations.update(ctx, dataSourceName, sql, List.of(id),
+            "delete " + entityType.getName() + " by id " + id);
         invalidateCache(id);
     }
 
@@ -379,28 +295,18 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     private Map<Object, T> dbFindMany(Collection<Object> ids) {
         FieldMeta<?> idField = requireIdField();
         String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(", "));
-        String sql = "SELECT * FROM " + qualifiedTable()
+        String sql = "SELECT * FROM " + MetaSupport.qualifiedTable(meta)
             + " WHERE " + idField.column() + " IN (" + placeholders + ")";
-        Map<Object, T> result = new LinkedHashMap<>();
-        Connection conn = TransactionManager.currentConnection(ctx, dataSourceName);
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            int i = 1;
-            for (Object id : ids) {
-                ps.setObject(i++, id);
-            }
-            try (ResultSet rs = ps.executeQuery()) {
+        return JdbcOperations.query(ctx, dataSourceName, sql, List.copyOf(ids),
+            rs -> {
+                Map<Object, T> result = new LinkedHashMap<>();
                 while (rs.next()) {
-                    T entity = mapper.map(toRow(rs));
+                    T entity = mapper.map(MetaSupport.toRow(rs, meta));
                     result.put(mapper.getId(entity), entity);
                 }
-            }
-        } catch (SQLException e) {
-            throw new HormException(
-                "Failed to findMany " + entityType.getName() + " by ids " + ids, e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, dataSourceName, conn);
-        }
-        return result;
+                return result;
+            },
+            "findMany " + entityType.getName() + " by ids " + ids);
     }
 
     /**
@@ -458,39 +364,6 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         return meta.cached() && ctx.cacheChain() != null;
     }
 
-    /** Converts the meta-module {@link com.holo.framework.horm.meta.CachePolicy} to the cache-module runtime type. */
-    private CachePolicy toRuntimePolicy(com.holo.framework.horm.meta.CachePolicy metaPolicy) {
-        if (metaPolicy == null) {
-            return null;
-        }
-        return CachePolicy.builder()
-            .ttl(metaPolicy.ttl())
-            .evictionPolicy(com.holo.framework.horm.cache.EvictionPolicy.valueOf(metaPolicy.evictionPolicy().name()))
-            .maxEntries(metaPolicy.maxEntries())
-            .maxWeight(metaPolicy.maxWeight())
-            .writeStrategy(com.holo.framework.horm.cache.WriteStrategy.valueOf(metaPolicy.writeStrategy().name()))
-            .nullable(metaPolicy.nullable())
-            .nullTtl(metaPolicy.nullTtl())
-            .build();
-    }
-
-    /** Materializes a {@link Row} from the current cursor position of {@code rs}. */
-    private Row toRow(ResultSet rs) throws SQLException {
-        Row row = Row.create(meta.tableName());
-        for (FieldMeta<?> fd : meta.fields()) {
-            row.set(fd.column(), rs.getObject(fd.column()));
-        }
-        return row;
-    }
-
-    /** Returns {@code schema.tableName} when a schema is set, else {@code tableName}. */
-    private String qualifiedTable() {
-        String schema = meta.schema();
-        return (schema == null || schema.isEmpty())
-            ? meta.tableName()
-            : schema + "." + meta.tableName();
-    }
-
     private FieldMeta<?> requireIdField() {
         FieldMeta<?> idField = meta.idField();
         if (idField == null) {
@@ -498,4 +371,5 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         }
         return idField;
     }
+
 }

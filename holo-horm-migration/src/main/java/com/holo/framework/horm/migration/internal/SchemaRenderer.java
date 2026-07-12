@@ -1,5 +1,9 @@
 package com.holo.framework.horm.migration.internal;
 
+import com.holo.framework.horm.core.dialect.Dialect;
+import com.holo.framework.horm.core.dialect.H2Dialect;
+import com.holo.framework.horm.core.dialect.PostgresDialect;
+
 /**
  * Schema 渲染器 SPI，将 TableDefinition 转换为数据库特定的 DDL SQL。
  */
@@ -101,4 +105,27 @@ public interface SchemaRenderer {
      * @return DDL SQL 片段
      */
     String renderColumnDefinition(ColumnDefinition column);
+
+    /**
+     * 根据方言选择合适的 SchemaRenderer 实现。
+     *
+     * <p>选择逻辑：
+     * <ul>
+     *   <li>PostgresDialect -> PostgresSchemaRenderer</li>
+     *   <li>H2Dialect (PostgreSQL 模式) -> PostgresSchemaRenderer</li>
+     *   <li>其他 -> MySQLSchemaRenderer (默认)</li>
+     * </ul>
+     *
+     * @param dialect 数据库方言
+     * @return 对应的 SchemaRenderer 实例
+     */
+    static SchemaRenderer forDialect(Dialect dialect) {
+        if (dialect instanceof PostgresDialect) {
+            return new PostgresSchemaRenderer();
+        }
+        if (dialect instanceof H2Dialect h2 && h2.isPostgresqlMode()) {
+            return new PostgresSchemaRenderer();
+        }
+        return new MySQLSchemaRenderer();
+    }
 }

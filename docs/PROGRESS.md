@@ -17,9 +17,10 @@
 | M6     | ✅ 完成 | 2026-07-06     | v1.0.0-M6  |
 | M7     | ✅ 完成 | 2026-07-06     | v1.0.0-M7  |
 | M8     | ✅ 完成 | 2026-07-06     | v1.0.0-M8  |
+| M8.5   | ✅ 完成 | 2026-07-11     | —          |
 | M9     | 📋 规划中 | —              | —          |
 
-**当前分支**：`feature/m8-starter`（M8 完成后待 squash merge 到 `main`）
+**当前分支**：`feature/m8.5-dialect`（M8.5 已完成，待 squash merge 到 `main`）
 
 ---
 
@@ -449,10 +450,66 @@
 
 ---
 
+## M8.5: 数据库方言适配（MySQL/PostgreSQL/H2）（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | 状态 |
+|--------|------|------|
+| D1 | `Dialect` 接口 + `IdentityStrategy` + `BatchInsertSyntax` 枚举 | ✅ 完成 |
+| D2 | `MySqlDialect` 实现（默认方言） | ✅ 完成 |
+| D3 | `PostgresDialect` 实现 | ✅ 完成 |
+| D4 | `H2Dialect` 实现（MySQL/PostgreSQL 兼容模式） | ✅ 完成 |
+| D5 | `DialectDetector` JDBC URL 自动检测 | ✅ 完成 |
+| D6 | `HormContext` 增加 Dialect 映射 | ✅ 完成 |
+| D7 | `QueryImpl` 分页改用 `Dialect.paginate()` | ✅ 完成 |
+| D8 | `JdbcRepository` exists/save 改用 `Dialect` | ✅ 完成 |
+| D9 | `UpdateQueryImpl`/`DeleteQueryImpl` 分页改用 `Dialect` | ✅ 完成 |
+| D10 | `SchemaRenderer` 对齐 `Dialect` 接口 | ✅ 完成 |
+| D11 | `PostgresSchemaRenderer` 实现 | ✅ 完成 |
+| D12 | `H2SchemaRenderer` 支持 PostgreSQL 模式 | ✅ 完成 |
+| D13 | Starter 多数据源 Dialect 自动检测 | ✅ 完成 |
+| D14 | Starter 默认数据源 Dialect 自动检测 | ✅ 完成 |
+| D15 | `DialectTest` — 各方言方法单元测试 | ✅ 完成 |
+| D16 | `DialectDetectorTest` — URL 检测测试 | ✅ 完成 |
+| D17 | H2 MODE=PostgreSQL 集成测试 | ✅ 完成 |
+| D18 | 现有测试回归验证 | ✅ 完成 |
+
+### 分批实施计划
+
+#### 批次 A：Dialect SPI + MySQL/H2（D1-D5, D16, D18）
+
+建立 Dialect 体系，现有功能零回归。
+
+#### 批次 B：核心模块改造 + PostgreSQL 方言（D3, D6-D9, D15, D17）
+
+JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
+
+#### 批次 C：迁移模块 + Starter 集成（D10-D14）
+
+迁移渲染器统一到 Dialect 体系，Spring Boot 自动检测。
+
+### 关键设计决策
+
+1. **Dialect 位于 core 模块**：`com.holo.framework.horm.core.dialect` 包，JdbcRepository/QueryImpl 直接消费，migration 模块通过 core 依赖获取类型映射
+2. **默认 Dialect 为 MySQL**：与现有 H2 MODE=MySQL 测试行为一致，零回归
+3. **Dialect.paginate() 签名含 bindings**：Oracle 方言的 `OFFSET ? ROWS FETCH NEXT ? ROWS ONLY` 需要绑定参数，且参数顺序与 MySQL 不同
+4. **JDBC URL 自动检测 + 显式配置**：优先从 URL 检测，支持 `spring.datasource.<name>.dialect` 手动覆盖
+5. **H2 双模式**：H2 支持 MySQL 和 PostgreSQL 兼容模式，`DialectDetector` 解析 `MODE=` 参数
+6. **SchemaRenderer 保留独立**：Dialect 提供 SQL 类型映射和标识符引用，SchemaRenderer 专注 DDL 语法差异，两者协作但不合并
+7. **Oracle/SQLite 仅定义接口**：M8.5 不实现 Oracle/SQLite 方言，但 Dialect 接口设计需预留扩展点
+
+### 设计文档
+
+详见 [docs/08-dialect-adaptation.md](./08-dialect-adaptation.md)
+
+---
+
 ## 后续里程碑概览
 
 | 里程碑 | 主题 | 预计 |
 |--------|------|------|
+| M8.5 | 数据库方言适配（MySQL/PostgreSQL/H2） | 2026 Q3 |
 | M9 | 性能基准与 GA 发布 | 2027 Q1-Q2 |
 
 ---

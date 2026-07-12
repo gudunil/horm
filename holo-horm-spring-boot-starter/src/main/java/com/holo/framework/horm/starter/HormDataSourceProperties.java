@@ -71,6 +71,14 @@ public class HormDataSourceProperties {
          */
         private String driverClassName;
 
+        /**
+         * 方言覆盖。可选值："mysql"、"postgresql" 等。
+         *
+         * <p>当设置此值时，将覆盖从 JDBC URL 自动检测到的方言。
+         * 当未设置时，系统将从 JDBC URL 自动检测方言。
+         */
+        private String dialect;
+
         public String getUrl() {
             return url;
         }
@@ -101,6 +109,14 @@ public class HormDataSourceProperties {
 
         public void setDriverClassName(String driverClassName) {
             this.driverClassName = driverClassName;
+        }
+
+        public String getDialect() {
+            return dialect;
+        }
+
+        public void setDialect(String dialect) {
+            this.dialect = dialect;
         }
     }
 }

@@ -189,13 +189,7 @@ public final class TransactionManager {
                 cleanup(status);
             }
             // Run afterCommit callbacks (swallow exceptions); discard afterRollback.
-            for (Runnable r : status.consumeAfterCommitCallbacks()) {
-                try {
-                    r.run();
-                } catch (Throwable t) {
-                    System.err.println("[HORM] afterCommit callback threw: " + t);
-                }
-            }
+            runCallbacks(status.consumeAfterCommitCallbacks(), "afterCommit");
             status.consumeAfterRollbackCallbacks();
         }
     }
@@ -221,13 +215,7 @@ public final class TransactionManager {
                 cleanup(status);
             }
             // Run afterRollback callbacks (swallow exceptions); discard afterCommit.
-            for (Runnable r : status.consumeAfterRollbackCallbacks()) {
-                try {
-                    r.run();
-                } catch (Throwable t) {
-                    System.err.println("[HORM] afterRollback callback threw: " + t);
-                }
-            }
+            runCallbacks(status.consumeAfterRollbackCallbacks(), "afterRollback");
             status.consumeAfterCommitCallbacks();
         }
     }
@@ -441,6 +429,16 @@ public final class TransactionManager {
     }
 
     // --- Internal helpers ---
+
+    private static void runCallbacks(Iterable<Runnable> callbacks, String type) {
+        for (Runnable r : callbacks) {
+            try {
+                r.run();
+            } catch (Throwable t) {
+                System.err.println("[HORM] " + type + " callback threw: " + t);
+            }
+        }
+    }
 
     private static Connection newConnection(DataSourceProvider provider, TransactionDefinition def) {
         try {

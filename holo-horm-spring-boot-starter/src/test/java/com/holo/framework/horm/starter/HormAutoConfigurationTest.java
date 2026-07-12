@@ -2,8 +2,10 @@ package com.holo.framework.horm.starter;
 
 import com.holo.framework.horm.core.DataSourceProvider;
 import com.holo.framework.horm.core.HormContext;
+import com.holo.framework.horm.core.dialect.Dialect;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,7 +23,14 @@ import static org.mockito.Mockito.*;
 class HormAutoConfigurationTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
-        .withConfiguration(AutoConfigurations.of(HormAutoConfiguration.class));
+        .withConfiguration(AutoConfigurations.of(HormAutoConfiguration.class))
+        .withBean(DataSourceProperties.class, () -> {
+            DataSourceProperties props = new DataSourceProperties();
+            props.setUrl("jdbc:h2:mem:test");
+            props.setUsername("sa");
+            props.setPassword("");
+            return props;
+        });
 
     @Test
     void autoConfigurationCreatesHormContext() {
@@ -99,6 +108,78 @@ class HormAutoConfigurationTest {
                 HormContext ctx = context.getBean(HormContext.class);
                 // Should not throw exception
                 ctx.dataSourceProvider().releaseConnection(null);
+            });
+    }
+
+    @Test
+    void dialectAutoDetectedFromH2Url() {
+        DataSource mockDataSource = mock(DataSource.class);
+
+        new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(HormAutoConfiguration.class))
+            .withBean(DataSource.class, () -> mockDataSource)
+            .withBean(DataSourceProperties.class, () -> {
+                DataSourceProperties props = new DataSourceProperties();
+                props.setUrl("jdbc:h2:mem:test;MODE=MySQL");
+                return props;
+            })
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                Dialect dialect = ctx.dialect("default");
+                assertThat(dialect.name()).isEqualTo("h2");
+            });
+    }
+
+    @Test
+    void dialectAutoDetectedFromMysqlUrl() {
+        DataSource mockDataSource = mock(DataSource.class);
+
+        new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(HormAutoConfiguration.class))
+            .withBean(DataSource.class, () -> mockDataSource)
+            .withBean(DataSourceProperties.class, () -> {
+                DataSourceProperties props = new DataSourceProperties();
+                props.setUrl("jdbc:mysql://localhost:3306/mydb");
+                return props;
+            })
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                Dialect dialect = ctx.dialect("default");
+                assertThat(dialect.name()).isEqualTo("mysql");
+            });
+    }
+
+    @Test
+    void dialectAutoDetectedFromPostgresqlUrl() {
+        DataSource mockDataSource = mock(DataSource.class);
+
+        new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(HormAutoConfiguration.class))
+            .withBean(DataSource.class, () -> mockDataSource)
+            .withBean(DataSourceProperties.class, () -> {
+                DataSourceProperties props = new DataSourceProperties();
+                props.setUrl("jdbc:postgresql://localhost:5432/mydb");
+                return props;
+            })
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                Dialect dialect = ctx.dialect("default");
+                assertThat(dialect.name()).isEqualTo("postgresql");
+            });
+    }
+
+    @Test
+    void dialectDefaultsToMySqlWhenUrlIsNull() {
+        DataSource mockDataSource = mock(DataSource.class);
+
+        new ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(HormAutoConfiguration.class))
+            .withBean(DataSource.class, () -> mockDataSource)
+            .withBean(DataSourceProperties.class, DataSourceProperties::new)
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                Dialect dialect = ctx.dialect("default");
+                assertThat(dialect.name()).isEqualTo("mysql");
             });
     }
 

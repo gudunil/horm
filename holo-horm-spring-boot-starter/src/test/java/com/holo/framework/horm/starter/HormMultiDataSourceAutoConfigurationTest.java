@@ -3,6 +3,7 @@ package com.holo.framework.horm.starter;
 import com.holo.framework.horm.core.DataSourceProvider;
 import com.holo.framework.horm.core.HormContext;
 import com.holo.framework.horm.core.datasource.DataSourceRegistry;
+import com.holo.framework.horm.core.dialect.Dialect;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -174,6 +175,101 @@ class HormMultiDataSourceAutoConfigurationTest {
 
                 // 释放 null 连接不应该抛出异常
                 provider.releaseConnection(null);
+            });
+    }
+
+    // --- 方言自动检测测试 ---
+
+    @Test
+    void dialectAutoDetectedFromH2Url() {
+        contextRunner
+            .withPropertyValues(
+                "spring.datasource.datasources.primary.url=jdbc:h2:mem:testdb",
+                "spring.datasource.datasources.primary.username=sa",
+                "spring.datasource.datasources.primary.password="
+            )
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                Dialect dialect = ctx.dialect("primary");
+                assertThat(dialect.name()).isEqualTo("h2");
+            });
+    }
+
+    @Test
+    void dialectAutoDetectedFromMysqlUrl() {
+        contextRunner
+            .withPropertyValues(
+                "spring.datasource.datasources.primary.url=jdbc:mysql://localhost:3306/db",
+                "spring.datasource.datasources.primary.username=root",
+                "spring.datasource.datasources.primary.password=secret"
+            )
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                Dialect dialect = ctx.dialect("primary");
+                assertThat(dialect.name()).isEqualTo("mysql");
+            });
+    }
+
+    @Test
+    void dialectAutoDetectedFromPostgresqlUrl() {
+        contextRunner
+            .withPropertyValues(
+                "spring.datasource.datasources.primary.url=jdbc:postgresql://localhost:5432/db",
+                "spring.datasource.datasources.primary.username=postgres",
+                "spring.datasource.datasources.primary.password=secret"
+            )
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                Dialect dialect = ctx.dialect("primary");
+                assertThat(dialect.name()).isEqualTo("postgresql");
+            });
+    }
+
+    @Test
+    void dialectManualOverrideViaProperty() {
+        contextRunner
+            .withPropertyValues(
+                "spring.datasource.datasources.primary.url=jdbc:h2:mem:testdb",
+                "spring.datasource.datasources.primary.username=sa",
+                "spring.datasource.datasources.primary.password=",
+                "spring.datasource.datasources.primary.dialect=postgresql"
+            )
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                Dialect dialect = ctx.dialect("primary");
+                // 手动覆盖应优先于 URL 自动检测
+                assertThat(dialect.name()).isEqualTo("postgresql");
+            });
+    }
+
+    @Test
+    void dialectDefaultsToMySqlWhenUrlIsBlank() {
+        contextRunner
+            .withPropertyValues(
+                "spring.datasource.datasources.primary.username=sa",
+                "spring.datasource.datasources.primary.password="
+            )
+            .run(context -> {
+                DataSourceRegistry registry = context.getBean(DataSourceRegistry.class);
+                assertThat(registry.hasDefault()).isTrue();
+            });
+    }
+
+    @Test
+    void multipleDatasourcesWithDifferentDialects() {
+        contextRunner
+            .withPropertyValues(
+                "spring.datasource.datasources.primary.url=jdbc:mysql://localhost:3306/db1",
+                "spring.datasource.datasources.primary.username=root",
+                "spring.datasource.datasources.primary.password=",
+                "spring.datasource.datasources.secondary.url=jdbc:postgresql://localhost:5432/db2",
+                "spring.datasource.datasources.secondary.username=postgres",
+                "spring.datasource.datasources.secondary.password="
+            )
+            .run(context -> {
+                HormContext ctx = context.getBean(HormContext.class);
+                assertThat(ctx.dialect("primary").name()).isEqualTo("mysql");
+                assertThat(ctx.dialect("secondary").name()).isEqualTo("postgresql");
             });
     }
 

@@ -76,4 +76,29 @@ class HormDataSourcePropertiesTest {
         assertThat(properties.getDatasources()).hasSize(2);
         assertThat(properties.getDatasources()).containsKeys("primary", "secondary");
     }
+
+    @Test
+    void dataSourceConfigDialectGetterAndSetter() {
+        HormDataSourceProperties.DataSourceConfig config = new HormDataSourceProperties.DataSourceConfig();
+        assertThat(config.getDialect()).isNull();
+
+        config.setDialect("postgresql");
+        assertThat(config.getDialect()).isEqualTo("postgresql");
+    }
+
+    @Test
+    void dataSourceConfigWithDialectOverride() {
+        HormDataSourceProperties properties = new HormDataSourceProperties();
+        Map<String, HormDataSourceProperties.DataSourceConfig> datasources = new HashMap<>();
+
+        HormDataSourceProperties.DataSourceConfig config = new HormDataSourceProperties.DataSourceConfig();
+        config.setUrl("jdbc:h2:mem:test");
+        config.setDialect("postgresql");
+
+        datasources.put("primary", config);
+        properties.setDatasources(datasources);
+
+        HormDataSourceProperties.DataSourceConfig retrieved = properties.getDatasources().get("primary");
+        assertThat(retrieved.getDialect()).isEqualTo("postgresql");
+    }
 }

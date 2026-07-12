@@ -72,14 +72,10 @@ public final class EntityMetaRegistry {
     private static void loadIndexFromUrl(URL url, ClassLoader loader) {
         try (InputStream in = url.openStream();
              BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                String trimmed = line.trim();
-                if (trimmed.isEmpty() || trimmed.startsWith("#")) {
-                    continue;
-                }
-                registerByMetaClassName(trimmed, loader);
-            }
+            reader.lines()
+                .map(String::trim)
+                .filter(line -> !line.isEmpty() && !line.startsWith("#"))
+                .forEach(line -> registerByMetaClassName(line, loader));
         } catch (Exception e) {
             System.err.println("[HORM] Failed to read entity index " + url + ": " + e);
         }
