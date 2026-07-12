@@ -3,31 +3,25 @@ package com.holo.framework.horm.core.instrument;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.List;
-import java.util.Map;
 
 import com.holo.framework.horm.core.Model;
-import com.holo.framework.horm.core.query.Query;
-import com.holo.framework.horm.core.query.UpdateQuery;
 import com.holo.framework.horm.meta.annotation.Entity;
 
 import net.bytebuddy.build.Plugin;
-import net.bytebuddy.description.modifier.Ownership;
-import net.bytebuddy.description.modifier.Visibility;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.ClassFileLocator;
 import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.implementation.MethodCall;
 import net.bytebuddy.implementation.bytecode.assign.Assigner;
+import net.bytebuddy.matcher.ElementMatchers;
 
 /**
- * ByteBuddy build-time plugin that injects type-safe Active Record static
- * helpers directly into the bytecode of every class annotated with
- * {@link Entity}.
+ * ByteBuddy build-time plugin that rewrites the generic static helpers declared
+ * in {@link Model} into type-safe, entity-specific static methods on every
+ * class annotated with {@link Entity}.
  *
- * <p>The Java source files are left untouched. For example, after
- * transformation the bytecode of {@code User} contains:
+ * <p>For example, after transformation the bytecode of {@code User} contains:
  * <pre>
  * public static User find(Object id) {
  *     return Model.find(User.class, id);
@@ -95,50 +89,15 @@ public class HormModelPlugin implements Plugin {
         Implementation implementation = call
                 .withAssigner(Assigner.DEFAULT, Assigner.Typing.DYNAMIC);
 
-        TypeDescription.Generic returnType = resolveReturnType(entityType, helperName);
-
-        DynamicType.Builder.MethodDefinition.ParameterDefinition<?> def = builder
-                .defineMethod(helperName, returnType, Visibility.PUBLIC, Ownership.STATIC);
-        for (int i = 0; i < helperArgTypes.length; i++) {
-            def = def.withParameter(helperArgTypes[i], "arg" + i);
+        if (helperArgTypes.length == 0) {
+            return builder.method(ElementMatchers.named(helperName)
+                            .and(ElementMatchers.isStatic())
+                            .and(ElementMatchers.takesArguments(0)))
+                    .intercept(implementation);
         }
-        return def.intercept(implementation);
-    }
-
-    private static TypeDescription.Generic resolveReturnType(TypeDescription entityType,
-                                                             String helperName) {
-        return switch (helperName) {
-            case "find" -> TypeDescription.Generic.Builder
-                    .parameterizedType(entityType.asErasure(), new TypeDescription[0])
-                    .build();
-            case "findMany" -> {
-                TypeDescription map = TypeDescription.ForLoadedType.of(Map.class);
-                TypeDescription object = TypeDescription.ForLoadedType.of(Object.class);
-                yield TypeDescription.Generic.Builder
-                        .parameterizedType(map, object, entityType.asErasure())
-                        .build();
-            }
-            case "all" -> {
-                TypeDescription list = TypeDescription.ForLoadedType.of(List.class);
-                yield TypeDescription.Generic.Builder
-                        .parameterizedType(list, entityType.asErasure())
-                        .build();
-            }
-            case "count" -> TypeDescription.Generic.Builder.rawType(long.class).build();
-            case "query" -> {
-                TypeDescription query = TypeDescription.ForLoadedType.of(Query.class);
-                yield TypeDescription.Generic.Builder
-                        .parameterizedType(query, entityType.asErasure())
-                        .build();
-            }
-            case "update" -> {
-                TypeDescription updateQuery = TypeDescription.ForLoadedType.of(UpdateQuery.class);
-                yield TypeDescription.Generic.Builder
-                        .parameterizedType(updateQuery, entityType.asErasure())
-                        .build();
-            }
-            default -> throw new IllegalArgumentException(
-                    "Unknown Active Record helper: " + helperName);
-        };
+        return builder.method(ElementMatchers.named(helperName)
+                        .and(ElementMatchers.isStatic())
+                        .and(ElementMatchers.takesArguments(helperArgTypes)))
+                .intercept(implementation);
     }
 }

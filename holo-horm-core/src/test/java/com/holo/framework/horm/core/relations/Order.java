@@ -1,9 +1,13 @@
 package com.holo.framework.horm.core.relations;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import com.holo.framework.horm.core.Model;
+import com.holo.framework.horm.core.query.Query;
+import com.holo.framework.horm.core.query.UpdateQuery;
 import com.holo.framework.horm.meta.annotation.BelongsTo;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
@@ -56,4 +60,29 @@ public class Order extends Model<Order> {
 
     public List<UserWithRelations> getParentUsers() { return parentUsers; }
     public void setParentUsers(List<UserWithRelations> parentUsers) { this.parentUsers = parentUsers; }
+
+    public static Order find(Object id) {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static Map<Object, Order> findMany(Collection<?> ids) {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static List<Order> all() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static long count() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static Query<Order> query() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static UpdateQuery<Order> update() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
 }

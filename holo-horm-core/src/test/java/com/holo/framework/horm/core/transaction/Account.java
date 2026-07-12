@@ -1,8 +1,13 @@
 package com.holo.framework.horm.core.transaction;
 
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
 import com.holo.framework.horm.core.Model;
+import com.holo.framework.horm.core.query.Query;
+import com.holo.framework.horm.core.query.UpdateQuery;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
 import com.holo.framework.horm.meta.annotation.GenerationType;
@@ -32,4 +37,29 @@ public class Account extends Model<Account> {
 
     public BigDecimal getBalance() { return balance; }
     public void setBalance(BigDecimal balance) { this.balance = balance; }
+
+    public static Account find(Object id) {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static Map<Object, Account> findMany(Collection<?> ids) {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static List<Account> all() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static long count() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static Query<Account> query() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static UpdateQuery<Account> update() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
 }

@@ -78,7 +78,7 @@ class UserCrudTest {
         user.setCreatedAt(Instant.parse("2026-07-04T10:00:00Z"));
         user.save();
 
-        User found = User.find(User.class, user.getId());
+        User found = User.find(user.getId());
 
         assertThat(found).isNotNull();
         assertThat(found.getEmail()).isEqualTo("find@b.com");
@@ -87,7 +87,7 @@ class UserCrudTest {
 
     @Test
     void findByIdReturnsNullWhenNotFound() {
-        User found = User.find(User.class, 999_999L);
+        User found = User.find(999_999L);
 
         assertThat(found).isNull();
     }
@@ -102,7 +102,7 @@ class UserCrudTest {
         u2.setEmail("all2@b.com");
         u2.save();
 
-        List<User> all = User.all(User.class);
+        List<User> all = User.all();
 
         assertThat(all.size()).isGreaterThanOrEqualTo(2);
         assertThat(all).extracting(User::getEmail).contains("all1@b.com", "all2@b.com");
@@ -117,13 +117,13 @@ class UserCrudTest {
 
         user.delete();
 
-        User found = User.find(User.class, id);
+        User found = User.find(id);
         assertThat(found).isNull();
     }
 
     @Test
     void countReturnsCorrectNumber() {
-        long before = User.count(User.class);
+        long before = User.count();
 
         User u = new User();
         u.setEmail("count@b.com");

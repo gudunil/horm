@@ -109,6 +109,21 @@
 
   <build>
     <plugins>
+      <!-- Generate Active Record static method signatures into @Entity source files
+                 before compilation; ByteBuddy then fills in the implementations. -->
+      <plugin>
+        <groupId>com.holo.framework</groupId>
+        <artifactId>holo-horm-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>generate-active-record-signatures</id>
+            <goals>
+              <goal>generate-active-record</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
