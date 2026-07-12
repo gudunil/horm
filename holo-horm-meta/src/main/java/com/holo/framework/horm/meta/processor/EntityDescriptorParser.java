@@ -2,9 +2,12 @@ package com.holo.framework.horm.meta.processor;
 
 import com.holo.framework.horm.meta.RelationType;
 import com.holo.framework.horm.meta.annotation.BelongsTo;
+import com.holo.framework.horm.meta.annotation.CacheLevel;
 import com.holo.framework.horm.meta.annotation.CascadeType;
+import com.holo.framework.horm.meta.annotation.Cached;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
+import com.holo.framework.horm.meta.annotation.EvictionPolicy;
 import com.holo.framework.horm.meta.annotation.GeneratedValue;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
@@ -14,10 +17,14 @@ import com.holo.framework.horm.meta.annotation.HasOne;
 import com.holo.framework.horm.meta.annotation.Id;
 import com.holo.framework.horm.meta.annotation.Table;
 import com.holo.framework.horm.meta.annotation.Version;
+import com.holo.framework.horm.meta.annotation.WriteStrategy;
 
 import javax.annotation.processing.ProcessingEnvironment;
+import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
@@ -26,6 +33,8 @@ import javax.lang.model.type.MirroredTypeException;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Supplier;
 
@@ -125,6 +134,8 @@ public final class EntityDescriptorParser {
             }
         }
 
+        parseCached(type, builder);
+
         return builder.build();
     }
 
@@ -189,6 +200,158 @@ public final class EntityDescriptorParser {
             enumType,
             enumQualifiedName,
             isVersionField
+        );
+    }
+
+    /**
+     * Parse the {@code @Cached} annotation (and its nested {@code @CachePolicy})
+     * from the entity type, populating the {@code cached}/{@code cachePolicy}/
+     * {@code cacheLevels} fields on the descriptor builder.
+     *
+     * <p>When {@code @Cached} is absent or {@code enabled=false}, the builder
+     * defaults apply ({@code cached=false}, {@code cachePolicy=null},
+     * {@code cacheLevels=empty}). When present and enabled, a
+     * {@link EntityDescriptor.CachePolicyDescriptor} is built from the nested
+     * {@code @CachePolicy} annotation, carrying the raw TTL strings for the
+     * validator (R12) and the code generator to parse.
+     *
+     * <p>TTL strings are intentionally <em>not</em> parsed here — the parser
+     * remains permissive so that an invalid TTL on one entity does not block
+     * processing of sibling entities. R12 validation in {@link EntityValidator}
+     * reports the compile error.
+     *
+     * <p>The annotation is read via {@link AnnotationMirror} rather than
+     * {@link TypeElement#getAnnotation(Class)} because direct invocation of
+     * {@code Cached.policy()} triggers a JVM-level type mismatch on the nested
+     * {@code @CachePolicy} annotation (the APT mirror representation cannot be
+     * coerced to the reflective {@code CachePolicy} proxy). Walking the mirror
+     * tree avoids that class-loading boundary entirely.
+     */
+    static void parseCached(TypeElement type, EntityDescriptor.Builder builder) {
+        AnnotationMirror cachedMirror = findAnnotation(type, Cached.class.getName());
+        if (cachedMirror == null) {
+            return;
+        }
+
+        // Defaults from @Cached (applied when an attribute is not explicitly set).
+        boolean enabled = true;
+        CacheLevel[] levels = {CacheLevel.L1};
+        AnnotationMirror policyMirror = null;
+
+        // getElementValues() returns only explicitly-set attributes; missing
+        // entries keep the annotation's default value.
+        for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry
+                : cachedMirror.getElementValues().entrySet()) {
+            String attrName = entry.getKey().getSimpleName().toString();
+            Object value = entry.getValue().getValue();
+            switch (attrName) {
+                case "enabled":
+                    enabled = (Boolean) value;
+                    break;
+                case "levels":
+                    levels = extractLevels(value);
+                    break;
+                case "policy":
+                    policyMirror = (AnnotationMirror) value;
+                    break;
+                default:
+                    break;
+            }
+        }
+
+        if (!enabled) {
+            return;
+        }
+
+        EntityDescriptor.CachePolicyDescriptor policyDescriptor = extractPolicyDescriptor(policyMirror);
+
+        builder.cached(true)
+            .cachePolicy(policyDescriptor)
+            .cacheLevels(levels);
+    }
+
+    /**
+     * Locate an annotation mirror by its fully-qualified type name on the
+     * given element. Returns {@code null} when the annotation is absent.
+     */
+    private static AnnotationMirror findAnnotation(Element element, String annotationFqn) {
+        for (AnnotationMirror m : element.getAnnotationMirrors()) {
+            if (annotationFqn.equals(m.getAnnotationType().toString())) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Convert the {@code levels} attribute value (a {@code List<? extends
+     * AnnotationValue>} whose entries wrap enum constants) into a
+     * {@link CacheLevel} array.
+     */
+    @SuppressWarnings("unchecked")
+    private static CacheLevel[] extractLevels(Object value) {
+        List<? extends AnnotationValue> list = (List<? extends AnnotationValue>) value;
+        CacheLevel[] result = new CacheLevel[list.size()];
+        for (int i = 0; i < list.size(); i++) {
+            Object v = list.get(i).getValue();
+            // For an enum constant, the AnnotationValue wraps a VariableElement.
+            String enumName = ((VariableElement) v).getSimpleName().toString();
+            result[i] = CacheLevel.valueOf(enumName);
+        }
+        return result;
+    }
+
+    /**
+     * Build a {@link EntityDescriptor.CachePolicyDescriptor} from the nested
+     * {@code @CachePolicy} mirror. When {@code policyMirror} is {@code null}
+     * (the user wrote bare {@code @Cached} without {@code policy = ...}), all
+     * defaults from {@link com.holo.framework.horm.meta.annotation.CachePolicy}
+     * are applied. When non-null, only the attributes explicitly set by the
+     * user override the defaults.
+     */
+    private static EntityDescriptor.CachePolicyDescriptor extractPolicyDescriptor(AnnotationMirror policyMirror) {
+        // Defaults from @CachePolicy annotation declaration
+        String ttl = "30m";
+        EvictionPolicy eviction = EvictionPolicy.LRU;
+        int maxEntries = 10000;
+        WriteStrategy writeStrategy = WriteStrategy.AROUND;
+        boolean nullable = true;
+        String nullTtl = "1m";
+
+        if (policyMirror != null) {
+            for (Map.Entry<? extends ExecutableElement, ? extends AnnotationValue> entry
+                    : policyMirror.getElementValues().entrySet()) {
+                String attrName = entry.getKey().getSimpleName().toString();
+                Object value = entry.getValue().getValue();
+                switch (attrName) {
+                    case "ttl":
+                        ttl = (String) value;
+                        break;
+                    case "eviction":
+                        eviction = EvictionPolicy.valueOf(
+                            ((VariableElement) value).getSimpleName().toString());
+                        break;
+                    case "maxEntries":
+                        maxEntries = (Integer) value;
+                        break;
+                    case "writeStrategy":
+                        writeStrategy = WriteStrategy.valueOf(
+                            ((VariableElement) value).getSimpleName().toString());
+                        break;
+                    case "nullable":
+                        nullable = (Boolean) value;
+                        break;
+                    case "nullTtl":
+                        nullTtl = (String) value;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+
+        return new EntityDescriptor.CachePolicyDescriptor(
+            ttl, eviction, maxEntries, writeStrategy, nullable, nullTtl
         );
     }
 
@@ -345,6 +508,47 @@ public final class EntityDescriptorParser {
             return s;
         }
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    /**
+     * Parse a TTL duration string into a {@link java.time.Duration}.
+     *
+     * <p>Accepts two forms:
+     * <ul>
+     *   <li>ISO-8601 period format (e.g. {@code "PT30M"}, {@code "PT1H30M"}) —
+     *       parsed via {@link java.time.Duration#parse}.</li>
+     *   <li>Simplified {@code "<number><unit>"} form where unit is one of
+     *       {@code s}/{@code m}/{@code h}/{@code d} (seconds/minutes/hours/days).
+     *       Examples: {@code "30m"}, {@code "2h"}, {@code "1d"}, {@code "45s"}.</li>
+     * </ul>
+     *
+     * @throws IllegalArgumentException if the string is null, empty, or does not
+     *         match either form
+     */
+    static java.time.Duration parseDuration(String s) {
+        if (s == null || s.isEmpty()) {
+            throw new IllegalArgumentException("duration string is null or empty");
+        }
+        // ISO-8601 form starts with 'P' (e.g. "PT30M", "P1DT2H")
+        if (s.charAt(0) == 'P') {
+            return java.time.Duration.parse(s);
+        }
+        // Simplified "<n><unit>" form
+        char unit = s.charAt(s.length() - 1);
+        String numStr = s.substring(0, s.length() - 1);
+        long num;
+        try {
+            num = Long.parseLong(numStr);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("invalid duration: " + s);
+        }
+        switch (unit) {
+            case 's': return java.time.Duration.ofSeconds(num);
+            case 'm': return java.time.Duration.ofMinutes(num);
+            case 'h': return java.time.Duration.ofHours(num);
+            case 'd': return java.time.Duration.ofDays(num);
+            default: throw new IllegalArgumentException("invalid duration unit: " + unit);
+        }
     }
 
     private static String firstNonEmpty(String... values) {

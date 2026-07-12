@@ -1,8 +1,11 @@
 package com.holo.framework.horm.meta.processor;
 
 import com.holo.framework.horm.meta.RelationType;
+import com.holo.framework.horm.meta.annotation.CacheLevel;
 import com.holo.framework.horm.meta.annotation.CascadeType;
+import com.holo.framework.horm.meta.annotation.EvictionPolicy;
 import com.holo.framework.horm.meta.annotation.GenerationType;
+import com.holo.framework.horm.meta.annotation.WriteStrategy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +29,9 @@ public final class EntityDescriptor {
     private final List<FieldDescriptor> fields;
     private final FieldDescriptor idField;
     private final List<RelationDescriptor> relations;
+    private final boolean cached;
+    private final CachePolicyDescriptor cachePolicy;
+    private final CacheLevel[] cacheLevels;
 
     private EntityDescriptor(Builder b) {
         this.packageName = b.packageName;
@@ -37,6 +43,9 @@ public final class EntityDescriptor {
         this.fields = List.copyOf(b.fields);
         this.idField = b.idField;
         this.relations = List.copyOf(b.relations);
+        this.cached = b.cached;
+        this.cachePolicy = b.cachePolicy;
+        this.cacheLevels = b.cacheLevels == null ? new CacheLevel[0] : b.cacheLevels.clone();
     }
 
     public String packageName() { return packageName; }
@@ -48,6 +57,9 @@ public final class EntityDescriptor {
     public List<FieldDescriptor> fields() { return fields; }
     public FieldDescriptor idField() { return idField; }
     public List<RelationDescriptor> relations() { return relations; }
+    public boolean cached() { return cached; }
+    public CachePolicyDescriptor cachePolicy() { return cachePolicy; }
+    public CacheLevel[] cacheLevels() { return cacheLevels.clone(); }
 
     /** Package where generated companion classes (XxxMeta, XxxMapper) are written. */
     public String generatedPackage() {
@@ -66,6 +78,9 @@ public final class EntityDescriptor {
         private final List<FieldDescriptor> fields = new ArrayList<>();
         private final List<RelationDescriptor> relations = new ArrayList<>();
         private FieldDescriptor idField;
+        private boolean cached;
+        private CachePolicyDescriptor cachePolicy;
+        private CacheLevel[] cacheLevels;
 
         public Builder packageName(String v) { this.packageName = v; return this; }
         public Builder simpleName(String v) { this.simpleName = v; return this; }
@@ -81,6 +96,9 @@ public final class EntityDescriptor {
             return this;
         }
         public Builder idField(FieldDescriptor f) { this.idField = f; return this; }
+        public Builder cached(boolean v) { this.cached = v; return this; }
+        public Builder cachePolicy(CachePolicyDescriptor v) { this.cachePolicy = v; return this; }
+        public Builder cacheLevels(CacheLevel[] v) { this.cacheLevels = v; return this; }
 
         public EntityDescriptor build() { return new EntityDescriptor(this); }
     }
@@ -220,5 +238,48 @@ public final class EntityDescriptor {
         public String getterName() { return getterName; }
         public String setterName() { return setterName; }
         public CascadeType[] cascadeTypes() { return cascadeTypes; }
+    }
+
+    /**
+     * Intermediate representation of a {@code @CachePolicy} annotation, storing
+     * the raw annotation values. TTL strings are kept as-is; parsing to
+     * {@link java.time.Duration} happens in {@link EntityValidator} (R12) and
+     * in {@link MetaClassBuilder} when emitting the {@code CACHE_POLICY}
+     * constant.
+     *
+     * <p>Storing raw strings (rather than pre-parsed {@code Duration} objects)
+     * keeps the descriptor robust against invalid TTL values: the parser
+     * remains permissive and the validator reports R12 errors, while the
+     * builder can fall back to defaults when generating code for an entity
+     * that will fail compilation anyway.
+     */
+    public static final class CachePolicyDescriptor {
+        private final String ttl;
+        private final EvictionPolicy eviction;
+        private final int maxEntries;
+        private final WriteStrategy writeStrategy;
+        private final boolean nullable;
+        private final String nullTtl;
+
+        public CachePolicyDescriptor(String ttl,
+                                     EvictionPolicy eviction,
+                                     int maxEntries,
+                                     WriteStrategy writeStrategy,
+                                     boolean nullable,
+                                     String nullTtl) {
+            this.ttl = ttl;
+            this.eviction = eviction;
+            this.maxEntries = maxEntries;
+            this.writeStrategy = writeStrategy;
+            this.nullable = nullable;
+            this.nullTtl = nullTtl;
+        }
+
+        public String ttl() { return ttl; }
+        public EvictionPolicy eviction() { return eviction; }
+        public int maxEntries() { return maxEntries; }
+        public WriteStrategy writeStrategy() { return writeStrategy; }
+        public boolean nullable() { return nullable; }
+        public String nullTtl() { return nullTtl; }
     }
 }

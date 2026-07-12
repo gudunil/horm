@@ -8,7 +8,10 @@ import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -403,6 +406,197 @@ class TransactionManagerTest {
             .isInstanceOf(TransactionException.class)
             .hasMessageContaining("Failed to rollback");
 
+        TransactionManager.clear();
+    }
+
+    // ----- M6 afterCommit / afterRollback hooks -----
+
+    @Test
+    void afterCommitRunsAfterSuccessfulCommit() throws SQLException {
+        TransactionDefinition def = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRED).build();
+        TransactionStatus status = TransactionManager.begin(ctx, def);
+
+        AtomicBoolean ran = new AtomicBoolean(false);
+        TransactionManager.afterCommit(() -> ran.set(true));
+
+        assertThat(ran).isFalse();
+        TransactionManager.commit(status);
+
+        assertThat(ran).isTrue();
+        TransactionManager.clear();
+    }
+
+    @Test
+    void afterRollbackRunsAfterRollback() throws SQLException {
+        TransactionDefinition def = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRED).build();
+        TransactionStatus status = TransactionManager.begin(ctx, def);
+
+        AtomicBoolean ran = new AtomicBoolean(false);
+        TransactionManager.afterRollback(() -> ran.set(true));
+
+        assertThat(ran).isFalse();
+        TransactionManager.rollback(status);
+
+        assertThat(ran).isTrue();
+        TransactionManager.clear();
+    }
+
+    @Test
+    void afterCommitRunsImmediatelyOutsideTransaction() {
+        AtomicBoolean ran = new AtomicBoolean(false);
+        TransactionManager.afterCommit(() -> ran.set(true));
+        assertThat(ran).isTrue();
+    }
+
+    @Test
+    void afterRollbackDiscardedOutsideTransaction() {
+        AtomicBoolean ran = new AtomicBoolean(false);
+        TransactionManager.afterRollback(() -> ran.set(true));
+        assertThat(ran).isFalse();
+    }
+
+    @Test
+    void afterCommitCallbacksExecuteInRegistrationOrder() throws SQLException {
+        TransactionDefinition def = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRED).build();
+        TransactionStatus status = TransactionManager.begin(ctx, def);
+
+        List<Integer> order = new ArrayList<>();
+        TransactionManager.afterCommit(() -> order.add(1));
+        TransactionManager.afterCommit(() -> order.add(2));
+        TransactionManager.afterCommit(() -> order.add(3));
+
+        TransactionManager.commit(status);
+
+        assertThat(order).containsExactly(1, 2, 3);
+        TransactionManager.clear();
+    }
+
+    @Test
+    void afterCommitCallbackExceptionIsSwallowed() throws SQLException {
+        TransactionDefinition def = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRED).build();
+        TransactionStatus status = TransactionManager.begin(ctx, def);
+
+        AtomicBoolean secondRan = new AtomicBoolean(false);
+        TransactionManager.afterCommit(() -> { throw new RuntimeException("boom"); });
+        TransactionManager.afterCommit(() -> secondRan.set(true));
+
+        // Must not throw; second callback still runs.
+        TransactionManager.commit(status);
+
+        assertThat(secondRan).isTrue();
+        TransactionManager.clear();
+    }
+
+    @Test
+    void afterRollbackCallbackExceptionIsSwallowed() throws SQLException {
+        TransactionDefinition def = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRED).build();
+        TransactionStatus status = TransactionManager.begin(ctx, def);
+
+        AtomicBoolean secondRan = new AtomicBoolean(false);
+        TransactionManager.afterRollback(() -> { throw new RuntimeException("boom"); });
+        TransactionManager.afterRollback(() -> secondRan.set(true));
+
+        // Must not throw; second callback still runs.
+        TransactionManager.rollback(status);
+
+        assertThat(secondRan).isTrue();
+        TransactionManager.clear();
+    }
+
+    @Test
+    void joinedTransactionAfterCommitPropagatesToOuterTransaction() throws SQLException {
+        AtomicBoolean ran = new AtomicBoolean(false);
+
+        TransactionManager.execute(ctx, () -> {
+            TransactionManager.execute(ctx, () -> {
+                TransactionManager.afterCommit(() -> ran.set(true));
+                assertThat(ran).isFalse();
+            });
+            // Inner (joined) transaction committed: callback not run yet.
+            assertThat(ran).isFalse();
+        });
+
+        // Outer transaction committed: callback fired.
+        assertThat(ran).isTrue();
+        TransactionManager.clear();
+    }
+
+    @Test
+    void joinedTransactionAfterRollbackPropagatesToOuterTransaction() throws SQLException {
+        AtomicBoolean ran = new AtomicBoolean(false);
+
+        assertThatThrownBy(() ->
+            TransactionManager.execute(ctx, (Runnable) () -> {
+                TransactionManager.execute(ctx, (Runnable) () -> {
+                    TransactionManager.afterRollback(() -> ran.set(true));
+                    assertThat(ran).isFalse();
+                    throw new RuntimeException("inner failure");
+                });
+            })
+        ).isInstanceOf(RuntimeException.class).hasMessageContaining("inner failure");
+
+        assertThat(ran).isTrue();
+        TransactionManager.clear();
+    }
+
+    @Test
+    void requiresNewAfterCommitRunsOnItsOwnCommit() throws SQLException {
+        TransactionDefinition outerDef = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRED).build();
+        TransactionStatus outerStatus = TransactionManager.begin(ctx, outerDef);
+
+        TransactionDefinition innerDef = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRES_NEW).build();
+        TransactionStatus innerStatus = TransactionManager.begin(ctx, innerDef);
+
+        AtomicBoolean ran = new AtomicBoolean(false);
+        TransactionManager.afterCommit(() -> ran.set(true));
+
+        TransactionManager.commit(innerStatus);
+        assertThat(ran).isTrue();
+
+        TransactionManager.commit(outerStatus);
+        TransactionManager.clear();
+    }
+
+    @Test
+    void afterCommitDiscardedWhenTransactionRollsBack() throws SQLException {
+        TransactionDefinition def = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRED).build();
+        TransactionStatus status = TransactionManager.begin(ctx, def);
+
+        AtomicBoolean commitRan = new AtomicBoolean(false);
+        AtomicBoolean rollbackRan = new AtomicBoolean(false);
+        TransactionManager.afterCommit(() -> commitRan.set(true));
+        TransactionManager.afterRollback(() -> rollbackRan.set(true));
+
+        TransactionManager.rollback(status);
+
+        assertThat(commitRan).isFalse();
+        assertThat(rollbackRan).isTrue();
+        TransactionManager.clear();
+    }
+
+    @Test
+    void afterRollbackDiscardedWhenTransactionCommits() throws SQLException {
+        TransactionDefinition def = TransactionDefinition.builder()
+            .propagation(Propagation.REQUIRED).build();
+        TransactionStatus status = TransactionManager.begin(ctx, def);
+
+        AtomicBoolean commitRan = new AtomicBoolean(false);
+        AtomicBoolean rollbackRan = new AtomicBoolean(false);
+        TransactionManager.afterCommit(() -> commitRan.set(true));
+        TransactionManager.afterRollback(() -> rollbackRan.set(true));
+
+        TransactionManager.commit(status);
+
+        assertThat(commitRan).isTrue();
+        assertThat(rollbackRan).isFalse();
         TransactionManager.clear();
     }
 }

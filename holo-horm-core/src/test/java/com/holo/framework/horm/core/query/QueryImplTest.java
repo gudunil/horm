@@ -300,8 +300,9 @@ class QueryImplTest {
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(conn).prepareStatement(sql.capture());
         assertThat(sql.getValue())
-            .isEqualTo("SELECT 1 FROM test_entities WHERE (id = ?) LIMIT 1");
+            .isEqualTo("SELECT 1 FROM test_entities WHERE (id = ?) LIMIT ?");
         verify(ps).setObject(1, 1L);
+        verify(ps).setObject(2, 1L);
     }
 
     @Test
@@ -428,7 +429,7 @@ class QueryImplTest {
     }
 
     @Test
-    void offsetWithoutLimitRendersOffsetOnly() throws Exception {
+    void offsetWithoutLimitRendersLimitMaxWithOffset() throws Exception {
         when(conn.prepareStatement(anyString())).thenReturn(ps);
         when(ps.executeQuery()).thenReturn(rs);
         when(rs.next()).thenReturn(false);
@@ -437,8 +438,9 @@ class QueryImplTest {
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
         verify(conn).prepareStatement(sql.capture());
-        assertThat(sql.getValue()).isEqualTo("SELECT * FROM test_entities OFFSET ?");
-        verify(ps).setObject(1, 5L);
+        assertThat(sql.getValue()).isEqualTo("SELECT * FROM test_entities LIMIT ? OFFSET ?");
+        verify(ps).setObject(1, Long.MAX_VALUE);
+        verify(ps).setObject(2, 5L);
     }
 
     @Test

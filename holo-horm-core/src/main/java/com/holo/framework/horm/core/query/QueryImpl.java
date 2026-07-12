@@ -1,10 +1,18 @@
 package com.holo.framework.horm.core.query;
 
+import com.holo.framework.horm.cache.CachePolicy;
+import com.holo.framework.horm.cache.TypeReference;
+import com.holo.framework.horm.cache.key.CacheKey;
+import com.holo.framework.horm.cache.key.CacheKeyBuilder;
+import com.holo.framework.horm.cache.key.QueryHash;
 import com.holo.framework.horm.core.HormContext;
 import com.holo.framework.horm.core.HormException;
+import com.holo.framework.horm.core.JdbcOperations;
+import com.holo.framework.horm.core.MetaSupport;
 import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.core.EntityMetaRegistry;
 import com.holo.framework.horm.core.TransactionManager;
+import com.holo.framework.horm.core.dialect.Dialect;
 import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
@@ -14,8 +22,6 @@ import com.holo.framework.horm.meta.query.Condition;
 import com.holo.framework.horm.meta.query.RelationField;
 import com.holo.framework.horm.meta.query.TypedField;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -25,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 /**
  * Default {@link Query} implementation. SQL is composed from the
@@ -46,6 +53,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
     private final HormContext ctx;
     private final EntityMeta<T> meta;
     private final Mapper<T> mapper;
+    private final String dataSourceName;
 
     private final List<Condition> whereConditions = new ArrayList<>();
     private final List<OrderBy> orderByClauses = new ArrayList<>();
@@ -58,6 +66,8 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
     private final List<JoinKind> joinKinds = new ArrayList<>();
     private List<TypedField<T, ?>> selectFields;  // null means SELECT *
 
+    private final CachePolicy runtimeCachePolicy;
+
     private enum JoinKind { FETCH, LEFT, INNER }
 
     public QueryImpl(Class<T> entityType, HormContext ctx) {
@@ -65,6 +75,8 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         this.ctx = ctx;
         this.meta = EntityMetaRegistry.lookup(entityType);
         this.mapper = meta.mapper();
+        this.dataSourceName = MetaSupport.resolveDataSourceName(meta);
+        this.runtimeCachePolicy = MetaSupport.toRuntimePolicy(meta.cachePolicy());
     }
 
     @Override
@@ -205,27 +217,36 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         if (!joins.isEmpty() || selectFields != null) {
             return listWithFetch();
         }
-        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(qualifiedTable());
+        if (queryCacheEnabled()) {
+            long effectiveLimit = limit == null ? Long.MAX_VALUE : limit;
+            return ctx.cacheChain()
+                .get(queryKey(effectiveLimit), listTypeRef(), () -> dbList(effectiveLimit), runtimeCachePolicy)
+                .orElse(List.of());
+        }
+        return dbList(limit == null ? Long.MAX_VALUE : limit);
+    }
+
+    /** Database execution backing {@link #list()} and the query-cache loader. */
+    private List<T> dbList(long effectiveLimit) {
+        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(MetaSupport.qualifiedTable(meta));
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
         appendOrderBy(sql);
-        appendLimitOffset(sql, bindings);
-
-        List<T> result = new ArrayList<>();
-        Connection conn = TransactionManager.currentConnection(ctx);
-        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            bind(ps, bindings);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    result.add(mapper.map(toRow(rs)));
-                }
-            }
-        } catch (SQLException e) {
-            throw new HormException("Failed to list " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, conn);
+        Dialect dialect = ctx.dialect(dataSourceName);
+        if (effectiveLimit != Long.MAX_VALUE || offset != null) {
+            long off = offset != null ? offset : 0L;
+            dialect.paginate(sql, bindings, off, effectiveLimit);
         }
-        return result;
+
+        return JdbcOperations.query(ctx, dataSourceName, sql.toString(), bindings,
+            rs -> {
+                List<T> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapper.map(MetaSupport.toRow(rs, meta)));
+                }
+                return result;
+            },
+            "list " + entityType.getName());
     }
 
     @Override
@@ -234,73 +255,51 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
             List<T> all = listWithFetch();
             return all.isEmpty() ? Optional.empty() : Optional.of(all.get(0));
         }
-        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(qualifiedTable());
+        if (queryCacheEnabled()) {
+            return Optional.ofNullable(ctx.cacheChain()
+                .get(queryKey(1L), new TypeReference<>() {}, () -> dbFindFirst().orElse(null), runtimeCachePolicy)
+                .orElse(null));
+        }
+        return dbFindFirst();
+    }
+
+    /** Database execution backing {@link #findFirst()} and the query-cache loader. */
+    private Optional<T> dbFindFirst() {
+        StringBuilder sql = new StringBuilder("SELECT * FROM ").append(MetaSupport.qualifiedTable(meta));
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
         appendOrderBy(sql);
-        sql.append(" LIMIT ?");
-        bindings.add(1L);
-        if (offset != null) {
-            sql.append(" OFFSET ?");
-            bindings.add(offset);
-        }
+        Dialect dialect = ctx.dialect(dataSourceName);
+        long off = offset != null ? offset : 0L;
+        dialect.paginate(sql, bindings, off, 1L);
 
-        Connection conn = TransactionManager.currentConnection(ctx);
-        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            bind(ps, bindings);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return Optional.of(mapper.map(toRow(rs)));
-                }
-                return Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new HormException("Failed to findFirst " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, conn);
-        }
+        return JdbcOperations.query(ctx, dataSourceName, sql.toString(), bindings,
+            rs -> rs.next() ? Optional.of(mapper.map(MetaSupport.toRow(rs, meta))) : Optional.empty(),
+            "findFirst " + entityType.getName());
     }
 
     @Override
     public long count() {
-        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ").append(qualifiedTable());
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ").append(MetaSupport.qualifiedTable(meta));
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
 
-        Connection conn = TransactionManager.currentConnection(ctx);
-        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            bind(ps, bindings);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getLong(1);
-                }
-                return 0L;
-            }
-        } catch (SQLException e) {
-            throw new HormException("Failed to count " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, conn);
-        }
+        return JdbcOperations.query(ctx, dataSourceName, sql.toString(), bindings,
+            rs -> rs.next() ? rs.getLong(1) : 0L,
+            "count " + entityType.getName());
     }
 
     @Override
     public boolean exists() {
-        StringBuilder sql = new StringBuilder("SELECT 1 FROM ").append(qualifiedTable());
+        StringBuilder sql = new StringBuilder("SELECT 1 FROM ").append(MetaSupport.qualifiedTable(meta));
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
-        sql.append(" LIMIT 1");
+        Dialect dialect = ctx.dialect(dataSourceName);
+        dialect.paginate(sql, bindings, 0L, 1L);
 
-        Connection conn = TransactionManager.currentConnection(ctx);
-        try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            bind(ps, bindings);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
-        } catch (SQLException e) {
-            throw new HormException("Failed to check existence of " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, conn);
-        }
+        return JdbcOperations.query(ctx, dataSourceName, sql.toString(), bindings,
+            ResultSet::next,
+            "check existence of " + entityType.getName());
     }
 
     private void appendConditions(Condition... conditions) {
@@ -361,51 +360,63 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
                 sql.append(", ");
             }
             OrderBy ob = orderByClauses.get(i);
-            if (ob.alias != null) {
-                sql.append(ob.alias).append(".");
+            if (ob.alias() != null) {
+                sql.append(ob.alias()).append(".");
             }
-            sql.append(ob.column).append(" ").append(ob.direction.name());
+            sql.append(ob.column()).append(" ").append(ob.direction().name());
         }
     }
 
     private void appendLimitOffset(StringBuilder sql, List<Object> bindings) {
-        if (limit != null) {
-            sql.append(" LIMIT ?");
-            bindings.add(limit);
-        }
-        if (offset != null) {
-            sql.append(" OFFSET ?");
-            bindings.add(offset);
+        if (limit != null || offset != null) {
+            Dialect dialect = ctx.dialect(dataSourceName);
+            long lim = limit != null ? limit : Long.MAX_VALUE;
+            long off = offset != null ? offset : 0L;
+            dialect.paginate(sql, bindings, off, lim);
         }
     }
 
-    private void bind(PreparedStatement ps, List<Object> bindings) throws SQLException {
-        int i = 1;
-        for (Object b : bindings) {
-            ps.setObject(i++, b);
+    // ----- M6 query-cache helpers -----
+
+    /** Returns {@code true} when this query is eligible for result caching. */
+    private boolean queryCacheEnabled() {
+        return meta.cached() && ctx.cacheChain() != null
+            && runtimeCachePolicy != null
+            && runtimeCachePolicy.writeStrategy() == com.holo.framework.horm.cache.WriteStrategy.THROUGH
+            && joins.isEmpty()
+            && selectFields == null;
+    }
+
+    /** Builds a stable {@link CacheKey} for the current query shape. */
+    private CacheKey queryKey(long effectiveLimit) {
+        long off = offset == null ? 0L : offset;
+        String hash = QueryHash.hash(conditionsSql(), ordersSql(), off, effectiveLimit);
+        return new CacheKeyBuilder()
+            .entityType(entityType)
+            .queryKey(hash)
+            .build();
+    }
+
+    private String conditionsSql() {
+        if (whereConditions.isEmpty()) {
+            return "";
         }
+        return whereConditions.stream()
+            .map(Condition::sqlFragment)
+            .collect(Collectors.joining(" AND "));
     }
 
-    private Row toRow(ResultSet rs) throws SQLException {
-        Row row = Row.create(meta.tableName());
-        for (FieldMeta<?> fd : meta.fields()) {
-            row.set(fd.column(), rs.getObject(fd.column()));
+    private String ordersSql() {
+        if (orderByClauses.isEmpty()) {
+            return "";
         }
-        return row;
+        return orderByClauses.stream()
+            .map(ob -> ob.column() + " " + ob.direction().name())
+            .collect(Collectors.joining(", "));
     }
 
-    private String qualifiedTable() {
-        String schema = meta.schema();
-        return (schema == null || schema.isEmpty())
-            ? meta.tableName()
-            : schema + "." + meta.tableName();
-    }
-
-    private String qualifiedTableOf(EntityMeta<?> m) {
-        String schema = m.schema();
-        return (schema == null || schema.isEmpty())
-            ? m.tableName()
-            : schema + "." + m.tableName();
+    private TypeReference<List<T>> listTypeRef() {
+        return new TypeReference<>() {};
     }
 
     /**
@@ -474,43 +485,43 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
             selectCols.add("t0." + fd.column() + " AS t0__" + fd.column());
         }
         for (JoinAlias ja : joinAliases) {
-            for (FieldMeta<?> fd : ja.targetMeta.fields()) {
-                selectCols.add(ja.targetAlias + "." + fd.column()
-                    + " AS " + ja.targetAlias + "__" + fd.column());
+            for (FieldMeta<?> fd : ja.targetMeta().fields()) {
+                selectCols.add(ja.targetAlias() + "." + fd.column()
+                    + " AS " + ja.targetAlias() + "__" + fd.column());
             }
         }
         sql.append(String.join(", ", selectCols));
 
-        sql.append(" FROM ").append(qualifiedTable()).append(" t0");
+        sql.append(" FROM ").append(MetaSupport.qualifiedTable(meta)).append(" t0");
 
         for (JoinAlias ja : joinAliases) {
-            String kind = (ja.kind == JoinKind.INNER) ? "INNER JOIN" : "LEFT JOIN";
-            RelationType rt = ja.relation.relationType();
-            String targetTable = qualifiedTableOf(ja.targetMeta);
+            String kind = (ja.kind() == JoinKind.INNER) ? "INNER JOIN" : "LEFT JOIN";
+            RelationType rt = ja.relation().relationType();
+            String targetTable = MetaSupport.qualifiedTable(ja.targetMeta());
             if (rt == RelationType.BELONGS_TO) {
-                sql.append(" ").append(kind).append(" ").append(targetTable).append(" ").append(ja.targetAlias)
-                    .append(" ON ").append(ja.targetAlias).append(".id = t0.")
-                    .append(ja.relation.foreignKey());
+                sql.append(" ").append(kind).append(" ").append(targetTable).append(" ").append(ja.targetAlias())
+                    .append(" ON ").append(ja.targetAlias()).append(".id = t0.")
+                    .append(ja.relation().foreignKey());
             } else if (rt == RelationType.HAS_ONE || rt == RelationType.HAS_MANY) {
-                sql.append(" ").append(kind).append(" ").append(targetTable).append(" ").append(ja.targetAlias)
-                    .append(" ON ").append(ja.targetAlias).append(".").append(ja.relation.foreignKey())
+                sql.append(" ").append(kind).append(" ").append(targetTable).append(" ").append(ja.targetAlias())
+                    .append(" ON ").append(ja.targetAlias()).append(".").append(ja.relation().foreignKey())
                     .append(" = t0.id");
             } else if (rt == RelationType.HAS_AND_BELONGS_TO_MANY) {
-                sql.append(" ").append(kind).append(" ").append(ja.relation.joinTable()).append(" ").append(ja.middleAlias)
-                    .append(" ON ").append(ja.middleAlias).append(".").append(ja.relation.foreignKey())
+                sql.append(" ").append(kind).append(" ").append(ja.relation().joinTable()).append(" ").append(ja.middleAlias())
+                    .append(" ON ").append(ja.middleAlias()).append(".").append(ja.relation().foreignKey())
                     .append(" = t0.id");
-                sql.append(" ").append(kind).append(" ").append(targetTable).append(" ").append(ja.targetAlias)
-                    .append(" ON ").append(ja.targetAlias).append(".id = ").append(ja.middleAlias)
-                    .append(".").append(ja.relation.associationForeignKey());
+                sql.append(" ").append(kind).append(" ").append(targetTable).append(" ").append(ja.targetAlias())
+                    .append(" ON ").append(ja.targetAlias()).append(".id = ").append(ja.middleAlias())
+                    .append(".").append(ja.relation().associationForeignKey());
             } else if (rt == RelationType.HAS_MANY_THROUGH) {
-                EntityMeta<?> throughMeta = EntityMetaRegistry.lookup(ja.relation.through());
-                String throughTable = qualifiedTableOf(throughMeta);
-                sql.append(" ").append(kind).append(" ").append(throughTable).append(" ").append(ja.middleAlias)
-                    .append(" ON ").append(ja.middleAlias).append(".").append(ja.relation.foreignKey())
+                EntityMeta<?> throughMeta = EntityMetaRegistry.lookup(ja.relation().through());
+                String throughTable = MetaSupport.qualifiedTable(throughMeta);
+                sql.append(" ").append(kind).append(" ").append(throughTable).append(" ").append(ja.middleAlias())
+                    .append(" ON ").append(ja.middleAlias()).append(".").append(ja.relation().foreignKey())
                     .append(" = t0.id");
-                sql.append(" ").append(kind).append(" ").append(targetTable).append(" ").append(ja.targetAlias)
-                    .append(" ON ").append(ja.targetAlias).append(".id = ").append(ja.middleAlias)
-                    .append(".").append(ja.relation.associationForeignKey());
+                sql.append(" ").append(kind).append(" ").append(targetTable).append(" ").append(ja.targetAlias())
+                    .append(" ON ").append(ja.targetAlias()).append(".id = ").append(ja.middleAlias())
+                    .append(".").append(ja.relation().associationForeignKey());
             }
         }
 
@@ -561,43 +572,35 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         }
 
         List<FieldMeta<?>> rootFields = projectedFields();
-        Connection conn = TransactionManager.currentConnection(ctx);
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            bind(ps, bindings);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    Row rootRow = splitPrefixedRow(rs, "t0", meta, rootFields);
-                    T root = mapper.map(rootRow);
-                    Object rootId = mapper.getId(root);
+        JdbcOperations.query(ctx, dataSourceName, sql, bindings, rs -> {
+            while (rs.next()) {
+                Row rootRow = splitPrefixedRow(rs, "t0", meta, rootFields);
+                T root = mapper.map(rootRow);
+                Object rootId = mapper.getId(root);
 
-                    T existing = byRootId.putIfAbsent(rootId, root);
-                    T actualRoot = (existing != null) ? existing : root;
+                byRootId.putIfAbsent(rootId, root);
 
-                    for (int i = 0; i < joinAliases.size(); i++) {
-                        JoinAlias ja = joinAliases.get(i);
-                        Row targetRow = splitPrefixedRow(rs, ja.targetAlias, ja.targetMeta,
-                            new ArrayList<>(ja.targetMeta.fields()));
-                        Mapper<Object> targetMapper = (Mapper<Object>) ja.targetMapper;
-                        Object target = targetMapper.map(targetRow);
-                        Object targetId = targetMapper.getId(target);
+                for (int i = 0; i < joinAliases.size(); i++) {
+                    JoinAlias ja = joinAliases.get(i);
+                    Row targetRow = splitPrefixedRow(rs, ja.targetAlias(), ja.targetMeta(),
+                        new ArrayList<>(ja.targetMeta().fields()));
+                    Mapper<Object> targetMapper = (Mapper<Object>) ja.targetMapper();
+                    Object target = targetMapper.map(targetRow);
+                    Object targetId = targetMapper.getId(target);
 
-                        // LEFT JOIN with no matching row yields null target id;
-                        // skip so the relation stays an empty list.
-                        if (targetId == null) {
-                            continue;
-                        }
-
-                        Map<Object, List<Object>> accumulated = perJoinAccumulated.get(i);
-                        List<Object> list = accumulated.computeIfAbsent(rootId, k -> new ArrayList<>());
-                        list.add(target);
+                    // LEFT JOIN with no matching row yields null target id;
+                    // skip so the relation stays an empty list.
+                    if (targetId == null) {
+                        continue;
                     }
+
+                    Map<Object, List<Object>> accumulated = perJoinAccumulated.get(i);
+                    List<Object> list = accumulated.computeIfAbsent(rootId, k -> new ArrayList<>());
+                    list.add(target);
                 }
             }
-        } catch (SQLException e) {
-            throw new HormException("Failed to listWithFetch " + entityType.getName(), e);
-        } finally {
-            TransactionManager.releaseConnection(ctx, conn);
-        }
+            return null;  // result accumulated via byRootId / perJoinAccumulated side effects
+        }, "listWithFetch " + entityType.getName());
 
         for (Map.Entry<Object, T> entry : byRootId.entrySet()) {
             Object rootId = entry.getKey();
@@ -605,45 +608,28 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
             for (int i = 0; i < joinAliases.size(); i++) {
                 JoinAlias ja = joinAliases.get(i);
                 List<Object> list = perJoinAccumulated.get(i).getOrDefault(rootId, new ArrayList<>());
-                mapper.setRelation(root, ja.relation.name(), list);
+                mapper.setRelation(root, ja.relation().name(), list);
             }
         }
 
         return new ArrayList<>(byRootId.values());
     }
 
-    private static final class OrderBy {
-        final String column;
-        final Order direction;
-        final String alias;  // null = bare column (default path); "t0"/"t1"/... = JOIN path
-
-        OrderBy(String column, Order direction, String alias) {
-            this.column = column;
-            this.direction = direction;
-            this.alias = alias;
-        }
+    private record OrderBy(String column, Order direction, String alias) {
+        // alias: null = bare column (default path); "t0"/"t1"/... = JOIN path
     }
 
     /**
      * Per-join resolved metadata: allocated SQL aliases + looked-up
      * {@link EntityMeta}/{@link Mapper} for the join target.
      */
-    private static final class JoinAlias {
-        final RelationField<?, ?> relation;
-        final JoinKind kind;
-        final String targetAlias;  // t1, t2, ...
-        final String middleAlias;  // jt1/jt2 (HABTM) or th1/th2 (THROUGH), null otherwise
-        final EntityMeta<?> targetMeta;
-        final Mapper<?> targetMapper;
-
-        JoinAlias(RelationField<?, ?> relation, JoinKind kind, String targetAlias,
-                  String middleAlias, EntityMeta<?> targetMeta, Mapper<?> targetMapper) {
-            this.relation = relation;
-            this.kind = kind;
-            this.targetAlias = targetAlias;
-            this.middleAlias = middleAlias;
-            this.targetMeta = targetMeta;
-            this.targetMapper = targetMapper;
-        }
+    private record JoinAlias(
+        RelationField<?, ?> relation,
+        JoinKind kind,
+        String targetAlias,   // t1, t2, ...
+        String middleAlias,   // jt1/jt2 (HABTM) or th1/th2 (THROUGH), null otherwise
+        EntityMeta<?> targetMeta,
+        Mapper<?> targetMapper
+    ) {
     }
 }

@@ -1,7 +1,7 @@
 # HORM 开发进度
 
 > 接续点文档：记录各里程碑完成状态、关键决策、下一步计划。
-> 维护人：Holo Framework Team · 更新时间：2026-07-05
+> 维护人：Holo Framework Team · 更新时间：2026-07-06
 
 ---
 
@@ -13,9 +13,14 @@
 | M2     | ✅ 完成 | 2026-07-04     | v1.0.0-M2  |
 | M3     | ✅ 完成 | 2026-07-05     | v1.0.0-M3  |
 | M4     | ✅ 完成 | 2026-07-05     | v1.0.0-M4  |
-| M5-M9  | 📋 规划中 | —              | —          |
+| M5     | ✅ 完成 | 2026-07-05     | v1.0.0-M5  |
+| M6     | ✅ 完成 | 2026-07-06     | v1.0.0-M6  |
+| M7     | ✅ 完成 | 2026-07-06     | v1.0.0-M7  |
+| M8     | ✅ 完成 | 2026-07-06     | v1.0.0-M8  |
+| M8.5   | ✅ 完成 | 2026-07-11     | —          |
+| M9     | 📋 规划中 | —              | —          |
 
-**当前分支**：`feature/m4-transactions`（M4 完成后待 squash merge 到 `main`）
+**当前分支**：`feature/m8.5-dialect`（M8.5 已完成，待 squash merge 到 `main`）
 
 ---
 
@@ -221,14 +226,290 @@
 
 ---
 
+## M5: 多数据源 SPI 与路由（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | 状态 |
+|--------|------|------|
+| M5-1 | `DataSourceRegistry` — 多数据源注册表，管理命名数据源 | ✅ |
+| M5-2 | `HormContext` 重构 — 持有 `DataSourceRegistry`，提供按名称/按实体类型获取 DataSourceProvider | ✅ |
+| M5-3 | `Horm` 入口扩展 — `install(String, DataSourceProvider)` + `install(DataSourceProvider)` | ✅ |
+| M5-4 | `JdbcRepository` 路由 — 根据 EntityMeta.dataSource() 选择 DataSourceProvider | ✅ |
+| M5-5 | `TransactionManager` 多数据源 — 按数据源名称独立事务栈 | ✅ |
+| M5-6 | 查询构建器路由 — QueryImpl/UpdateQueryImpl/DeleteQueryImpl 使用实体数据源 | ✅ |
+| M5-7 | H2 多数据源集成测试 — 两个 H2 内存库，验证跨数据源操作 | ✅ |
+| M5-8 | 覆盖率检查 + PROGRESS.md 更新 + tag v1.0.0-M5 | ✅ |
+
+### 测试与覆盖率
+
+- **测试总数**：320（meta 模块 148 + core 模块 172）
+- 新增测试：
+  - `DataSourceRegistryTest`（13 测试）— 数据源注册、查找、默认数据源
+  - `MultiDatasourceIntegrationTest`（4 H2 集成测试）— 跨数据源 CRUD、事务隔离
+  - `HormMultiDatasourceTest`（6 测试）— Horm 入口多数据源安装
+  - `RowTest`（51 测试）— Row.MapRow 类型转换全覆盖
+  - `EntityMetaTest`（16 测试）— EntityMeta Builder + 字段查找
+  - `FieldAccessorTest`（5 测试）— 读写/只读访问器
+  - `MapperTest`（3 测试）— Mapper 默认方法
+  - `TransactionMethodMetaTest`（7 测试）— 事务元数据
+- **JaCoCo 覆盖率**：
+  - meta 模块整体：85%（> 80% 目标 ✅）
+  - core 模块整体：89%（> 80% 目标 ✅）
+  - `com.holo.framework.horm.meta` 包：90%（从 3% 提升至 90%）
+  - `com.holo.framework.horm.core.datasource` 包：100%
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core -am verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **DataSourceRegistry 独立类**：`DataSourceRegistry` 作为独立类管理命名数据源，`HormContext` 持有引用，职责清晰。
+2. **默认数据源名称为 "default"**：未指定 `dataSource` 的实体自动路由到 `"default"` 数据源。
+3. **每个数据源独立事务栈**：`TransactionManager` 使用 `Map<String, Deque<TransactionStatus>>` 为每个数据源维护独立的 ThreadLocal 事务栈，跨数据源操作各自独立事务（不支持 XA）。
+4. **EntityMeta.dataSource() 驱动路由**：`JdbcRepository` 构造时根据 `EntityMeta.dataSource()` 选择对应的 DataSourceProvider，查询构建器同理。
+5. **Horm.install() 双模式**：`install(DataSourceProvider)` 注册默认数据源，`install(String, DataSourceProvider)` 注册命名数据源。
+6. **运行时静态路由**：M5 不支持运行时动态切换数据源，仅在启动时注册，实体与数据源映射在编译期由 APT 生成。
+
+### 已知限制（M5 范围内）
+
+- 不支持运行时动态切换数据源 — 仅启动时注册
+- 不支持 XA 分布式事务 — 跨数据源操作各自独立事务
+- 不支持数据源连接池配置 — 仅 SPI 接口，具体实现由用户提供
+- 不支持读写分离路由 — 留待 M6 缓存链
+- `@Entity(dataSource = "...")` 仅支持字符串字面量，不支持 SpEL 或配置引用
+
+---
+
+## M6: 缓存链（L1 + L2 组合）+ batch loading（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | Commit |
+|--------|------|--------|
+| M6-1 | 缓存 SPI 契约：`Cache`/`CacheChain`/`CachePolicy`/`CacheLevel`/`WriteStrategy`/`EvictionPolicy`/`CacheEvent`/`TypeReference` | `<本 commit>` |
+| M6-2 | `DefaultCacheChain` 多级链实现（逐层查找、上层回填、批量加载、事件发布） | `<本 commit>` |
+| M6-3 | `CaffeineCache` L1 实现（零序列化、TTL/size 淘汰、事件转发） | `<本 commit>` |
+| M6-4 | `NoOpCache` 兜底实现 | `<本 commit>` |
+| M6-5 | 缓存键设计：`CacheKey`/`CacheKeyBuilder`/`QueryHash`/`SensitiveHash` | `<本 commit>` |
+| M6-额外 | `RedisCache` L2 stub + `Serializer`/`JdkSerializer` + `SingleFlightLoader` + `TtlJitter` | `<本 commit>` |
+| M6-6 | `@Cached`/`@CachePolicy` 注解 + APT 扩展（`EntityDescriptor`/`EntityValidator`/`EntityMeta`/`MetaClassBuilder`） | `<本 commit>` |
+| M6-7 | ORM 集成：`HormContext` 可选 `CacheChain`、`TransactionManager.afterCommit/afterRollback` 钩子、`Repository.findMany`/`Model.findMany` | `<本 commit>` |
+| M6-7 | `JdbcRepository` 缓存路径 + `QueryImpl` 可选查询缓存（仅 THROUGH 模式） | `<本 commit>` |
+| M6-9 | H2 集成测试（`FindManyCacheIntegrationTest`）、`JdbcRepositoryCacheTest`、全量验证与 JaCoCo 覆盖率检查 | `<本 commit>` |
+
+### 测试与覆盖率
+
+- **测试总数**：708（meta 模块 156 + cache 模块 346 + core 模块 206）
+- 新增测试：
+  - `CachedAnnotationProcessorTest`（8 测试）— `@Cached` APT 生成与 R12 校验
+  - `HormContextTest` 扩展 — cache chain 构造与访问器
+  - `TransactionManagerTest` 扩展 — afterCommit/afterRollback 钩子、嵌套事务回调传播
+  - `JdbcRepositoryCacheTest`（12 测试）— 缓存命中/未命中、write-through、afterCommit 失效
+  - `FindManyCacheIntegrationTest`（5 H2 集成测试）— 部分命中、全未命中、批量回填、Repository.findMany、absent id
+- **JaCoCo 覆盖率**：
+  - meta 模块整体：84%（> 80% 目标 ✅）
+  - cache 模块整体：87%（> 80% 目标 ✅）
+  - core 模块整体：86%（> 84% 目标 ✅）
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core,holo-horm-cache -am verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **模块依赖解耦**：`holo-horm-meta` 不依赖 `holo-horm-cache`；缓存相关枚举与 `CachePolicy` 在 meta 模块独立定义（`com.holo.framework.horm.meta.annotation`），避免 APT 阶段类加载问题。
+2. **APT 嵌套注解解析**：`EntityDescriptorParser.parseCached()` 使用 `AnnotationMirror` 手动遍历 `@Cached`/`@CachePolicy` 元素值，绕过 JVM 反射强制类型转换导致的 "Incorrectly typed data found" 错误。
+3. **JavaPoet 长整型字面量**：`MetaClassBuilder` 生成 `Duration.ofNanos(...)` 时使用 `$LL` 占位符，避免大整数被当作 int 编译失败。
+4. **缓存默认关闭**：未标注 `@Cached` 时 `EntityMeta.cached()=false`、`HormContext.cacheChain()` 默认 null，M1-M5 行为零回归。
+5. **事务边界写入**：所有缓存写入/失效通过 `TransactionManager.afterCommit()` 延迟到事务提交后执行；rollback 时执行 afterRollback 回调，保障数据一致性。
+6. **WriteStrategy 语义**：`THROUGH` 在提交后 put 并允许查询缓存；`AROUND`（默认）不写缓存、不缓存查询结果；`BEHIND` 已预留但未在 M6 实现。
+7. **批量加载**：`JdbcRepository.findMany(Collection<ID>)` 构造 `Set<CacheKey>` 调用 `CacheChain.getAll`，缺失 key 通过 `SELECT * FROM t WHERE id IN (...)` 批量回填。
+8. **查询缓存条件**：仅当 `@Cached` + `WriteStrategy.THROUGH` + 无 JOIN + 无 select 投影时启用，避免 AROUND 模式缓存污染。
+9. **循环依赖修复**：`holo-horm-cache` 原依赖 `holo-horm-core` compile scope 导致循环；将 cache→core 改为 test scope，core→cache 改为 compile scope，并移除 cache 中的 `QueryHash.hash(Query)` 方法。
+10. **并发测试确定性**：`SingleFlightLoaderTest` 使用 `AtomicInteger` 计数 + 主线程轮询替代 `Thread.sleep`，消除多核 CPU 调度导致的 flaky。
+
+### 已知限制（M6 范围内）
+
+- `RedisCache` 为 stub 实现，未启动真实 Redis 实例验证；L2 集群失效广播 Pub/Sub 未实现
+- `BEHIND` 写策略已定义但 M6 未实现异步写behind逻辑
+- 查询缓存仅支持单表、无 JOIN、无投影、THROUGH 模式
+- `CaffeineCache` 不支持 per-entry TTL，仅使用构造时全局 TTL
+- `RedisCache` 统计信息为零（Redisson 无原生 stats，M6 不实现）
+- 缓存未与数据库 schema 迁移工具集成；DDL 仍需手动维护
+
+---
+
+## M7: 数据库迁移（Flyway 集成）（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | Commit |
+|--------|------|--------|
+| M7-1 | 创建 `holo-horm-migration` 模块 + pom.xml（Flyway core 依赖） | `<本 commit>` |
+| M7-2 | 定义 Migration SPI：`Migration` 抽象类 + `Schema` 接口 + `TableBuilder` + `ColumnBuilder` DSL | `<本 commit>` |
+| M7-3 | 实现 `Schema` 渲染器：`H2SchemaRenderer` / `MySQLSchemaRenderer` 将 DSL 转为 DDL SQL | `<本 commit>` |
+| M7-4 | 集成 Flyway：`FlywayMigrationRunner` 封装 Flyway 引擎，支持 Java + SQL 双格式迁移 | `<本 commit>` |
+| M7-5 | 多数据源迁移：`MultiDataSourceMigrationRunner` + `DataSourceRegistry` 分组执行 | `<本 commit>` |
+| M7-6 | 校验和验证：`MigrationChecksum` CRC32 校验 + `MigrationChecksumException` | `<本 commit>` |
+| M7-7 | Horm 集成：`Horm.migrate()` / `Horm.migrate(String)` 入口 + `MigrationExecutor` SPI | `<本 commit>` |
+| M7-8 | 命令行 stub：`MigrationCommand` 接口 + `MigrateCommand`/`RollbackCommand`/`StatusCommand`/`MakeCommand` | `<本 commit>` |
+| M7-9 | H2 集成测试 + 覆盖率检查 + PROGRESS.md + tag v1.0.0-M7 | `<本 commit>` |
+
+### 测试与覆盖率
+
+- **测试总数**：744（meta 模块 156 + cache 模块 346 + core 模块 206 + migration 模块 36）
+- 新增测试：
+  - `MigrationDslIntegrationTest`（4 H2 集成测试）— DSL 创建表、多语句迁移、状态查询、校验和
+  - `MigrationChecksumTest`（5 测试）— CRC32 校验和计算
+  - `MigrationCommandsTest`（5 测试）— 命令查找与执行
+  - `H2SchemaRendererTest`（10 测试）— H2 DDL 渲染
+  - `MySQLSchemaRendererTest`（6 测试）— MySQL DDL 渲染
+  - `DdlSchemaTest`（6 测试）— Schema DSL 语句收集
+- **JaCoCo 覆盖率**：
+  - meta 模块整体：84%（> 80% 目标 ✅）
+  - cache 模块整体：87%（> 80% 目标 ✅）
+  - core 模块整体：86%（> 84% 目标 ✅）
+  - migration 模块整体：82%（> 80% 目标 ✅）
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core,holo-horm-cache,holo-horm-migration -am verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **Flyway 作为迁移引擎**：M7 采用 Flyway 作为迁移引擎核心（成熟、生产级、Spring Boot 原生集成），在其上层提供 HORM 风格的 DSL 包装。不重新实现迁移版本管理、checksum、baseline 等 Flyway 已有的能力。
+2. **Migration DSL vs 纯 SQL**：优先支持 Flyway 原生的 Java/SQL 迁移格式；HORM 的 `Migration` + `Schema` DSL 作为便捷 API 封装在 Flyway `JavaMigration` 之上，生成 SQL 交由 Flyway 执行。
+3. **模块边界**：`holo-horm-migration` 为新模块，依赖 `holo-horm-core`（获取 DataSourceRegistry）+ `flyway-core`（迁移引擎）。不依赖 cache/meta 模块。
+4. **H2 兼容性**：Migration DSL 生成的 DDL 需同时兼容 H2（MODE=MySQL）和真实 MySQL；类型映射由 `SchemaRenderer` 处理。
+5. **baseline 支持**：首次在已有数据库上启用迁移时，Flyway baseline 避免重复执行历史迁移。
+6. **多数据源隔离**：每个数据源独立的 Flyway 实例 + `flyway_schema_history` 表；默认数据源无需指定名称。
+7. **rollback 范围**：Flyway 社区版不支持 undo migration；M7 的 `down()` 仅在测试中使用，生产环境 rollback 需 Flyway Pro/Enterprise 或手动 SQL。
+8. **MigrationExecutor SPI**：`Horm.migrate()` 通过 `ServiceLoader` 发现 `MigrationExecutor` 实现，避免 core 模块直接依赖 migration 模块，保持模块解耦。
+9. **NonCloseableConnection 包装**：`ConnectionDataSource` 返回不可关闭的连接包装器，防止 Flyway 关闭底层连接后影响后续操作。
+
+### 已知限制（M7 范围内）
+
+- `down()` 方法仅在测试中使用，生产环境 rollback 需 Flyway Pro/Enterprise 或手动 SQL
+- 不支持运行时动态添加迁移脚本 — 仅启动时扫描 classpath
+- 不支持迁移脚本热重载 — 需重启应用
+- 命令行工具为 stub 实现，M8 Spring Boot Starter 完整集成
+- 不支持迁移脚本版本冲突检测 — 由 Flyway 内部处理
+- 不支持跨数据源事务迁移 — 每个数据源独立迁移
+
+---
+
+## M8: Spring Boot Starter + @Transactional APT 实现（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | Commit |
+|--------|------|--------|
+| M8-1 | 扩展 `TransactionMethodMeta` 支持 `rollbackFor`/`noRollbackFor` + `shouldRollback()` 方法 | `<本 commit>` |
+| M8-2 | 扩展 `TransactionAdvisorBuilder` 生成完整事务元数据（APT 读取 Class[] 注解属性） | `<本 commit>` |
+| M8-3 | 创建 `TransactionAdvisorRegistry`：运行时加载 `transactions.idx` 索引，提供 O(1) 查询 | `<本 commit>` |
+| M8-4 | 创建 `TransactionInterceptor`：运行时事务拦截器，执行事务边界 + 异常回滚判断 | `<本 commit>` |
+| M8-5 | 创建 `@EnableHorm` 注解 + `HormAutoConfiguration` + `HormProperties` 配置类 | `<本 commit>` |
+| M8-6 | 创建 `HormTransactionalBeanPostProcessor`：JDK 动态代理包装 @Transactional Bean | `<本 commit>` |
+| M8-7 | Flyway 自动迁移（`HormMigrationAutoConfiguration`）+ 多数据源自动配置 | `<本 commit>` |
+| M8-8 | 集成测试 + 覆盖率检查 + PROGRESS.md + tag v1.0.0-M8 | `<本 commit>` |
+
+### 测试与覆盖率
+
+- **测试总数**：863（meta 模块 156 + cache 模块 368 + core 模块 206 + migration 模块 99 + starter 模块 34）
+- 新增测试：
+  - `TransactionMethodMetaTest` 扩展 — `shouldRollback()` 异常判断逻辑
+  - `HormAutoConfigurationTest`（6 测试）— Spring Boot 自动装配 + SpringDataSourceProvider 连接管理
+  - `HormMultiDataSourceAutoConfigurationTest`（9 测试）— 多数据源配置 + ConfigurableDataSourceProvider 连接管理
+  - `HormTransactionalBeanPostProcessorTest`（3 测试）— JDK 代理创建
+  - `HormMigrationAutoConfigurationTest`（4 测试）— Flyway 自动迁移条件装配
+  - `HormMigrationAutoConfigurationRunTest`（5 测试）— 迁移执行逻辑
+  - `HormDataSourcePropertiesTest`（4 测试）— 配置属性绑定
+  - `HormPropertiesTest`（3 测试）— 配置属性
+- **JaCoCo 覆盖率**：
+  - meta 模块整体：84%（> 80% 目标 ✅）
+  - cache 模块整体：87%（> 80% 目标 ✅）
+  - core 模块整体：86%（> 84% 目标 ✅）
+  - migration 模块整体：82%（> 80% 目标 ✅）
+  - starter 模块整体：97%（> 80% 目标 ✅）
+- **验证命令**：`mvn -f holo-horm/pom.xml clean verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **APT 实现 @Transactional（非 AOP）**：M8 采用 APT 编译期生成事务元数据 + 运行时拦截器方案，而非 Spring AOP。APT 在编译期为 `@Transactional` 类生成 `XxxTransactionAdvisor` 元数据伴随类，运行时通过 `TransactionAdvisorRegistry` 加载索引，`TransactionInterceptor` 执行事务边界。
+2. **JDK 动态代理**：`HormTransactionalBeanPostProcessor` 使用 JDK 动态代理（非 CGLIB）包装 Spring Bean，要求目标 Bean 实现至少一个接口。未实现接口的 Bean 不会被代理。
+3. **事务元数据索引**：APT 生成 `META-INF/horm/transactions.idx` 索引文件，列出所有 `XxxTransactionAdvisor` 全限定类名。运行时 `TransactionAdvisorRegistry` 通过 `ClassLoader.getResources()` 加载索引，反射读取 `METHODS` 静态字段。
+4. **异常回滚规则**：`TransactionMethodMeta.shouldRollback(Throwable)` 实现三层判断：① `noRollbackFor` 匹配则不回滚；② `rollbackFor` 非空且不匹配则不回滚；③ 默认 `RuntimeException`/`Error` 回滚。
+5. **APT 读取 Class[] 注解属性**：`TransactionAdvisorBuilder.extractClassNames()` 通过 `MirroredTypeException` 捕获 `TypeMirror`，处理 `TypeKind.ARRAY` 和 `TypeKind.DECLARED` 两种情况，提取异常类全限定名。
+6. **Spring Boot 自动装配**：`HormAutoConfiguration` 从 `spring.datasource.*` 构造 `SpringDataSourceProvider`，创建 `HormContext` 并调用 `Horm.install()`。`@ConditionalOnClass(Horm.class)` 保证可选依赖。
+7. **Flyway 自动迁移**：`HormMigrationAutoConfiguration` 实现 `CommandLineRunner`，当 `holo.horm.migration.auto-on-startup=true` 时启动时调用 `Horm.migrate()`。`@ConditionalOnClass({Horm.class, Flyway.class})` 保证 classpath 无 Flyway 时跳过。
+8. **多数据源自动配置**：`HormMultiDataSourceAutoConfiguration` 从 `spring.datasource.<name>.*` 读取多数据源配置，为每个数据源创建 `DataSourceProvider` 并注册到 `DataSourceRegistry`。第一个数据源自动注册为默认。
+9. **TransactionManager.popAndResume 可见性**：将 `popAndResume` 方法从 `private` 改为包级私有，供 `TransactionInterceptor` 调用。
+
+### 已知限制（M8 范围内）
+
+- **JDK 动态代理限制**：仅代理实现了接口的 Bean；未实现接口的 Bean 不会被代理（需 CGLIB，M8 未实现）
+- **APT 多异常类处理**：`extractClassNames()` 当前仅处理数组第一个元素，`rollbackFor = {A.class, B.class}` 会丢失 B.class（待修复）
+- **无集成测试**：M8 核心功能已实现，但 Spring Boot 集成测试（`@SpringBootTest`）待补充
+- **无 CGLIB 支持**：未实现接口的 Bean 无法代理，需引入 CGLIB 或要求用户实现接口
+- **无 @Transactional 继承**：不支持从父类/接口继承 `@Transactional` 注解
+- **无嵌套事务**：`REQUIRES_NEW` 传播行为已支持，但 `NESTED`（保存点）未实现
+- **无 Spring 事务管理器集成**：未暴露 `PlatformTransactionManager` 包装 HORM 的 `TransactionManager`
+
+---
+
+## M8.5: 数据库方言适配（MySQL/PostgreSQL/H2）（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | 状态 |
+|--------|------|------|
+| D1 | `Dialect` 接口 + `IdentityStrategy` + `BatchInsertSyntax` 枚举 | ✅ 完成 |
+| D2 | `MySqlDialect` 实现（默认方言） | ✅ 完成 |
+| D3 | `PostgresDialect` 实现 | ✅ 完成 |
+| D4 | `H2Dialect` 实现（MySQL/PostgreSQL 兼容模式） | ✅ 完成 |
+| D5 | `DialectDetector` JDBC URL 自动检测 | ✅ 完成 |
+| D6 | `HormContext` 增加 Dialect 映射 | ✅ 完成 |
+| D7 | `QueryImpl` 分页改用 `Dialect.paginate()` | ✅ 完成 |
+| D8 | `JdbcRepository` exists/save 改用 `Dialect` | ✅ 完成 |
+| D9 | `UpdateQueryImpl`/`DeleteQueryImpl` 分页改用 `Dialect` | ✅ 完成 |
+| D10 | `SchemaRenderer` 对齐 `Dialect` 接口 | ✅ 完成 |
+| D11 | `PostgresSchemaRenderer` 实现 | ✅ 完成 |
+| D12 | `H2SchemaRenderer` 支持 PostgreSQL 模式 | ✅ 完成 |
+| D13 | Starter 多数据源 Dialect 自动检测 | ✅ 完成 |
+| D14 | Starter 默认数据源 Dialect 自动检测 | ✅ 完成 |
+| D15 | `DialectTest` — 各方言方法单元测试 | ✅ 完成 |
+| D16 | `DialectDetectorTest` — URL 检测测试 | ✅ 完成 |
+| D17 | H2 MODE=PostgreSQL 集成测试 | ✅ 完成 |
+| D18 | 现有测试回归验证 | ✅ 完成 |
+
+### 分批实施计划
+
+#### 批次 A：Dialect SPI + MySQL/H2（D1-D5, D16, D18）
+
+建立 Dialect 体系，现有功能零回归。
+
+#### 批次 B：核心模块改造 + PostgreSQL 方言（D3, D6-D9, D15, D17）
+
+JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
+
+#### 批次 C：迁移模块 + Starter 集成（D10-D14）
+
+迁移渲染器统一到 Dialect 体系，Spring Boot 自动检测。
+
+### 关键设计决策
+
+1. **Dialect 位于 core 模块**：`com.holo.framework.horm.core.dialect` 包，JdbcRepository/QueryImpl 直接消费，migration 模块通过 core 依赖获取类型映射
+2. **默认 Dialect 为 MySQL**：与现有 H2 MODE=MySQL 测试行为一致，零回归
+3. **Dialect.paginate() 签名含 bindings**：Oracle 方言的 `OFFSET ? ROWS FETCH NEXT ? ROWS ONLY` 需要绑定参数，且参数顺序与 MySQL 不同
+4. **JDBC URL 自动检测 + 显式配置**：优先从 URL 检测，支持 `spring.datasource.<name>.dialect` 手动覆盖
+5. **H2 双模式**：H2 支持 MySQL 和 PostgreSQL 兼容模式，`DialectDetector` 解析 `MODE=` 参数
+6. **SchemaRenderer 保留独立**：Dialect 提供 SQL 类型映射和标识符引用，SchemaRenderer 专注 DDL 语法差异，两者协作但不合并
+7. **Oracle/SQLite 仅定义接口**：M8.5 不实现 Oracle/SQLite 方言，但 Dialect 接口设计需预留扩展点
+
+### 设计文档
+
+详见 [docs/08-dialect-adaptation.md](./08-dialect-adaptation.md)
+
+---
+
 ## 后续里程碑概览
 
 | 里程碑 | 主题 | 预计 |
 |--------|------|------|
-| M5 | 多数据源 SPI 与路由 | 2026 Q3 |
-| M6 | 缓存链（L1 + L2 组合）+ batch loading | 2026 Q4 |
-| M7 | 数据库迁移（Flyway 集成） | 2026 Q4 |
-| M8 | Spring Boot Starter + `@Transactional` 运行时 AOP 代理织入 | 2027 Q1 |
+| M8.5 | 数据库方言适配（MySQL/PostgreSQL/H2） | 2026 Q3 |
 | M9 | 性能基准与 GA 发布 | 2027 Q1-Q2 |
 
 ---
@@ -247,11 +528,11 @@
 
 ## 接续点（下次开发从这里开始）
 
-1. **可选**：将 `feature/m4-transactions` squash merge 到 `main`：
+1. **可选**：将 `feature/m6-cache` squash merge 到 `main`：
    ```bash
    git -C e:\project\Holo\holo-horm checkout main
-   git -C e:\project\Holo\holo-horm merge --squash feature/m4-transactions
-   git -C e:\project\Holo\holo-horm commit -m "feat(m4): squash merge transaction, cascade, batch, optimistic locking"
-   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M4 -m "M4: ..."
+   git -C e:\project\Holo\holo-horm merge --squash feature/m6-cache
+   git -C e:\project\Holo\holo-horm commit -m "feat(m6): squash merge cache chain and batch loading"
+   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M6 -m "M6: cache chain + batch loading"
    ```
-2. **启动 M5**：新建分支 `feature/m5-datasource`，实现多数据源 SPI 与路由
+2. **启动 M7**：新建分支 `feature/m7-migration`，实现 Flyway 数据库迁移集成

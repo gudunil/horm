@@ -18,7 +18,7 @@
     <dependencies>
         <dependency>
             <groupId>com.holo.framework</groupId>
-            <artifactId>holo-horm-core</artifactId>
+            <artifactId>holo-horm-meta</artifactId>
         </dependency>
 
         <!-- 缓存实现（可选） -->

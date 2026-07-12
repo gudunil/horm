@@ -2,6 +2,7 @@ package com.holo.framework.horm.meta.processor;
 
 import com.holo.framework.horm.meta.RelationType;
 import com.holo.framework.horm.meta.annotation.BelongsTo;
+import com.holo.framework.horm.meta.annotation.CacheLevel;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
 import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
@@ -45,6 +46,8 @@ import java.util.Set;
  *   <li><b>R3</b> — {@code @Id}/{@code @Column} fields must not be {@code final}
  *       ({@code Model<T>} requires setters)</li>
  *   <li><b>R4</b> — field types must be supported by {@link TypeMapper}</li>
+ *   <li><b>R12</b> — {@code @Cached} policy validation: {@code ttl}/{@code nullTtl}
+ *       must be parseable durations; {@code levels} must not be empty</li>
  * </ul>
  *
  * <p>R2 compares fully-qualified type names as strings only — no class loading.
@@ -134,6 +137,9 @@ public final class EntityValidator {
 
         // R10-R11: @Version field validation (M4)
         validateVersion(d, type, env, fieldElements);
+
+        // R12: @Cached policy validation (M6)
+        validateCache(d, type, env);
     }
 
     /**
@@ -316,6 +322,81 @@ public final class EntityValidator {
             env.getMessager().printMessage(
                 Diagnostic.Kind.ERROR,
                 "@Entity " + d.qualifiedName() + " must have at most one @Version field",
+                type
+            );
+        }
+    }
+
+    /**
+     * Validate {@code @Cached} policy (R12).
+     *
+     * <p>Rules:
+     * <ul>
+     *   <li><b>R12a</b> — when {@code @Cached} is enabled, {@code levels} must
+     *       not be empty</li>
+     *   <li><b>R12b</b> — {@code @CachePolicy.ttl} must be parseable as a
+     *       {@link java.time.Duration} (ISO-8601 or simplified {@code "<n><unit>"} form)</li>
+     *   <li><b>R12c</b> — {@code @CachePolicy.nullTtl} must be parseable as a
+     *       {@link java.time.Duration}</li>
+     * </ul>
+     *
+     * <p>The {@code "@Cached must be on an @Entity class"} constraint is
+     * enforced structurally: {@code HormEntityProcessor} only invokes the
+     * parser/validator on {@code @Entity}-annotated types, so a
+     * {@code @Cached} on a non-{@code @Entity} class is simply ignored (no
+     * companion class is generated, no cache metadata is emitted).
+     *
+     * <p>Java annotation arrays cannot contain {@code null}, so the
+     * {@code levels must not contain null} sub-rule is satisfied by the
+     * language and not re-checked here.
+     */
+    private static void validateCache(EntityDescriptor d, TypeElement type,
+                                      ProcessingEnvironment env) {
+        if (!d.cached()) {
+            return;
+        }
+
+        // R12a: levels must not be empty
+        CacheLevel[] levels = d.cacheLevels();
+        if (levels.length == 0) {
+            env.getMessager().printMessage(
+                Diagnostic.Kind.ERROR,
+                "@Cached on " + d.qualifiedName() + " declares empty levels; at least one CacheLevel is required",
+                type
+            );
+        }
+
+        EntityDescriptor.CachePolicyDescriptor policy = d.cachePolicy();
+        if (policy == null) {
+            // Defensive: parser should always populate policy when cached=true
+            env.getMessager().printMessage(
+                Diagnostic.Kind.ERROR,
+                "@Cached on " + d.qualifiedName() + " is missing @CachePolicy descriptor",
+                type
+            );
+            return;
+        }
+
+        // R12b: ttl must be parseable
+        try {
+            EntityDescriptorParser.parseDuration(policy.ttl());
+        } catch (IllegalArgumentException e) {
+            env.getMessager().printMessage(
+                Diagnostic.Kind.ERROR,
+                "@CachePolicy.ttl '" + policy.ttl() + "' on " + d.qualifiedName()
+                    + " is not a valid duration: " + e.getMessage(),
+                type
+            );
+        }
+
+        // R12c: nullTtl must be parseable
+        try {
+            EntityDescriptorParser.parseDuration(policy.nullTtl());
+        } catch (IllegalArgumentException e) {
+            env.getMessager().printMessage(
+                Diagnostic.Kind.ERROR,
+                "@CachePolicy.nullTtl '" + policy.nullTtl() + "' on " + d.qualifiedName()
+                    + " is not a valid duration: " + e.getMessage(),
                 type
             );
         }
