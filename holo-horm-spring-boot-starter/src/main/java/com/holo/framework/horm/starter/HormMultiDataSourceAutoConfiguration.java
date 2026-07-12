@@ -181,8 +181,13 @@ public class HormMultiDataSourceAutoConfiguration {
      */
     private Dialect createDialectByName(String dialectName) {
         return switch (dialectName.toLowerCase()) {
+            case "mysql" -> new MySqlDialect();
             case "postgresql", "postgres" -> new PostgresDialect();
-            default -> new MySqlDialect();
+            default -> {
+                log.warn("Unknown dialect '{}'; falling back to MySQL. Supported values: 'mysql', 'postgresql'. "
+                    + "For H2, omit the 'dialect' property to use auto-detection.", dialectName);
+                yield new MySqlDialect();
+            }
         };
     }
 

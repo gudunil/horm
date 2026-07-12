@@ -60,7 +60,7 @@ public class HormAutoConfiguration {
         DataSourceRegistry registry = new DataSourceRegistry();
         registry.registerDefault(provider);
 
-        Map<String, Dialect> dialects = Map.of("default", dialect);
+        Map<String, Dialect> dialects = Map.of(DataSourceRegistry.DEFAULT_NAME, dialect);
         HormContext context = new HormContext(registry, null, dialects);
         Horm.install(context);
         return context;

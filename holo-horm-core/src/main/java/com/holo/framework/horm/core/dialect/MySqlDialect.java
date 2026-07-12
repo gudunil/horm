@@ -67,11 +67,11 @@ public class MySqlDialect implements Dialect {
 
         var updateClause = new StringJoiner(", ");
         for (var col : updateColumns) {
-            updateClause.add(quoteIdentifier(col) + "=VALUES(" + quoteIdentifier(col) + ")");
+            updateClause.add(quoteIdentifier(col) + "=new_row." + quoteIdentifier(col));
         }
 
         return "INSERT INTO " + quoteIdentifier(table)
-            + " (" + insertCols + ") VALUES (" + placeholders + ")"
+            + " (" + insertCols + ") VALUES (" + placeholders + ") AS new_row"
             + " ON DUPLICATE KEY UPDATE " + updateClause;
     }
 

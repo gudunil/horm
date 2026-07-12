@@ -132,8 +132,8 @@ class MySqlDialectTest {
             new String[]{"id"},
             new String[]{"name", "email"});
         assertThat(result).isEqualTo(
-            "INSERT INTO `user` (`id`, `name`, `email`) VALUES (?, ?, ?)"
-                + " ON DUPLICATE KEY UPDATE `name`=VALUES(`name`), `email`=VALUES(`email`)");
+            "INSERT INTO `user` (`id`, `name`, `email`) VALUES (?, ?, ?) AS new_row"
+                + " ON DUPLICATE KEY UPDATE `name`=new_row.`name`, `email`=new_row.`email`");
     }
 
     @Test

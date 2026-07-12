@@ -101,6 +101,10 @@ public class H2Dialect implements Dialect {
                 + " ON CONFLICT (" + uniqueJoin + ") DO UPDATE SET " + updateClause;
         }
 
+        // H2's MySQL compatibility mode does not support the row-alias syntax
+        // (INSERT ... AS new_row) introduced in MySQL 8.0.19, so the legacy
+        // VALUES(col) reference is retained here for H2 compatibility.
+        // MySqlDialect uses the non-deprecated row-alias form for real MySQL.
         var updateClause = new StringJoiner(", ");
         for (var col : updateColumns) {
             updateClause.add(quoteIdentifier(col) + "=VALUES(" + quoteIdentifier(col) + ")");
