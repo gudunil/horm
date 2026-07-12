@@ -21,6 +21,7 @@
     <modules>
         <module>holo-horm-bom</module>
         <module>holo-horm-meta</module>
+        <module>holo-horm-maven-plugin</module>
         <module>holo-horm-core</module>
         <module>holo-horm-datasource</module>
         <module>holo-horm-cache</module>
@@ -65,6 +66,11 @@
             </dependency>
             <dependency>
                 <groupId>com.holo.framework</groupId>
+                <artifactId>holo-horm-maven-plugin</artifactId>
+                <version>${holo-horm.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.holo.framework</groupId>
                 <artifactId>holo-horm-core</artifactId>
                 <version>${holo-horm.version}</version>
             </dependency>
@@ -97,6 +103,15 @@
     </dependencyManagement>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>com.holo.framework</groupId>
+                    <artifactId>holo-horm-maven-plugin</artifactId>
+                    <version>${holo-horm.version}</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

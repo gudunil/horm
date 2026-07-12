@@ -1,11 +1,16 @@
 package com.holo.framework.horm.core;
 
+import java.time.Instant;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
+import com.holo.framework.horm.core.query.Query;
+import com.holo.framework.horm.core.query.UpdateQuery;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
-import com.holo.framework.horm.meta.annotation.Id;
 import com.holo.framework.horm.meta.annotation.GenerationType;
-
-import java.time.Instant;
+import com.holo.framework.horm.meta.annotation.Id;
 
 /**
  * Integration-test entity exercising the full APT → registry → JDBC pipeline
@@ -39,4 +44,28 @@ public class User extends Model<User> {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
+
+    public static User find(Object id) {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static Map<Object, User> findMany(Collection<?> ids) {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static List<User> all() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static long count() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static Query<User> query() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static UpdateQuery<User> update() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
 }

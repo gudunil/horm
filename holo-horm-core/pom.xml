@@ -1,129 +1,176 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
 
-    <parent>
-        <groupId>com.holo.framework</groupId>
-        <artifactId>holo-horm</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
-    </parent>
+  <parent>
+    <groupId>com.holo.framework</groupId>
+    <artifactId>holo-horm</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
 
-    <artifactId>holo-horm-core</artifactId>
+  <artifactId>holo-horm-core</artifactId>
 
-    <name>Holo :: HORM :: Core</name>
-    <description>HORM 核心 API：Active Record 基类、查询构建器、事务管理、关联关系、数据验证。</description>
+  <name>Holo :: HORM :: Core</name>
+  <description>HORM 核心 API：Active Record 基类、查询构建器、事务管理、关联关系、数据验证。</description>
 
-    <dependencies>
-        <!-- 元数据（编译期生成的元数据接口与运行时引用） -->
-        <dependency>
-            <groupId>com.holo.framework</groupId>
-            <artifactId>holo-horm-meta</artifactId>
-        </dependency>
+  <dependencies>
+    <!-- 元数据（编译期生成的元数据接口与运行时引用） -->
+    <dependency>
+      <groupId>com.holo.framework</groupId>
+      <artifactId>holo-horm-meta</artifactId>
+    </dependency>
 
-        <!-- 缓存链（M6 可选依赖；当 HormContext 未注入 CacheChain 时短路） -->
-        <dependency>
-            <groupId>com.holo.framework</groupId>
-            <artifactId>holo-horm-cache</artifactId>
-        </dependency>
+    <!-- 缓存链（M6 可选依赖；当 HormContext 未注入 CacheChain 时短路） -->
+    <dependency>
+      <groupId>com.holo.framework</groupId>
+      <artifactId>holo-horm-cache</artifactId>
+    </dependency>
 
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
 
-        <!-- 工具库 -->
-        <dependency>
-            <groupId>com.google.guava</groupId>
-            <artifactId>guava</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-lang3</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>commons-codec</groupId>
-            <artifactId>commons-codec</artifactId>
-        </dependency>
+    <!-- 工具库 -->
+    <dependency>
+      <groupId>com.google.guava</groupId>
+      <artifactId>guava</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>commons-codec</groupId>
+      <artifactId>commons-codec</artifactId>
+    </dependency>
 
-        <!-- 校验 -->
-        <dependency>
-            <groupId>jakarta.validation</groupId>
-            <artifactId>jakarta.validation-api</artifactId>
-        </dependency>
+    <!-- 校验 -->
+    <dependency>
+      <groupId>jakarta.validation</groupId>
+      <artifactId>jakarta.validation-api</artifactId>
+    </dependency>
 
-        <dependency>
-            <groupId>org.projectlombok</groupId>
-            <artifactId>lombok</artifactId>
-            <scope>provided</scope>
-        </dependency>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <scope>provided</scope>
+    </dependency>
 
-        <!-- APT：触发 holo-horm-meta 中的实体注解处理器
+    <!-- ByteBuddy build-time instrumentation for Active Record static helpers -->
+    <dependency>
+      <groupId>net.bytebuddy</groupId>
+      <artifactId>byte-buddy</artifactId>
+    </dependency>
+
+    <!-- APT：触发 holo-horm-meta 中的实体注解处理器
              （上方已声明 holo-horm-meta，APT 会自动从编译类路径中加载 META-INF/services） -->
 
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.assertj</groupId>
-            <artifactId>assertj-core</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <scope>test</scope>
-        </dependency>
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.mockito</groupId>
+      <artifactId>mockito-core</artifactId>
+      <scope>test</scope>
+    </dependency>
 
-        <!-- Caffeine is optional in holo-horm-cache; declare it explicitly for
+    <!-- Caffeine is optional in holo-horm-cache; declare it explicitly for
              M6 cache integration tests that need a real L1 cache. -->
-        <dependency>
-            <groupId>com.github.ben-manes.caffeine</groupId>
-            <artifactId>caffeine</artifactId>
-            <scope>test</scope>
-        </dependency>
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+      <scope>test</scope>
+    </dependency>
 
-        <dependency>
-            <groupId>com.h2database</groupId>
-            <artifactId>h2</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.mysql</groupId>
-            <artifactId>mysql-connector-j</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
+    <dependency>
+      <groupId>com.h2database</groupId>
+      <artifactId>h2</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.mysql</groupId>
+      <artifactId>mysql-connector-j</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.postgresql</groupId>
+      <artifactId>postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
 
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <release>${java.version}</release>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>com.holo.framework</groupId>
-                            <artifactId>holo-horm-meta</artifactId>
-                            <version>${project.version}</version>
-                        </path>
-                        <path>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                            <version>${lombok.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
+  <build>
+    <plugins>
+      <!-- Generate Active Record static method signatures into @Entity source files
+                 before compilation; ByteBuddy then fills in the implementations. -->
+      <plugin>
+        <groupId>com.holo.framework</groupId>
+        <artifactId>holo-horm-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>generate-active-record-signatures</id>
+            <goals>
+              <goal>generate-active-record</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <release>${java.version}</release>
+          <annotationProcessorPaths>
+            <path>
+              <groupId>com.holo.framework</groupId>
+              <artifactId>holo-horm-meta</artifactId>
+              <version>${project.version}</version>
+            </path>
+            <path>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+              <version>${lombok.version}</version>
+            </path>
+          </annotationProcessorPaths>
+        </configuration>
+      </plugin>
+
+      <!-- ByteBuddy build-time transformation: injects type-safe static helpers
+                 (find/all/count/query/update/delete) into every @Entity class. -->
+      <plugin>
+        <groupId>net.bytebuddy</groupId>
+        <artifactId>byte-buddy-maven-plugin</artifactId>
+        <configuration>
+          <transformations>
+            <transformation>
+              <plugin>com.holo.framework.horm.core.instrument.HormModelPlugin</plugin>
+            </transformation>
+          </transformations>
+        </configuration>
+        <executions>
+          <execution>
+            <id>instrument-entities</id>
+            <goals>
+              <goal>transform</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>instrument-test-entities</id>
+            <goals>
+              <goal>transform-test</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 </project>

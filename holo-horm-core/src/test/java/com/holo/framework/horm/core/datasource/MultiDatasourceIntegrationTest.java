@@ -1,32 +1,35 @@
 package com.holo.framework.horm.core.datasource;
 
-import com.holo.framework.horm.core.EntityMetaRegistry;
-import com.holo.framework.horm.core.Horm;
-import com.holo.framework.horm.core.HormContext;
-import com.holo.framework.horm.core.Model;
-import com.holo.framework.horm.core.SimpleDataSourceProvider;
-import com.holo.framework.horm.core.TransactionManager;
-import com.holo.framework.horm.core.datasource.generated.PrimaryUserMeta;
-import com.holo.framework.horm.core.datasource.generated.PrimaryUserQueryMeta;
-import com.holo.framework.horm.core.datasource.generated.SecondaryProductMeta;
-import com.holo.framework.horm.core.datasource.generated.SecondaryProductQueryMeta;
-import com.holo.framework.horm.meta.annotation.Column;
-import com.holo.framework.horm.meta.annotation.Entity;
-import com.holo.framework.horm.meta.annotation.GeneratedValue;
-import com.holo.framework.horm.meta.annotation.Id;
-import com.holo.framework.horm.meta.annotation.Table;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import com.holo.framework.horm.core.EntityMetaRegistry;
+import com.holo.framework.horm.core.Horm;
+import com.holo.framework.horm.core.HormContext;
+import com.holo.framework.horm.core.Model;
+import com.holo.framework.horm.core.SimpleDataSourceProvider;
+import com.holo.framework.horm.core.TransactionManager;
+import com.holo.framework.horm.core.datasource.generated.PrimaryUserQueryMeta;
+import com.holo.framework.horm.core.datasource.generated.SecondaryProductQueryMeta;
+import com.holo.framework.horm.core.query.Query;
+import com.holo.framework.horm.core.query.UpdateQuery;
+import com.holo.framework.horm.meta.annotation.Column;
+import com.holo.framework.horm.meta.annotation.Entity;
+import com.holo.framework.horm.meta.annotation.GeneratedValue;
+import com.holo.framework.horm.meta.annotation.Id;
 
 /**
  * Integration test for M5 multi-datasource routing.
@@ -245,6 +248,30 @@ public class MultiDatasourceIntegrationTest {
         public void setName(String name) { this.name = name; }
         public String getEmail() { return email; }
         public void setEmail(String email) { this.email = email; }
+
+        public static PrimaryUser find(Object id) {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static Map<Object, PrimaryUser> findMany(Collection<?> ids) {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static List<PrimaryUser> all() {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static long count() {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static Query<PrimaryUser> query() {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static UpdateQuery<PrimaryUser> update() {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
     }
 
     @Entity(table = "secondary_product", dataSource = "secondary")
@@ -265,5 +292,29 @@ public class MultiDatasourceIntegrationTest {
         public void setName(String name) { this.name = name; }
         public BigDecimal getPrice() { return price; }
         public void setPrice(BigDecimal price) { this.price = price; }
+
+        public static SecondaryProduct find(Object id) {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static Map<Object, SecondaryProduct> findMany(Collection<?> ids) {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static List<SecondaryProduct> all() {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static long count() {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static Query<SecondaryProduct> query() {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
+
+        public static UpdateQuery<SecondaryProduct> update() {
+            throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+        }
     }
 }

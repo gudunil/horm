@@ -1,17 +1,21 @@
 package com.holo.framework.horm.core.relations;
 
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+
 import com.holo.framework.horm.core.Model;
+import com.holo.framework.horm.core.query.Query;
+import com.holo.framework.horm.core.query.UpdateQuery;
 import com.holo.framework.horm.meta.annotation.CascadeType;
 import com.holo.framework.horm.meta.annotation.Column;
 import com.holo.framework.horm.meta.annotation.Entity;
+import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.holo.framework.horm.meta.annotation.HasAndBelongsToMany;
 import com.holo.framework.horm.meta.annotation.HasMany;
 import com.holo.framework.horm.meta.annotation.HasManyThrough;
 import com.holo.framework.horm.meta.annotation.HasOne;
-import com.holo.framework.horm.meta.annotation.GenerationType;
 import com.holo.framework.horm.meta.annotation.Id;
-
-import java.util.List;
 
 /**
  * M3 integration-test entity exercising all four parent-side relation
@@ -78,4 +82,28 @@ public class UserWithRelations extends Model<UserWithRelations> {
 
     public List<Product> getProducts() { return products; }
     public void setProducts(List<Product> products) { this.products = products; }
+
+    public static UserWithRelations find(Object id) {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static Map<Object, UserWithRelations> findMany(Collection<?> ids) {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static List<UserWithRelations> all() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static long count() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static Query<UserWithRelations> query() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
+
+    public static UpdateQuery<UserWithRelations> update() {
+        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
+    }
 }
