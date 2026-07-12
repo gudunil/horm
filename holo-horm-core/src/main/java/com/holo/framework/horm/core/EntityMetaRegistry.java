@@ -10,7 +10,9 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.ServiceLoader;
+import java.util.Set;
 
 /**
  * Runtime registry of {@link EntityMeta} instances.
@@ -58,6 +60,9 @@ public final class EntityMetaRegistry {
      * <p>The ServiceLoader path calls {@link EntityMetaProvider#provide()}
      * directly — no reflection. The legacy path uses {@code Class.forName}
      * + {@code Method.invoke} as a backward-compatible fallback.
+     *
+     * <p>To avoid duplicate loading, entities already loaded via ServiceLoader
+     * are skipped during legacy index processing.
      */
     private static void loadIndex() {
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
@@ -66,20 +71,22 @@ public final class EntityMetaRegistry {
         }
 
         // Preferred path: ServiceLoader<EntityMetaProvider> (zero-reflection)
-        loadFromServiceLoader(loader);
+        Set<Class<?>> loadedTypes = loadFromServiceLoader(loader);
 
         // Fallback path: legacy entities.idx (reflection-based)
-        // Always attempt to load — some entities may only be registered via index
-        loadLegacyIndex(loader);
+        // Skip entities already loaded via ServiceLoader to avoid duplicate work
+        loadLegacyIndex(loader, loadedTypes);
     }
 
-    private static void loadFromServiceLoader(ClassLoader loader) {
+    private static Set<Class<?>> loadFromServiceLoader(ClassLoader loader) {
+        Set<Class<?>> loadedTypes = new HashSet<>();
         try {
             for (EntityMetaProvider provider : ServiceLoader.load(EntityMetaProvider.class, loader)) {
                 try {
                     EntityMeta<?> meta = provider.provide();
                     if (meta != null) {
                         REGISTRY.put(meta.type(), meta);
+                        loadedTypes.add(meta.type());
                     }
                 } catch (Exception e) {
                     System.err.println("[HORM] Failed to load entity from provider "
@@ -89,14 +96,15 @@ public final class EntityMetaRegistry {
         } catch (Exception e) {
             System.err.println("[HORM] Failed to enumerate EntityMetaProvider services: " + e);
         }
+        return loadedTypes;
     }
 
-    private static void loadLegacyIndex(ClassLoader loader) {
+    private static void loadLegacyIndex(ClassLoader loader, Set<Class<?>> alreadyLoadedTypes) {
         try {
             Enumeration<URL> urls = loader.getResources(INDEX_RESOURCE);
             while (urls.hasMoreElements()) {
                 URL url = urls.nextElement();
-                loadIndexFromUrl(url, loader);
+                loadIndexFromUrl(url, loader, alreadyLoadedTypes);
             }
         } catch (Exception e) {
             // Defensive: never fail class-init because of an I/O error.
@@ -104,25 +112,28 @@ public final class EntityMetaRegistry {
         }
     }
 
-    private static void loadIndexFromUrl(URL url, ClassLoader loader) {
+    private static void loadIndexFromUrl(URL url, ClassLoader loader, Set<Class<?>> alreadyLoadedTypes) {
         try (InputStream in = url.openStream();
              BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             reader.lines()
                 .map(String::trim)
                 .filter(line -> !line.isEmpty() && !line.startsWith("#"))
-                .forEach(line -> registerByMetaClassName(line, loader));
+                .forEach(line -> registerByMetaClassName(line, loader, alreadyLoadedTypes));
         } catch (Exception e) {
             System.err.println("[HORM] Failed to read entity index " + url + ": " + e);
         }
     }
 
-    private static void registerByMetaClassName(String metaClassName, ClassLoader loader) {
+    private static void registerByMetaClassName(String metaClassName, ClassLoader loader, Set<Class<?>> alreadyLoadedTypes) {
         try {
             Class<?> clazz = Class.forName(metaClassName, true, loader);
             Method factory = clazz.getMethod("entityMeta");
             Object meta = factory.invoke(null);
             if (meta instanceof EntityMeta<?> em) {
-                REGISTRY.put(em.type(), em);
+                // Skip if already loaded via ServiceLoader
+                if (!alreadyLoadedTypes.contains(em.type())) {
+                    REGISTRY.put(em.type(), em);
+                }
             } else {
                 System.err.println("[HORM] " + metaClassName + ".entityMeta() returned non-EntityMeta: " + meta);
             }

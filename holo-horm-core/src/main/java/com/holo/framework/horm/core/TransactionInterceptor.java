@@ -42,6 +42,10 @@ public final class TransactionInterceptor {
         Class<?>[] interfaces = targetClass.getInterfaces();
         if (interfaces.length == 0) {
             // Cannot create JDK proxy without interfaces
+            System.err.println("[HORM] WARNING: Cannot create transaction proxy for "
+                + targetClass.getName() + " — no interfaces implemented. "
+                + "Transaction semantics will NOT be applied. "
+                + "Consider implementing an interface or using APT proxy generation.");
             return target;
         }
         return (T) Proxy.newProxyInstance(

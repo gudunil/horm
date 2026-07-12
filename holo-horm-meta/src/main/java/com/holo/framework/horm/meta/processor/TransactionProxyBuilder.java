@@ -25,12 +25,15 @@ import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.tools.Diagnostic;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Generates APT-based transaction proxy subclasses for classes containing
@@ -81,7 +84,7 @@ final class TransactionProxyBuilder {
         String generatedPackage = packageName + ".generated";
 
         // Collect non-transactional public methods for delegation
-        List<ExecutableElement> nonTxMethods = collectNonTransactionalMethods(type);
+        List<ExecutableElement> nonTxMethods = collectNonTransactionalMethods(type, processingEnv);
 
         // Generate proxy subclass
         ClassName targetCn = ClassName.bestGuess(qualifiedName);
@@ -111,31 +114,41 @@ final class TransactionProxyBuilder {
 
     private static List<ProxyMethodInfo> collectTransactionalMethods(TypeElement type, ProcessingEnvironment processingEnv) {
         List<ProxyMethodInfo> result = new ArrayList<>();
-        for (Element enclosed : type.getEnclosedElements()) {
-            if (enclosed.getKind() != ElementKind.METHOD) {
-                continue;
-            }
-            AnnotationMirror txMirror = findAnnotationMirror(enclosed, Transactional.class.getName());
-            if (txMirror != null && enclosed instanceof ExecutableElement method) {
-                // Skip final methods — cannot override
-                if (method.getModifiers().contains(Modifier.FINAL)) {
-                    processingEnv.getMessager().printMessage(
-                        Diagnostic.Kind.WARNING,
-                        "@Transactional on final method " + method.getSimpleName()
-                            + " — APT proxy cannot override; will fall back to runtime bridge",
-                        method
-                    );
+        Set<String> seenSignatures = new HashSet<>();
+
+        // Traverse class hierarchy to include inherited @Transactional methods
+        for (TypeElement currentType : getClassHierarchy(type, processingEnv)) {
+            for (Element enclosed : currentType.getEnclosedElements()) {
+                if (enclosed.getKind() != ElementKind.METHOD) {
                     continue;
                 }
-                // Skip static methods — cannot override
-                if (method.getModifiers().contains(Modifier.STATIC)) {
-                    continue;
+                AnnotationMirror txMirror = findAnnotationMirror(enclosed, Transactional.class.getName());
+                if (txMirror != null && enclosed instanceof ExecutableElement method) {
+                    // Skip final methods — cannot override
+                    if (method.getModifiers().contains(Modifier.FINAL)) {
+                        processingEnv.getMessager().printMessage(
+                            Diagnostic.Kind.WARNING,
+                            "@Transactional on final method " + method.getSimpleName()
+                                + " — APT proxy cannot override; will fall back to runtime bridge",
+                            method
+                        );
+                        continue;
+                    }
+                    // Skip static methods — cannot override
+                    if (method.getModifiers().contains(Modifier.STATIC)) {
+                        continue;
+                    }
+                    // Skip private methods — cannot override
+                    if (method.getModifiers().contains(Modifier.PRIVATE)) {
+                        continue;
+                    }
+
+                    // Deduplicate by method signature to handle overrides
+                    String signature = getMethodSignature(method);
+                    if (seenSignatures.add(signature)) {
+                        result.add(new ProxyMethodInfo(method, txMirror, processingEnv));
+                    }
                 }
-                // Skip private methods — cannot override
-                if (method.getModifiers().contains(Modifier.PRIVATE)) {
-                    continue;
-                }
-                result.add(new ProxyMethodInfo(method, txMirror, processingEnv));
             }
         }
 
@@ -143,7 +156,35 @@ final class TransactionProxyBuilder {
         // public non-static non-final methods as transactional with class-level config
         AnnotationMirror classTxMirror = findAnnotationMirror(type, Transactional.class.getName());
         if (classTxMirror != null && result.isEmpty()) {
-            for (Element enclosed : type.getEnclosedElements()) {
+            for (TypeElement currentType : getClassHierarchy(type, processingEnv)) {
+                for (Element enclosed : currentType.getEnclosedElements()) {
+                    if (enclosed.getKind() != ElementKind.METHOD) {
+                        continue;
+                    }
+                    if (enclosed instanceof ExecutableElement method
+                        && !method.getModifiers().contains(Modifier.STATIC)
+                        && !method.getModifiers().contains(Modifier.FINAL)
+                        && !method.getModifiers().contains(Modifier.PRIVATE)
+                        && method.getModifiers().contains(Modifier.PUBLIC)) {
+                        String signature = getMethodSignature(method);
+                        if (seenSignatures.add(signature)) {
+                            result.add(new ProxyMethodInfo(method, classTxMirror, processingEnv));
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static List<ExecutableElement> collectNonTransactionalMethods(TypeElement type, ProcessingEnvironment processingEnv) {
+        List<ExecutableElement> result = new ArrayList<>();
+        Set<String> seenSignatures = new HashSet<>();
+
+        // Traverse class hierarchy to include inherited non-transactional methods
+        for (TypeElement currentType : getClassHierarchy(type, processingEnv)) {
+            for (Element enclosed : currentType.getEnclosedElements()) {
                 if (enclosed.getKind() != ElementKind.METHOD) {
                     continue;
                 }
@@ -152,29 +193,14 @@ final class TransactionProxyBuilder {
                     && !method.getModifiers().contains(Modifier.FINAL)
                     && !method.getModifiers().contains(Modifier.PRIVATE)
                     && method.getModifiers().contains(Modifier.PUBLIC)) {
-                    result.add(new ProxyMethodInfo(method, classTxMirror, processingEnv));
-                }
-            }
-        }
-
-        return result;
-    }
-
-    private static List<ExecutableElement> collectNonTransactionalMethods(TypeElement type) {
-        List<ExecutableElement> result = new ArrayList<>();
-        for (Element enclosed : type.getEnclosedElements()) {
-            if (enclosed.getKind() != ElementKind.METHOD) {
-                continue;
-            }
-            if (enclosed instanceof ExecutableElement method
-                && !method.getModifiers().contains(Modifier.STATIC)
-                && !method.getModifiers().contains(Modifier.FINAL)
-                && !method.getModifiers().contains(Modifier.PRIVATE)
-                && method.getModifiers().contains(Modifier.PUBLIC)) {
-                // Only include if not already a transactional method
-                AnnotationMirror txMirror = findAnnotationMirror(method, Transactional.class.getName());
-                if (txMirror == null) {
-                    result.add(method);
+                    // Only include if not already a transactional method
+                    AnnotationMirror txMirror = findAnnotationMirror(method, Transactional.class.getName());
+                    if (txMirror == null) {
+                        String signature = getMethodSignature(method);
+                        if (seenSignatures.add(signature)) {
+                            result.add(method);
+                        }
+                    }
                 }
             }
         }
@@ -458,6 +484,46 @@ final class TransactionProxyBuilder {
 
     // --- Utility methods ---
 
+    /**
+     * Traverses the class hierarchy from the given type up to (but not including) Object.
+     * Returns a list starting with the type itself, followed by its superclass, etc.
+     */
+    private static List<TypeElement> getClassHierarchy(TypeElement type, ProcessingEnvironment processingEnv) {
+        List<TypeElement> hierarchy = new ArrayList<>();
+        TypeElement current = type;
+        while (current != null) {
+            hierarchy.add(current);
+            TypeMirror superclass = current.getSuperclass();
+            if (superclass instanceof DeclaredType declaredSuperclass) {
+                Element superElement = declaredSuperclass.asElement();
+                if (superElement instanceof TypeElement superTypeElement
+                    && !superTypeElement.getQualifiedName().toString().equals("java.lang.Object")) {
+                    current = superTypeElement;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        return hierarchy;
+    }
+
+    /**
+     * Returns a unique signature for a method based on its name and parameter types.
+     * Used for deduplication when traversing the class hierarchy.
+     */
+    private static String getMethodSignature(ExecutableElement method) {
+        StringBuilder sig = new StringBuilder();
+        sig.append(method.getSimpleName().toString()).append('(');
+        for (int i = 0; i < method.getParameters().size(); i++) {
+            if (i > 0) sig.append(',');
+            sig.append(method.getParameters().get(i).asType().toString());
+        }
+        sig.append(')');
+        return sig.toString();
+    }
+
     private static AnnotationMirror findAnnotationMirror(Element element, String annotationQualifiedName) {
         for (AnnotationMirror mirror : element.getAnnotationMirrors()) {
             if (mirror.getAnnotationType().toString().equals(annotationQualifiedName)) {
@@ -504,7 +570,10 @@ final class TransactionProxyBuilder {
                 .build()
                 .writeTo(filer);
         } catch (IOException e) {
-            // FilerException for duplicate writes is benign
+            // FilerException (duplicate writes) is benign, but other IO errors should be reported
+            if (!e.getClass().getName().contains("FilerException")) {
+                System.err.println("[HORM] Failed to write generated file to " + packageName + ": " + e.getMessage());
+            }
         }
     }
 

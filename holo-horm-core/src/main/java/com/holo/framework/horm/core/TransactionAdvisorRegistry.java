@@ -10,10 +10,12 @@ import java.lang.reflect.Field;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -67,6 +69,9 @@ public final class TransactionAdvisorRegistry {
      * and {@link TransactionAdvisorProvider#targetClassName()} directly — no reflection.
      * The legacy path uses {@code Class.forName} + {@code Field.get} as a
      * backward-compatible fallback.
+     *
+     * <p>To avoid duplicate loading, advisors already loaded via ServiceLoader
+     * are skipped during legacy index processing.
      */
     private static void loadIndex() {
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
@@ -75,14 +80,15 @@ public final class TransactionAdvisorRegistry {
         }
 
         // Preferred path: ServiceLoader<TransactionAdvisorProvider> (zero-reflection)
-        loadFromServiceLoader(loader);
+        Set<String> loadedClasses = loadFromServiceLoader(loader);
 
         // Fallback path: legacy transactions.idx (reflection-based)
-        // Always attempt to load — some advisors may only be registered via index
-        loadLegacyIndex(loader);
+        // Skip advisors already loaded via ServiceLoader to avoid duplicate work
+        loadLegacyIndex(loader, loadedClasses);
     }
 
-    private static void loadFromServiceLoader(ClassLoader loader) {
+    private static Set<String> loadFromServiceLoader(ClassLoader loader) {
+        Set<String> loadedClasses = new HashSet<>();
         try {
             for (TransactionAdvisorProvider provider : ServiceLoader.load(TransactionAdvisorProvider.class, loader)) {
                 try {
@@ -94,6 +100,7 @@ public final class TransactionAdvisorRegistry {
                             methodMap.put(meta.methodName(), meta);
                         }
                         REGISTRY.put(targetClassName, methodMap);
+                        loadedClasses.add(targetClassName);
                     }
                 } catch (Exception e) {
                     System.err.println("[HORM] Failed to load transaction advisor from provider "
@@ -103,14 +110,15 @@ public final class TransactionAdvisorRegistry {
         } catch (Exception e) {
             System.err.println("[HORM] Failed to enumerate TransactionAdvisorProvider services: " + e);
         }
+        return loadedClasses;
     }
 
-    private static void loadLegacyIndex(ClassLoader loader) {
+    private static void loadLegacyIndex(ClassLoader loader, Set<String> alreadyLoadedClasses) {
         try {
             Enumeration<URL> urls = loader.getResources(INDEX_RESOURCE);
             while (urls.hasMoreElements()) {
                 URL url = urls.nextElement();
-                loadIndexFromUrl(url, loader);
+                loadIndexFromUrl(url, loader, alreadyLoadedClasses);
             }
         } catch (Exception e) {
             // Defensive: never fail class-init because of an I/O error.
@@ -118,7 +126,7 @@ public final class TransactionAdvisorRegistry {
         }
     }
 
-    private static void loadIndexFromUrl(URL url, ClassLoader loader) {
+    private static void loadIndexFromUrl(URL url, ClassLoader loader, Set<String> alreadyLoadedClasses) {
         try (InputStream in = url.openStream();
              BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
             String line;
@@ -127,14 +135,14 @@ public final class TransactionAdvisorRegistry {
                 if (trimmed.isEmpty() || trimmed.startsWith("#")) {
                     continue;
                 }
-                registerByAdvisorClassName(trimmed, loader);
+                registerByAdvisorClassName(trimmed, loader, alreadyLoadedClasses);
             }
         } catch (Exception e) {
             System.err.println("[HORM] Failed to read transaction index " + url + ": " + e);
         }
     }
 
-    private static void registerByAdvisorClassName(String advisorClassName, ClassLoader loader) {
+    private static void registerByAdvisorClassName(String advisorClassName, ClassLoader loader, Set<String> alreadyLoadedClasses) {
         try {
             Class<?> advisorClass = Class.forName(advisorClassName, true, loader);
             Field methodsField = advisorClass.getField("METHODS");
@@ -143,13 +151,16 @@ public final class TransactionAdvisorRegistry {
                 // Derive the original class name from the advisor class name
                 // e.g. "com.example.FooTransactionAdvisor" -> "com.example.Foo"
                 String originalClassName = deriveOriginalClassName(advisorClassName);
-                Map<String, TransactionMethodMeta> methodMap = new ConcurrentHashMap<>();
-                for (Object obj : methodsList) {
-                    if (obj instanceof TransactionMethodMeta meta) {
-                        methodMap.put(meta.methodName(), meta);
+                // Skip if already loaded via ServiceLoader
+                if (!alreadyLoadedClasses.contains(originalClassName)) {
+                    Map<String, TransactionMethodMeta> methodMap = new ConcurrentHashMap<>();
+                    for (Object obj : methodsList) {
+                        if (obj instanceof TransactionMethodMeta meta) {
+                            methodMap.put(meta.methodName(), meta);
+                        }
                     }
+                    REGISTRY.put(originalClassName, methodMap);
                 }
-                REGISTRY.put(originalClassName, methodMap);
             } else {
                 System.err.println("[HORM] " + advisorClassName + ".METHODS is not a List: " + methodsObj);
             }
