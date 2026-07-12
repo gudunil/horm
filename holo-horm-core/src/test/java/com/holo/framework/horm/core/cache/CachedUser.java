@@ -1,12 +1,6 @@
 package com.holo.framework.horm.core.cache;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-
 import com.holo.framework.horm.core.Model;
-import com.holo.framework.horm.core.query.Query;
-import com.holo.framework.horm.core.query.UpdateQuery;
 import com.holo.framework.horm.meta.annotation.CacheLevel;
 import com.holo.framework.horm.meta.annotation.CachePolicy;
 import com.holo.framework.horm.meta.annotation.Cached;
@@ -45,29 +39,4 @@ public class CachedUser extends Model<CachedUser> {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
-
-    public static CachedUser find(Object id) {
-        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
-    }
-
-    public static Map<Object, CachedUser> findMany(Collection<?> ids) {
-        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
-    }
-
-    public static List<CachedUser> all() {
-        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
-    }
-
-    public static long count() {
-        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
-    }
-
-    public static Query<CachedUser> query() {
-        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
-    }
-
-    public static UpdateQuery<CachedUser> update() {
-        throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
-    }
-
 }
