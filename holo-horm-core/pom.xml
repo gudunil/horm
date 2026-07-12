@@ -109,21 +109,6 @@
 
   <build>
     <plugins>
-      <!-- Generate Active Record static method signatures into @Entity source files
-                 before compilation; ByteBuddy then fills in the implementations. -->
-      <plugin>
-        <groupId>com.holo.framework</groupId>
-        <artifactId>holo-horm-maven-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>generate-active-record-signatures</id>
-            <goals>
-              <goal>generate-active-record</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
@@ -150,26 +135,30 @@
         <groupId>net.bytebuddy</groupId>
         <artifactId>byte-buddy-maven-plugin</artifactId>
         <configuration>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
           <transformations>
             <transformation>
               <plugin>com.holo.framework.horm.core.instrument.HormModelPlugin</plugin>
             </transformation>
           </transformations>
         </configuration>
-        <executions>
-          <execution>
-            <id>instrument-entities</id>
-            <goals>
-              <goal>transform</goal>
-            </goals>
-          </execution>
-          <execution>
-            <id>instrument-test-entities</id>
-            <goals>
-              <goal>transform-test</goal>
-            </goals>
-          </execution>
-        </executions>
+          <executions>
+              <execution>
+                  <id>instrument-main</id>
+                  <goals>
+                      <goal>transform</goal>
+                  </goals>
+                  <!-- 默认 phase 就是 process-classes，可省略 -->
+              </execution>
+              <execution>
+                  <id>instrument-test</id>
+                  <goals>
+                      <goal>transform-test</goal>
+                  </goals>
+                  <!-- 默认 phase 是 process-test-classes -->
+              </execution>
+          </executions>
       </plugin>
     </plugins>
   </build>

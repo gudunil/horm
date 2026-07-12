@@ -36,6 +36,8 @@
         <holo-horm.version>${project.version}</holo-horm.version>
         <!-- 以下属性需与 holo-dependency-bom 中保持一致，便于子模块引用 -->
         <spring-boot.version>3.2.5</spring-boot.version>
+        <!-- Lombok 版本需在聚合 POM 中暴露，否则子模块无法在 annotationProcessorPaths 中引用 -->
+        <lombok.version>1.18.32</lombok.version>
         <!-- JavaPoet 版本统一管理（meta/codegen 直接声明，避免版本漂移） -->
         <javapoet.version>1.13.0</javapoet.version>
         <!-- JaCoCo 配置（parent-pom 未提供，由本聚合 pom 统一管理） -->
