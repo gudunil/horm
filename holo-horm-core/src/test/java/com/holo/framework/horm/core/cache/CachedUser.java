@@ -69,4 +69,5 @@ public class CachedUser extends Model<CachedUser> {
     public static UpdateQuery<CachedUser> update() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
+
 }

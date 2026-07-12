@@ -106,4 +106,5 @@ public class UserWithRelations extends Model<UserWithRelations> {
     public static UpdateQuery<UserWithRelations> update() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
+
 }

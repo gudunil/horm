@@ -44,28 +44,29 @@ public class User extends Model<User> {
 
     public Instant getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
-
+    
     public static User find(Object id) {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
-
+    
     public static Map<Object, User> findMany(Collection<?> ids) {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
-
+    
     public static List<User> all() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
-
+    
     public static long count() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
-
+    
     public static Query<User> query() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
-
+    
     public static UpdateQuery<User> update() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
+
 }

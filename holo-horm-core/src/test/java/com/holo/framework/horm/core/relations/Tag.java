@@ -55,4 +55,5 @@ public class Tag extends Model<Tag> {
     public static UpdateQuery<Tag> update() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
+
 }

@@ -15,7 +15,6 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
-import org.apache.maven.project.MavenProject;
 
 import com.github.javaparser.JavaParser;
 import com.github.javaparser.ParseResult;
@@ -41,9 +40,6 @@ import com.github.javaparser.printer.lexicalpreservation.LexicalPreservingPrinte
 @Mojo(name = "generate-active-record", defaultPhase = LifecyclePhase.PROCESS_SOURCES)
 public class GenerateActiveRecordMojo extends AbstractMojo {
 
-    @Parameter(defaultValue = "${project}", readonly = true, required = true)
-    private MavenProject project;
-
     @Parameter(defaultValue = "${project.basedir}/src/main/java", required = true)
     private File mainSourceDirectory;
 
@@ -52,9 +48,6 @@ public class GenerateActiveRecordMojo extends AbstractMojo {
 
     @Parameter(defaultValue = "Entity", required = true)
     private String entityAnnotationName;
-
-    @Parameter(defaultValue = "com.holo.framework.horm.core.Model", required = true)
-    private String modelClassName;
 
     @Parameter(defaultValue = "true")
     private boolean skipIfExists;

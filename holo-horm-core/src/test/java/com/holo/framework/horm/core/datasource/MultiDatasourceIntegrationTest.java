@@ -272,6 +272,7 @@ public class MultiDatasourceIntegrationTest {
         public static UpdateQuery<PrimaryUser> update() {
             throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
         }
+
     }
 
     @Entity(table = "secondary_product", dataSource = "secondary")
@@ -316,5 +317,6 @@ public class MultiDatasourceIntegrationTest {
         public static UpdateQuery<SecondaryProduct> update() {
             throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
         }
+
     }
 }

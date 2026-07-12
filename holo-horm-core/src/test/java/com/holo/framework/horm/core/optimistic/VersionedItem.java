@@ -52,4 +52,5 @@ public class VersionedItem extends Model<VersionedItem> {
     public static UpdateQuery<VersionedItem> update() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
+
 }

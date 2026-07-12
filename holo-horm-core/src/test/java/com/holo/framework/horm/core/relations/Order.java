@@ -84,4 +84,5 @@ public class Order extends Model<Order> {
     public static UpdateQuery<Order> update() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
+
 }

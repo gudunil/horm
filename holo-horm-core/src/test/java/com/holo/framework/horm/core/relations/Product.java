@@ -55,4 +55,5 @@ public class Product extends Model<Product> {
     public static UpdateQuery<Product> update() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
+
 }

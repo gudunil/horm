@@ -61,4 +61,5 @@ public class Profile extends Model<Profile> {
     public static UpdateQuery<Profile> update() {
         throw new UnsupportedOperationException("Instrumented by HORM ByteBuddy plugin");
     }
+
 }
