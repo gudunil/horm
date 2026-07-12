@@ -1,0 +1,4 @@
+Benchmark                 Mode  Cnt     Score     Error  Units
+CacheBenchmark.cacheHit   avgt   10   145.954 ±   4.565  ns/op
+CacheBenchmark.cacheMiss  avgt   10  8779.601 ±  33.824  ns/op
+CacheBenchmark.noCache    avgt   10  7164.899 ± 135.660  ns/op

@@ -55,6 +55,12 @@
             <artifactId>hibernate-core</artifactId>
         </dependency>
 
+        <!-- Caffeine：cache 模块声明为 optional，benchmark 需显式引入以使用 CachedHormSetup -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
