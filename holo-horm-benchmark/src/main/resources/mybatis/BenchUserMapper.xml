@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.holo.framework.horm.benchmark.entity.MybatisBenchUser">
+
+    <resultMap id="benchUserMap" type="com.holo.framework.horm.benchmark.entity.MybatisBenchUser">
+        <id property="id" column="id"/>
+        <result property="email" column="email"/>
+        <result property="name" column="name"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <select id="findById" parameterType="long" resultMap="benchUserMap">
+        SELECT id, email, name, created_at FROM bench_users WHERE id = #{id}
+    </select>
+
+    <select id="findAll" resultMap="benchUserMap">
+        SELECT id, email, name, created_at FROM bench_users
+    </select>
+
+    <select id="findList" resultMap="benchUserMap">
+        SELECT id, email, name, created_at FROM bench_users
+        ORDER BY id
+        LIMIT #{limit}
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*) FROM bench_users
+    </select>
+
+    <insert id="insert" parameterType="com.holo.framework.horm.benchmark.entity.MybatisBenchUser"
+            useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO bench_users (email, name, created_at)
+        VALUES (#{email}, #{name}, #{createdAt})
+    </insert>
+
+    <update id="update" parameterType="com.holo.framework.horm.benchmark.entity.MybatisBenchUser">
+        UPDATE bench_users
+        SET email = #{email}, name = #{name}, created_at = #{createdAt}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById" parameterType="long">
+        DELETE FROM bench_users WHERE id = #{id}
+    </delete>
+
+    <select id="findByIds" resultMap="benchUserMap">
+        SELECT id, email, name, created_at FROM bench_users
+        WHERE id IN
+        <foreach item="id" collection="list" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </select>
+
+</mapper>

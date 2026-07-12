@@ -19,9 +19,11 @@ public class BenchDataSourceProvider implements DataSourceProvider {
         }
     }
 
+    public static final String JDBC_URL = "jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1";
+
     @Override
     public Connection getConnection() throws SQLException {
-        Connection conn = DriverManager.getConnection("jdbc:h2:mem:bench;DB_CLOSE_DELAY=-1", "sa", "");
+        Connection conn = DriverManager.getConnection(JDBC_URL, "sa", "");
         conn.setAutoCommit(true);
         return conn;
     }
