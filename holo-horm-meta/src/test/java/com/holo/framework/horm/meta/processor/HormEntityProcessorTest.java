@@ -959,6 +959,76 @@ class HormEntityProcessorTest {
         assertThat(proxySrc).contains("NORMAL_METHOD_META");
     }
 
+    @Test
+    void generatesEntityMetaProviderImplementation() throws IOException {
+        Compilation comp = compile(USER_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String src = src(generated(comp, "UserMeta.java"));
+        assertThat(src).contains("implements EntityMetaProvider");
+        assertThat(src).contains("public EntityMeta<?> provide()");
+        assertThat(src).contains("return entityMeta()");
+    }
+
+    @Test
+    void generatesServiceLoaderConfigForEntityMetaProvider() throws IOException {
+        Compilation comp = compile(USER_SOURCE);
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String config = comp.generatedFiles().stream()
+            .filter(f -> f.getName().contains("META-INF/services/"))
+            .filter(f -> f.getName().contains("EntityMetaProvider"))
+            .findFirst().orElseThrow(() -> new AssertionError("no EntityMetaProvider service config"))
+            .getCharContent(true).toString();
+
+        assertThat(config).contains("test.generated.UserMeta");
+    }
+
+    @Test
+    void generatesTransactionAdvisorProviderImplementation() throws IOException {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public class InvoiceService {
+                @Transactional
+                public void createInvoice(String invoiceNo) {}
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String advisorSrc = src(generated(comp, "InvoiceServiceTransactionAdvisor.java"));
+        assertThat(advisorSrc).contains("implements TransactionAdvisorProvider");
+        assertThat(advisorSrc).contains("public List<TransactionMethodMeta> methods()");
+        assertThat(advisorSrc).contains("return METHODS");
+        assertThat(advisorSrc).contains("public String targetClassName()");
+        assertThat(advisorSrc).contains("return \"test.InvoiceService\"");
+    }
+
+    @Test
+    void generatesServiceLoaderConfigForTransactionAdvisorProvider() throws IOException {
+        Compilation comp = compileWithStubs("""
+            package test;
+            import com.holo.framework.horm.meta.annotation.Transactional;
+
+            public class ShippingService {
+                @Transactional(readOnly = true)
+                public String ship(String orderId) { return "shipped"; }
+            }
+            """);
+
+        assertThat(comp.status()).isEqualTo(Compilation.Status.SUCCESS);
+
+        String config = comp.generatedFiles().stream()
+            .filter(f -> f.getName().contains("META-INF/services/"))
+            .filter(f -> f.getName().contains("TransactionAdvisorProvider"))
+            .findFirst().orElseThrow(() -> new AssertionError("no TransactionAdvisorProvider service config"))
+            .getCharContent(true).toString();
+
+        assertThat(config).contains("test.generated.ShippingServiceTransactionAdvisor");
+    }
+
     private static Compilation compileWithStubs(String... sources) {
         String[] all = new String[sources.length + 7];
         all[0] = MODEL_SOURCE;

@@ -1,23 +1,29 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.meta.TransactionAdvisorProvider;
 import com.holo.framework.horm.meta.TransactionMethodMeta;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Runtime registry of transaction metadata, populated at class-init by
- * scanning {@code META-INF/horm/transactions.idx} on the classpath.
+ * Runtime registry of transaction metadata.
+ *
+ * <p>Populated at class-init by first attempting to discover
+ * {@link TransactionAdvisorProvider} implementations via {@link ServiceLoader}
+ * (the preferred, zero-reflection path). If no ServiceLoader configuration
+ * is found, falls back to scanning {@code META-INF/horm/transactions.idx}
+ * on the classpath (the legacy, reflection-based path).
  *
  * <p>The index file is written by the {@code holo-horm-meta} annotation
  * processor at compile time — one fully-qualified {@code XxxTransactionAdvisor}
@@ -54,18 +60,52 @@ public final class TransactionAdvisorRegistry {
     }
 
     /**
-     * Scans every {@code META-INF/horm/transactions.idx} on the classpath and
-     * registers the corresponding transaction metadata.
+     * Scans for transaction metadata using ServiceLoader first, then falls
+     * back to the legacy {@code META-INF/horm/transactions.idx} classpath index.
      *
-     * <p>Multiple jars may each contribute their own index file; the
-     * classloader's {@link ClassLoader#getResources(String)} enumeration
-     * merges them transparently.
+     * <p>The ServiceLoader path calls {@link TransactionAdvisorProvider#methods()}
+     * and {@link TransactionAdvisorProvider#targetClassName()} directly — no reflection.
+     * The legacy path uses {@code Class.forName} + {@code Field.get} as a
+     * backward-compatible fallback.
      */
     private static void loadIndex() {
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         if (loader == null) {
             loader = TransactionAdvisorRegistry.class.getClassLoader();
         }
+
+        // Preferred path: ServiceLoader<TransactionAdvisorProvider> (zero-reflection)
+        loadFromServiceLoader(loader);
+
+        // Fallback path: legacy transactions.idx (reflection-based)
+        // Always attempt to load — some advisors may only be registered via index
+        loadLegacyIndex(loader);
+    }
+
+    private static void loadFromServiceLoader(ClassLoader loader) {
+        try {
+            for (TransactionAdvisorProvider provider : ServiceLoader.load(TransactionAdvisorProvider.class, loader)) {
+                try {
+                    String targetClassName = provider.targetClassName();
+                    List<TransactionMethodMeta> methods = provider.methods();
+                    if (targetClassName != null && methods != null && !methods.isEmpty()) {
+                        Map<String, TransactionMethodMeta> methodMap = new ConcurrentHashMap<>();
+                        for (TransactionMethodMeta meta : methods) {
+                            methodMap.put(meta.methodName(), meta);
+                        }
+                        REGISTRY.put(targetClassName, methodMap);
+                    }
+                } catch (Exception e) {
+                    System.err.println("[HORM] Failed to load transaction advisor from provider "
+                        + provider.getClass().getName() + ": " + e);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[HORM] Failed to enumerate TransactionAdvisorProvider services: " + e);
+        }
+    }
+
+    private static void loadLegacyIndex(ClassLoader loader) {
         try {
             Enumeration<URL> urls = loader.getResources(INDEX_RESOURCE);
             while (urls.hasMoreElements()) {

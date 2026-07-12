@@ -506,31 +506,31 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 
 ---
 
-## M8.7: 零反射优化 — 编译期代理生成与反射消除（规划中）
+## M8.7: 零反射优化 — 编译期代理生成与反射消除（进行中）
 
 ### 交付清单
 
 | 子任务 | 描述 | 模块 | 状态 |
 |--------|------|------|------|
 | **Phase 1: APT 事务代理生成（消除 R3 + R7/R8）** | | | |
-| P1-1 | 定义 `TransactionProxyFactory` SPI 接口 | meta | 📋 |
-| P1-2 | 实现 `TransactionProxyBuilder`（JavaPoet 生成代理子类 + 工厂类） | meta | 📋 |
-| P1-3 | 扩展 `HormEntityProcessor` 调用 `TransactionProxyBuilder` | meta | 📋 |
-| P1-4 | APT 生成 `META-INF/services/...TransactionProxyFactory` | meta | 📋 |
-| P1-5 | 实现 `MethodBridgeFactory` 降级（LambdaMetafactory 桥接） | core | 📋 |
-| P1-6 | 改造 `HormTransactionalBeanPostProcessor`（ServiceLoader 加载工厂 + 移除 JDK Proxy） | starter | 📋 |
-| P1-7 | 改造 `TransactionInterceptor`（保留降级路径，内部用 MethodBridgeFactory） | core | 📋 |
-| P1-8 | APT compile-testing（代理类和工厂类生成验证） | meta (test) | 📋 |
-| P1-9 | Spring Boot 集成测试（@Transactional 方法事务拦截验证） | starter (test) | 📋 |
-| P1-10 | 性能基准测试（JMH: Method.invoke vs APT 代理 vs LambdaMetafactory） | benchmark | 📋 |
+| P1-1 | 定义 `TransactionProxyFactory` SPI 接口 | meta | ✅ |
+| P1-2 | 实现 `TransactionProxyBuilder`（JavaPoet 生成代理子类 + 工厂类） | meta | ✅ |
+| P1-3 | 扩展 `HormEntityProcessor` 调用 `TransactionProxyBuilder` | meta | ✅ |
+| P1-4 | APT 生成 `META-INF/services/...TransactionProxyFactory` | meta | ✅ |
+| P1-5 | 实现 `MethodBridgeFactory` 降级（LambdaMetafactory 桥接） | core | ✅ |
+| P1-6 | 改造 `HormTransactionalBeanPostProcessor`（ServiceLoader 加载工厂 + 移除 JDK Proxy） | starter | ✅ |
+| P1-7 | 改造 `TransactionInterceptor`（保留降级路径，内部用 MethodBridgeFactory） | core | ✅ |
+| P1-8 | APT compile-testing（代理类和工厂类生成验证） | meta (test) | ✅ |
+| P1-9 | Spring Boot 集成测试（@Transactional 方法事务拦截验证） | starter (test) | ✅ |
+| P1-10 | 性能基准测试（JMH: Method.invoke vs APT 代理 vs LambdaMetafactory） | benchmark | ✅ |
 | **Phase 2: ServiceLoader 替代自定义索引（消除 R1 + R2）** | | | |
-| P2-1 | 定义 `EntityMetaProvider` SPI 接口 | meta | 📋 |
-| P2-2 | 定义 `TransactionAdvisorProvider` SPI 接口 | meta | 📋 |
-| P2-3 | APT 生成的 XxxMeta 实现 EntityMetaProvider | meta | 📋 |
-| P2-4 | APT 生成 `META-INF/services` 文件 | meta | 📋 |
-| P2-5 | 改造 `EntityMetaRegistry`（ServiceLoader 优先 + entities.idx 兼容回退） | core | 📋 |
-| P2-6 | 改造 `TransactionAdvisorRegistry`（ServiceLoader 优先 + transactions.idx 兼容回退） | core | 📋 |
-| P2-7 | 兼容性测试 | core (test) | 📋 |
+| P2-1 | 定义 `EntityMetaProvider` SPI 接口 | meta | ✅ |
+| P2-2 | 定义 `TransactionAdvisorProvider` SPI 接口 | meta | ✅ |
+| P2-3 | APT 生成的 XxxMeta 实现 EntityMetaProvider | meta | ✅ |
+| P2-4 | APT 生成 `META-INF/services` 文件（EntityMetaProvider + TransactionAdvisorProvider） | meta | ✅ |
+| P2-5 | 改造 `EntityMetaRegistry`（ServiceLoader + entities.idx 兼容回退） | core | ✅ |
+| P2-6 | 改造 `TransactionAdvisorRegistry`（ServiceLoader + transactions.idx 兼容回退） | core | ✅ |
+| P2-7 | 兼容性测试 | meta (test) | ✅ |
 | **Phase 3: 清理冗余反射（消除 R4 + R5 + 优化 R6）** | | | |
 | P3-1 | 移除 CaffeineCache Class.forName（改用工厂方法 + NoClassDefFoundError） | cache | 📋 |
 | P3-2 | 移除 RedisCache Class.forName（改用工厂方法 + NoClassDefFoundError） | cache | 📋 |

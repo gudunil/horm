@@ -1,5 +1,6 @@
 package com.holo.framework.horm.meta.processor;
 
+import com.holo.framework.horm.meta.TransactionAdvisorProvider;
 import com.holo.framework.horm.meta.annotation.Isolation;
 import com.holo.framework.horm.meta.annotation.Propagation;
 import com.holo.framework.horm.meta.annotation.Transactional;
@@ -7,6 +8,7 @@ import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
+import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeSpec;
 
@@ -54,7 +56,7 @@ final class TransactionAdvisorBuilder {
         String advisorName = simpleName + "TransactionAdvisor";
         String generatedPackage = packageName + ".generated";
 
-        TypeSpec advisorClass = buildAdvisorClass(advisorName, methods);
+        TypeSpec advisorClass = buildAdvisorClass(advisorName, qualifiedName, methods);
         JavaFile javaFile = JavaFile.builder(generatedPackage, advisorClass).build();
 
         try {
@@ -95,6 +97,7 @@ final class TransactionAdvisorBuilder {
     }
 
     private static TypeSpec buildAdvisorClass(String advisorName,
+                                               String targetQualifiedName,
                                                List<TransactionMethodInfo> methods) {
         ClassName metaType = ClassName.get(
             "com.holo.framework.horm.meta", "TransactionMethodMeta");
@@ -122,10 +125,29 @@ final class TransactionAdvisorBuilder {
             .initializer(init.build())
             .build();
 
+        // methods() — implements TransactionAdvisorProvider
+        MethodSpec methodsMethod = MethodSpec.methodBuilder("methods")
+            .addAnnotation(Override.class)
+            .addModifiers(javax.lang.model.element.Modifier.PUBLIC)
+            .returns(listType)
+            .addStatement("return METHODS")
+            .build();
+
+        // targetClassName() — implements TransactionAdvisorProvider
+        MethodSpec targetClassNameMethod = MethodSpec.methodBuilder("targetClassName")
+            .addAnnotation(Override.class)
+            .addModifiers(javax.lang.model.element.Modifier.PUBLIC)
+            .returns(String.class)
+            .addStatement("return $S", targetQualifiedName)
+            .build();
+
         return TypeSpec.classBuilder(advisorName)
             .addModifiers(javax.lang.model.element.Modifier.PUBLIC,
                 javax.lang.model.element.Modifier.FINAL)
+            .addSuperinterface(ClassName.get(TransactionAdvisorProvider.class))
             .addField(methodsField)
+            .addMethod(methodsMethod)
+            .addMethod(targetClassNameMethod)
             .build();
     }
 
