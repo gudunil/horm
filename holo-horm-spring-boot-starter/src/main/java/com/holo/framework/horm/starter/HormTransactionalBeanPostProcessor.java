@@ -1,86 +1,69 @@
 package com.holo.framework.horm.starter;
 
+import com.holo.framework.horm.core.HormContext;
 import com.holo.framework.horm.core.TransactionAdvisorRegistry;
 import com.holo.framework.horm.core.TransactionInterceptor;
-import com.holo.framework.horm.meta.annotation.Transactional;
+import com.holo.framework.horm.meta.TransactionProxyFactory;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
-import java.util.Arrays;
+import java.util.Map;
+import java.util.ServiceLoader;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Spring Bean 后置处理器，用于自动为标注了 {@link Transactional} 注解的 Bean 创建事务代理。
+ * Spring Bean 后置处理器，用于自动为标注了 {@code @Transactional} 注解的 Bean 创建事务代理。
  *
- * <p>此处理器在 Bean 初始化完成后检查 Bean 类是否标注了 {@code @Transactional} 注解
- * （类级别或方法级别）。如果存在注解且 Bean 实现了至少一个接口，则使用 JDK 动态代理
- * 包装该 Bean，代理调用 {@link TransactionInterceptor} 实现事务拦截。
+ * <p>M8.7 改造：优先使用 APT 编译期生成的代理子类（通过 {@link TransactionProxyFactory}
+ * SPI 发现），消除运行时反射。如果 APT 代理不可用（final 类/第三方类），降级到
+ * {@link TransactionInterceptor} 运行时拦截。
  *
- * <p>注意：JDK 动态代理要求 Bean 必须实现至少一个接口。对于未实现接口的 Bean，
- * 此处理器不会创建代理，事务注解将被忽略。
- *
- * <p>事务元数据由 APT 在编译期生成并注册到 {@code TransactionAdvisorRegistry}，
- * 运行时 {@link TransactionInterceptor} 根据元数据决定事务行为。
- *
- * @author Holo Framework Team
- * @since 1.0.0
+ * <p>此改造消除了以下反射调用：
+ * <ul>
+ *   <li>{@code Proxy.newProxyInstance()} — 替换为 APT 代理子类实例化</li>
+ *   <li>{@code getDeclaredMethods()} / {@code isAnnotationPresent()} — 替换为
+ *       ServiceLoader 发现 + 代理工厂匹配</li>
+ * </ul>
  */
 public class HormTransactionalBeanPostProcessor implements BeanPostProcessor {
 
-    /**
-     * 在 Bean 初始化完成后检查是否需要创建事务代理。
-     *
-     * <p>如果 Bean 类标注了 {@code @Transactional} 注解（类级别或任意方法级别），
-     * 且 Bean 实现了至少一个接口，则返回 JDK 动态代理；否则返回原始 Bean。
-     *
-     * @param bean     the new bean instance
-     * @param beanName the name of the bean
-     * @return 事务代理或原始 Bean
-     * @throws BeansException in case of errors
-     */
+    private final Map<Class<?>, TransactionProxyFactory> factoryCache = new ConcurrentHashMap<>();
+    private volatile boolean serviceLoaderExhausted = false;
+
     @Override
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
         Class<?> beanClass = bean.getClass();
 
-        // 检查是否有事务元数据注册（APT 生成或手动注册）
-        if (!TransactionAdvisorRegistry.isTransactional(beanClass) && !hasTransactionalAnnotation(beanClass)) {
+        // Try APT-generated proxy factory first (zero-reflection path)
+        TransactionProxyFactory factory = factoryCache.computeIfAbsent(beanClass, this::findFactory);
+        if (factory != null) {
+            try {
+                return factory.create(bean, HormContext.current());
+            } catch (Exception e) {
+                // Factory failed; fall through to runtime interceptor
+            }
+        }
+
+        // Fallback: check if transaction metadata exists and use runtime interceptor
+        if (!TransactionAdvisorRegistry.isTransactional(beanClass)) {
             return bean;
         }
 
-        Class<?>[] interfaces = beanClass.getInterfaces();
-        if (interfaces.length == 0) {
-            // JDK 动态代理要求至少一个接口；未实现接口的 Bean 无法代理
-            return bean;
-        }
-
-        return Proxy.newProxyInstance(
-            beanClass.getClassLoader(),
-            interfaces,
-            (proxy, method, args) -> TransactionInterceptor.invoke(bean, method, args)
-        );
+        // Runtime interception path (reflection-based, for classes without APT proxy)
+        return TransactionInterceptor.createProxy(bean);
     }
 
-    /**
-     * 检查指定类是否标注了 {@code @Transactional} 注解。
-     *
-     * <p>检查范围包括类级别注解和所有方法的注解（含继承自父类的方法）。
-     *
-     * @param clazz the class to check
-     * @return true 如果类或任意方法标注了 {@code @Transactional}
-     */
-    private boolean hasTransactionalAnnotation(Class<?> clazz) {
-        Class<?> current = clazz;
-        while (current != null && current != Object.class) {
-            if (current.isAnnotationPresent(Transactional.class)) {
-                return true;
+    private TransactionProxyFactory findFactory(Class<?> beanClass) {
+        for (TransactionProxyFactory f : loadFactories()) {
+            if (f.targetType().equals(beanClass)) {
+                return f;
             }
-            if (Arrays.stream(current.getDeclaredMethods())
-                .anyMatch(m -> m.isAnnotationPresent(Transactional.class))) {
-                return true;
-            }
-            current = current.getSuperclass();
         }
-        return false;
+        return null;
+    }
+
+    private Iterable<TransactionProxyFactory> loadFactories() {
+        return ServiceLoader.load(TransactionProxyFactory.class,
+            Thread.currentThread().getContextClassLoader());
     }
 }

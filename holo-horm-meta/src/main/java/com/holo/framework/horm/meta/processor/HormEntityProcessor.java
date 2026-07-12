@@ -55,6 +55,7 @@ public class HormEntityProcessor extends AbstractProcessor {
 
     private final List<EntityDescriptor> descriptors = new ArrayList<>();
     private final List<String> transactionAdvisorNames = new ArrayList<>();
+    private final List<String> transactionProxyFactoryNames = new ArrayList<>();
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -80,6 +81,18 @@ public class HormEntityProcessor extends AbstractProcessor {
                     messager().printMessage(
                         Diagnostic.Kind.ERROR,
                         "Failed to write transactions.idx: " + ex.getMessage()
+                    );
+                }
+            }
+            if (!transactionProxyFactoryNames.isEmpty()) {
+                try {
+                    IndexWriter.writeServiceConfig(processingEnv.getFiler(),
+                        "com.holo.framework.horm.meta.TransactionProxyFactory",
+                        transactionProxyFactoryNames);
+                } catch (IOException ex) {
+                    messager().printMessage(
+                        Diagnostic.Kind.ERROR,
+                        "Failed to write TransactionProxyFactory service config: " + ex.getMessage()
                     );
                 }
             }
@@ -128,6 +141,10 @@ public class HormEntityProcessor extends AbstractProcessor {
                     String advisorName = TransactionAdvisorBuilder.build(type, processingEnv.getFiler(), processingEnv);
                     if (advisorName != null) {
                         transactionAdvisorNames.add(advisorName);
+                    }
+                    String factoryName = TransactionProxyBuilder.build(type, processingEnv.getFiler(), processingEnv);
+                    if (factoryName != null) {
+                        transactionProxyFactoryNames.add(factoryName);
                     }
                 } catch (Exception ex) {
                     messager().printMessage(

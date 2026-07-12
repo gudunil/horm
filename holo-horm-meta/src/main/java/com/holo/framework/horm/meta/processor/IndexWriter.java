@@ -69,6 +69,33 @@ public final class IndexWriter {
         }
     }
 
+    /**
+     * Writes a {@code META-INF/services/<serviceInterface>} file listing the
+     * given implementation classes. This is the standard JDK ServiceLoader
+     * configuration format used for M8.7 zero-reflection proxy discovery.
+     *
+     * <p>Existing entries are merged and de-duplicated so that manually
+     * maintained service files in {@code src/main/resources} are preserved.
+     *
+     * @param filer             the APT filer
+     * @param serviceInterface  the fully-qualified service interface name
+     *                          (e.g. {@code "com.holo.framework.horm.meta.TransactionProxyFactory"})
+     * @param implementationNames fully-qualified names of implementation classes
+     */
+    public static void writeServiceConfig(Filer filer, String serviceInterface,
+                                          List<String> implementationNames) throws IOException {
+        String path = "META-INF/services/" + serviceInterface;
+        Set<String> entries = new LinkedHashSet<>(readExistingEntries(filer, path));
+        entries.addAll(implementationNames);
+        FileObject res = filer.createResource(StandardLocation.CLASS_OUTPUT, "", path);
+        try (Writer w = res.openWriter()) {
+            for (String entry : entries) {
+                w.write(entry);
+                w.write('\n');
+            }
+        }
+    }
+
     private static Set<String> readExistingEntries(Filer filer, String path) {
         Set<String> existing = new LinkedHashSet<>();
         try {

@@ -505,9 +505,10 @@ public final class TransactionManager {
      * new transaction the callbacks have already been consumed by
      * {@link #commit}/{@link #rollback}, so there is nothing to transfer.
      *
-     * <p>Package-private for use by {@link TransactionInterceptor}.
+     * <p>Public for use by {@link TransactionInterceptor} and APT-generated
+     * transaction proxy subclasses.
      */
-    static void popAndResume(String dataSourceName, TransactionStatus status) {
+    public static void popAndResume(String dataSourceName, TransactionStatus status) {
         Map<String, Deque<TransactionStatus>> stacks = TRANSACTION_STACKS.get();
         Deque<TransactionStatus> stack = stacks.get(dataSourceName);
         if (stack != null && !stack.isEmpty() && stack.peek() == status) {
