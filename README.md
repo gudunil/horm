@@ -78,25 +78,31 @@ public class User extends Model<User> {
 ### 使用
 
 ```java
+import com.holo.framework.horm.core.Model;
+import com.holo.framework.horm.core.query.Order;
+
 // 创建
 User user = new User();
 user.setEmail("a@b.com");
-user.save();
+user.save();                      // INSERT，主键回填
 
 // 查询
-User found = User.find(User.class, 1L);
+User found = Model.find(User.class, 1L);
 
 // 条件查询（类型安全 DSL）
-List<User> actives = User.where(User.class, UserQueryMeta.EMAIL.like("%@b.com"))
-    .orderBy(UserQueryMeta.CREATED_AT.desc())
+List<User> actives = Model.query(User.class)
+    .where(UserQueryMeta.EMAIL.like("%@b.com"))
+    .orderBy(UserQueryMeta.CREATED_AT, Order.DESC)
     .limit(10)
-    .all();
+    .list();
 
-// 关联预加载
-List<User> users = User.all(User.class)
-    .include(User::getOrders)
-    .all();
+// 关联预加载（Eager JOIN）
+List<User> users = Model.query(User.class)
+    .fetch(UserQueryMeta.ORDERS)
+    .list();
 ```
+
+> **静态方法调用规范**：业务源码中应使用 `Model.find(User.class, id)` 而非 `User.find(id)`，避免 Java 静态方法编译期绑定到 fallback。详见 [docs/09-zero-reflection-optimization.md](./docs/09-zero-reflection-optimization.md)。
 
 ## 模块结构
 
@@ -119,6 +125,11 @@ holo-horm/
 
 完整文档位于 [`docs/`](./docs/README.md)，包括：
 
+- [快速上手](./docs/10-quickstart.md) — 5 分钟跑通
+- [用户指南](./docs/11-user-guide.md) — 完整 API 参考
+- [迁移指南](./docs/12-migration-guide.md) — 从 MyBatis/Hibernate 迁移
+- [性能基准报告](./docs/13-benchmark-results.md) — JMH 基准设计
+- [AOT / GraalVM](./docs/14-aot-graalvm.md) — Native Image 兼容性
 - [技术调研报告](./docs/00-research.md)
 - [架构设计](./docs/01-architecture.md)
 - [零反射实现方案](./docs/02-zero-reflection.md)
@@ -127,13 +138,16 @@ holo-horm/
 - [Active Record API](./docs/05-active-record.md)
 - [扩展特性](./docs/06-extension-features.md)
 - [性能与安全](./docs/07-performance-security.md)
+- [方言适配](./docs/08-dialect-adaptation.md)
+- [零反射优化（M8.7）](./docs/09-zero-reflection-optimization.md)
 - [架构图源文件](./docs/diagrams/)
 
 ## 版本
 
 - **当前版本**：1.0.0-SNAPSHOT
-- **状态**：设计阶段
-- **预计 GA**：2027-07
+- **状态**：M1-M8.7 已完成，M9 性能基准与文档完善进行中
+- **里程碑**：M1-M8.7 ✅ / M9 🚧
+- **预计 GA**：2026 Q4
 
 详见 [开发计划与里程碑](./docs/07-performance-security.md#六开发计划与里程碑)。
 

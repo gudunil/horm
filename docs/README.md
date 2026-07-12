@@ -16,6 +16,13 @@
 | 05 | [Active Record API](./05-active-record.md) | Model 基类、查询 DSL、关联关系、Scope、批量操作、验证、生命周期钩子 | 业务开发者 |
 | 06 | [扩展特性](./06-extension-features.md) | 类型安全、事务并发、迁移工具、日志监控、异常机制、代码生成、框架集成 | 全体 |
 | 07 | [性能与安全](./07-performance-security.md) | 性能优化、安全考量、AOT 兼容、容量规划、开发计划与里程碑 | 架构师、运维 |
+| 08 | [方言适配](./08-dialect-adaptation.md) | MySQL/PostgreSQL/H2 方言 SPI、URL 自动检测、SchemaRenderer | 核心开发者 |
+| 09 | [零反射优化](./09-zero-reflection-optimization.md) | M8.7 APT 编译期代理生成、ServiceLoader 替代反射、LambdaMetafactory 降级 | 核心开发者 |
+| 10 | [快速上手](./10-quickstart.md) | 5 分钟跑通：依赖、APT、实体、CRUD、查询、Spring Boot | 新用户 |
+| 11 | [用户指南](./11-user-guide.md) | 完整 API 参考：Active Record、Query DSL、事务、缓存、关联、多数据源、方言、迁移 | 业务开发者 |
+| 12 | [迁移指南](./12-migration-guide.md) | 从 MyBatis/Hibernate/JPA 迁移：概念映射、API 对照、常见陷阱 | 迁移用户 |
+| 13 | [性能基准报告](./13-benchmark-results.md) | JMH 基准设计、HORM vs JDBC/MyBatis/Hibernate 结果范围、优化建议 | 架构师、性能工程师 |
+| 14 | [AOT / GraalVM](./14-aot-graalvm.md) | Native Image 兼容性、配置说明、Tracing Agent、验证步骤 | 架构师、运维 |
 | - | [架构图源文件](./diagrams/) | PlantUML 架构图源文件 | 全体 |
 
 ---
@@ -24,14 +31,21 @@
 
 ### 我想要...
 
+- **5 分钟快速上手** → [10-quickstart.md](./10-quickstart.md)
+- **查看完整用户指南** → [11-user-guide.md](./11-user-guide.md)
+- **从 MyBatis/Hibernate 迁移** → [12-migration-guide.md](./12-migration-guide.md)
+- **查看性能基准** → [13-benchmark-results.md](./13-benchmark-results.md)
+- **了解 GraalVM Native Image** → [14-aot-graalvm.md](./14-aot-graalvm.md)
 - **了解整体设计** → [01-architecture.md](./01-architecture.md)
 - **了解技术选型依据** → [00-research.md](./00-research.md)
 - **使用 Active Record API** → [05-active-record.md](./05-active-record.md)
 - **理解零反射实现** → [02-zero-reflection.md](./02-zero-reflection.md)
+- **理解 M8.7 反射消除** → [09-zero-reflection-optimization.md](./09-zero-reflection-optimization.md)
 - **接入自定义数据源** → [03-multi-datasource.md](./03-multi-datasource.md) 第六章
 - **配置多级缓存** → [04-cache-chain.md](./04-cache-chain.md) 第九章
-- **使用事务** → [06-extension-features.md](./06-extension-features.md) 第二章
-- **数据库迁移** → [06-extension-features.md](./06-extension-features.md) 第三章
+- **使用事务** → [11-user-guide.md](./11-user-guide.md) 第三章
+- **数据库迁移** → [11-user-guide.md](./11-user-guide.md) 第八章
+- **方言适配** → [08-dialect-adaptation.md](./08-dialect-adaptation.md)
 - **了解开发计划** → [07-performance-security.md](./07-performance-security.md) 第六章
 
 ### 按角色查看
