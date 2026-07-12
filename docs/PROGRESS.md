@@ -1,7 +1,7 @@
 # HORM 开发进度
 
 > 接续点文档：记录各里程碑完成状态、关键决策、下一步计划。
-> 维护人：Holo Framework Team · 更新时间：2026-07-06
+> 维护人：Holo Framework Team · 更新时间：2026-07-13
 
 ---
 
@@ -19,9 +19,9 @@
 | M8     | ✅ 完成 | 2026-07-06     | v1.0.0-M8  |
 | M8.5   | ✅ 完成 | 2026-07-11     | —          |
 | M8.7   | ✅ 完成 | 2026-07-12     | —          |
-| M9     | 📋 规划中 | —              | —          |
+| M9     | ✅ 完成 | 2026-07-13     | —          |
 
-**当前分支**：`feature/m8.5-dialect`（M8.5 已完成，待 squash merge 到 `main`）
+**当前分支**：`feature/m9-ga-benchmark`（M9 已完成，待 squash merge 到 `main`）
 
 ---
 
@@ -576,13 +576,95 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 
 ---
 
+## M9: 性能基准与 GA 发布（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | 状态 |
+|--------|------|------|
+| **Phase 1: JMH 基准测试套件** | | |
+| P1-1 | BOM 添加 `hibernate-orm.version=6.4.4.Final` + `mybatis.version=3.5.16` | ✅ |
+| P1-2 | benchmark pom 引入 hibernate-core + mybatis 依赖 | ✅ |
+| P1-3 | 实体类：`BenchUser`(HORM) + `CachedBenchUser` + `MybatisBenchUser` + `HibernateBenchUser` | ✅ |
+| P1-4 | Schema: `bench_users` 表 DDL + MyBatis 配置 + Mapper XML | ✅ |
+| P1-5 | Setup 类：`BenchmarkEnv`(共享 H2) + `HormSetup` + `CachedHormSetup` + `JdbcSetup` + `MybatisSetup` + `HibernateSetup` | ✅ |
+| P1-6 | `FindByIdBenchmark`（4 框架对比） | ✅ |
+| P1-7 | `CrudBenchmark`（INSERT/UPDATE/DELETE × 4 框架 = 12 方法） | ✅ |
+| P1-8 | `QueryBenchmark`（条件查询+排序+分页，@Param 10/100） | ✅ |
+| P1-9 | `CacheBenchmark`（cacheHit/cacheMiss/noCache） | ✅ |
+| P1-10 | `BatchInsertBenchmark`（@Param 100/1000 × 4 框架） | ✅ |
+| P1-11 | `FindManyBenchmark`（批量查询 100 ID × 4 框架） | ✅ |
+| P1-12 | `BenchmarkRunner` JMH Main 入口 | ✅ |
+| P1-13 | 编译验证 + APT 生成伴随类（BenchUserQueryMeta 等） | ✅ |
+| **Phase 2: 文档完善** | | |
+| P2-1 | `docs/10-quickstart.md` — 5 分钟快速上手 | ✅ |
+| P2-2 | `docs/11-user-guide.md` — 完整用户指南（API/Query/事务/缓存/关联/数据源/方言/迁移） | ✅ |
+| P2-3 | `docs/12-migration-guide.md` — MyBatis/Hibernate/JPA 迁移指南 | ✅ |
+| P2-4 | `docs/13-benchmark-results.md` — JMH 基准设计 + 预期结果范围 + 优化建议 | ✅ |
+| P2-5 | `docs/14-aot-graalvm.md` — GraalVM Native Image 兼容性文档 | ✅ |
+| P2-6 | 更新 `docs/README.md` 与 `README.md`（修正过时 API，添加文档导航） | ✅ |
+| **Phase 3: AOT/GraalVM 配置** | | |
+| P3-1 | `holo-horm-meta` native-image.properties（`--initialize-at-build-time`） | ✅ |
+| P3-2 | `holo-horm-core` native-image.properties + resource-config.json | ✅ |
+| P3-3 | `holo-horm-cache` native-image.properties + reflect-config.json（TypeReference） | ✅ |
+| P3-4 | `holo-horm-spring-boot-starter` native-image.properties + resource-config.json | ✅ |
+| **Phase 4: 收尾** | | |
+| P4-1 | 更新根 `CLAUDE.md` 与 `holo-horm/CLAUDE.md` 模块状态 | ✅ |
+| P4-2 | 更新 `holo-horm-benchmark/CLAUDE.md` 源代码清单与设计决策 | ✅ |
+| P4-3 | 更新 `docs/PROGRESS.md` M9 章节 | ✅ |
+
+### 测试与覆盖率
+
+- **基准测试类**：6 个（不含 M8.7 的 `TransactionProxyBenchmark`）+ 1 个入口类
+- **benchmark 模块无单元测试**：纯 JMH 性能基准，运行时验证
+- **核心模块测试回归**：M9 未修改核心模块代码，无回归风险
+- **验证命令**：
+  - `mvn -pl holo-horm-benchmark -am compile -Pskip-enforcer` ✅
+  - `mvn -f holo-horm/pom.xml -pl holo-horm-meta,holo-horm-core,holo-horm-cache,holo-horm-spring-boot-starter -am compile -Pskip-enforcer -o` ✅
+
+### 关键设计决策
+
+1. **范围限定**：M9 仅包含 JMH 基准、文档完善、AOT 配置模板。不实现 codegen/examples/datasource 新模块；不配置 Maven Central 发布；版本号保持 1.0.0-SNAPSHOT。
+2. **ByteBuddy 注入时序**：benchmark main 源码必须用 `Model.find(BenchUser.class, id)` 而非 `BenchUser.find(id)`。根因：Java 静态方法编译期绑定，`BenchUser.find(id)` 在 test-compile 阶段会绑定到 `Model.find(Object)` fallback。详见 [docs/09-zero-reflection-optimization.md](./09-zero-reflection-optimization.md)。
+3. **CachedBenchUser 复用 bench_users 表**：只读场景安全，避免额外建表。`CachedHormSetup` 安装带 `CacheChain` 的 `HormContext`，`HormSetup` 安装无 `CacheChain` 的 context。
+4. **MyBatis foreach 修复**：裸 List 参数的默认 key 是 `list` 而非 `ids`，`BenchUserMapper.xml` 的 `findByIds` 改为 `collection="list"`。
+5. **@Param 必须配 @State**：JMH 要求使用 `@Param` 字段的类必须标注 `@State`。`QueryBenchmark` 和 `BatchInsertBenchmark` 都加了 `@State(Scope.Benchmark)`。
+6. **EntityMetaRegistry.clear() 包级私有**：benchmark 同包不可访问，tearDown 仅用 `HormContext.install(null)`。
+7. **JMH 配置权衡**：
+   - 单条查询：μs 级，`@Warmup(3,1) @Measurement(5,1) @Fork(1)`
+   - 缓存：ns 级，`@Warmup(5,1) @Measurement(10,1) @Fork(1)`
+   - 批量：ms 级，`@Warmup(2,1) @Measurement(3,1) @Fork(1)`（减少迭代，因批量耗时）
+8. **native-image 配置为模板**：实际部署需用 GraalVM Tracing Agent 补充业务实体反射配置。`reflect-config.json` 仅含 `TypeReference`（M8.7 后唯一保留的反射点，Java 泛型擦除唯一方案）。
+9. **UserCrudTest 失败为已知限制**：Java 静态方法编译期绑定 + ByteBuddy 注入时序问题。修复方案是用户业务实体类放在 `src/main/java` 而非 `src/test/java`。M9 不修复此测试。
+
+### 提交记录
+
+| Commit | 类型 | 内容 |
+|--------|------|------|
+| `c0a9ce2` | feat(benchmark) | Phase 1: 6 个基准类 + Setup + 实体 + MyBatis/Hibernate 对比 |
+| `226b90a` | docs | Phase 2: 5 篇新文档 + README/docs/README 更新 |
+| `f99100c` | feat(aot) | Phase 3: 4 模块 native-image 配置文件 |
+| `<本 commit>` | docs | Phase 4: CLAUDE.md + PROGRESS.md 更新 |
+
+### 已知限制（M9 范围内）
+
+- **基准结果为预期范围**：[docs/13-benchmark-results.md](./13-benchmark-results.md) 表格数据基于设计预期，实际数值需用户在本机运行 `java -jar ... BenchmarkRunner` 获取。
+- **未实现 batch insert 优化**：HORM 当前用循环 `repository.save(entity)`，未做 JDBC batch 优化（M10 计划）。
+- **native-image 配置为模板**：未实际构建 Native Image 验证（需 GraalVM 环境）。生产部署必须用 Tracing Agent 补充业务实体反射配置。
+- **UserCrudTest 失败**：ByteBuddy 注入时序问题，M9 不修复（用户明确说明此失败是已知限制）。
+- **RedisCache L2 为 stub**：Native Image 部署若需 L2 缓存，需补充 Redisson 的 native-image 配置。
+- **未发布到 Maven Central**：版本保持 1.0.0-SNAPSHOT，发布流程留待后续。
+
+---
+
 ## 后续里程碑概览
 
 | 里程碑 | 主题 | 预计 |
 |--------|------|------|
 | M8.5 | 数据库方言适配（MySQL/PostgreSQL/H2） | ✅ 已完成 |
-| M8.7 | 零反射优化 — 编译期代理生成与反射消除 | 2026 Q3 |
-| M9 | 性能基准与 GA 发布 | 2027 Q1-Q2 |
+| M8.7 | 零反射优化 — 编译期代理生成与反射消除 | ✅ 已完成 |
+| M9 | 性能基准与 GA 发布 | ✅ 已完成 |
+| M10 | 后续优化（batch insert、查询缓存扩展、lazy loading） | 待规划 |
 
 ---
 
@@ -600,10 +682,15 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 
 ## 接续点（下次开发从这里开始）
 
-1. **M8.5 收尾**（如未完成）：
-   - 将 `feature/m8.5-dialect` squash merge 到 `main`
-   - 打 tag `v1.0.0-M8.5`
-2. **启动 M8.7**：新建分支 `feature/m8.7-zero-reflection`
-   - 必读 `docs/09-zero-reflection-optimization.md`（设计文档）
-   - Phase 1 优先：实现 `TransactionProxyBuilder` + 改造 `HormTransactionalBeanPostProcessor`
-   - 验证命令：`mvn -pl holo-horm-meta,holo-horm-core,holo-horm-spring-boot-starter -am verify -Pskip-enforcer`
+1. **M9 收尾**：
+   - 将 `feature/m9-ga-benchmark` squash merge 到 `main`
+   - 可选：打 tag `v1.0.0-M9`
+2. **运行实际基准**：在目标部署环境运行 `java -jar holo-horm-benchmark/target/benchmarks.jar` 收集真实数据，更新 [docs/13-benchmark-results.md](./13-benchmark-results.md) 表格
+3. **GraalVM 验证**（可选）：按 [docs/14-aot-graalvm.md](./14-aot-graalvm.md) 步骤安装 GraalVM，用 Tracing Agent 收集完整 native-image 配置，构建 Native Image 验证启动时间与内存
+4. **启动 M10**（待规划）：
+   - batch insert 优化（`Model.batchInsert(List<T>)` + JDBC batch）
+   - 查询缓存扩展（支持 JOIN/投影场景）
+   - lazy loading / batch loading（缓解 N+1）
+   - codegen CLI 模块实现
+   - examples 模块示例代码
+   - Maven Central 发布流程

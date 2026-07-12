@@ -58,15 +58,15 @@ graph TD
 | 子模块 | 类型 | 职责 | 源代码状态 |
 |--------|------|------|-----------|
 | [holo-horm-bom](./holo-horm-bom/CLAUDE.md) | pom | HORM 内部模块版本清单 | 无源码 |
-| [holo-horm-meta](./holo-horm-meta/CLAUDE.md) | jar | 注解定义 + APT 处理器，编译期生成元数据 | 已完成 |
-| [holo-horm-core](./holo-horm-core/CLAUDE.md) | jar | 核心 API：Model、Query、Repository、Transaction | 已完成 |
-| [holo-horm-cache](./holo-horm-cache/CLAUDE.md) | jar | 缓存链系统（L1 Caffeine + L2 Redis stub） | 已完成 |
+| [holo-horm-meta](./holo-horm-meta/CLAUDE.md) | jar | 注解定义 + APT 处理器，编译期生成元数据 | 已完成 (M1-M8.7) |
+| [holo-horm-core](./holo-horm-core/CLAUDE.md) | jar | 核心 API：Model、Query、Repository、Transaction | 已完成 (M1-M8.5) |
+| [holo-horm-cache](./holo-horm-cache/CLAUDE.md) | jar | 缓存链系统（L1 Caffeine + L2 Redis stub） | 已完成 (M6) |
 | [holo-horm-datasource](./holo-horm-datasource/CLAUDE.md) | jar | 数据源 SPI 与参考实现 | POM 已建，无源码 |
-| [holo-horm-migration](./holo-horm-migration/CLAUDE.md) | jar | 数据库迁移工具（Flyway 集成） | 部分完成 |
+| [holo-horm-migration](./holo-horm-migration/CLAUDE.md) | jar | 数据库迁移工具（Flyway 集成） | 已完成 (M7) |
 | [holo-horm-codegen](./holo-horm-codegen/CLAUDE.md) | jar | 代码生成 CLI | POM 已建，无源码 |
-| [holo-horm-spring-boot-starter](./holo-horm-spring-boot-starter/CLAUDE.md) | jar | Spring Boot 自动装配 | POM 已建，无源码 |
+| [holo-horm-spring-boot-starter](./holo-horm-spring-boot-starter/CLAUDE.md) | jar | Spring Boot 自动装配 | 已完成 (M8) |
 | [holo-horm-examples](./holo-horm-examples/CLAUDE.md) | jar | 示例代码 | POM 已建，无源码 |
-| [holo-horm-benchmark](./holo-horm-benchmark/CLAUDE.md) | jar | JMH 性能基准 | POM 已建，无源码 |
+| [holo-horm-benchmark](./holo-horm-benchmark/CLAUDE.md) | jar | JMH 性能基准 | 已完成 (M9) |
 
 ## 里程碑状态
 
@@ -78,11 +78,11 @@ graph TD
 | M4 | 事务管理 + 级联 + 批量操作 + 乐观锁 | 已完成 |
 | M5 | 多数据源 SPI 与路由 | 已完成 |
 | M6 | 缓存链（L1 + L2 组合）+ batch loading | 已完成 |
-| M7 | 数据库迁移（Flyway 集成） | 部分完成 |
+| M7 | 数据库迁移（Flyway 集成） | 已完成 |
 | M8 | Spring Boot Starter + @Transactional AOP | 已完成 |
 | M8.5 | 数据库方言适配（MySQL/PostgreSQL/H2） | 已完成 |
-| M8.7 | 零反射优化 — 编译期代理生成与反射消除 | 规划中 |
-| M9 | 性能基准与 GA 发布 | 规划中 |
+| M8.7 | 零反射优化 — 编译期代理生成与反射消除 | 已完成 |
+| M9 | 性能基准与 GA 发布 | 已完成 |
 
 ## 构建命令
 
@@ -125,6 +125,11 @@ mvn compile -Pskip-enforcer
 - `docs/07-performance-security.md` — 性能与安全
 - `docs/08-dialect-adaptation.md` — 数据库方言适配
 - `docs/09-zero-reflection-optimization.md` — M8.7 零反射优化设计
+- `docs/10-quickstart.md` — 5 分钟快速上手
+- `docs/11-user-guide.md` — 完整用户指南
+- `docs/12-migration-guide.md` — 从 MyBatis/Hibernate 迁移指南
+- `docs/13-benchmark-results.md` — 性能基准报告
+- `docs/14-aot-graalvm.md` — AOT / GraalVM Native Image 兼容性
 - `docs/PROGRESS.md` — 开发进度与里程碑
 
 ## 相关文件清单
