@@ -18,6 +18,7 @@
 | M7     | ✅ 完成 | 2026-07-06     | v1.0.0-M7  |
 | M8     | ✅ 完成 | 2026-07-06     | v1.0.0-M8  |
 | M8.5   | ✅ 完成 | 2026-07-11     | —          |
+| M8.7   | 📋 规划中 | —              | —          |
 | M9     | 📋 规划中 | —              | —          |
 
 **当前分支**：`feature/m8.5-dialect`（M8.5 已完成，待 squash merge 到 `main`）
@@ -505,11 +506,82 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 
 ---
 
+## M8.7: 零反射优化 — 编译期代理生成与反射消除（规划中）
+
+### 交付清单
+
+| 子任务 | 描述 | 模块 | 状态 |
+|--------|------|------|------|
+| **Phase 1: APT 事务代理生成（消除 R3 + R7/R8）** | | | |
+| P1-1 | 定义 `TransactionProxyFactory` SPI 接口 | meta | 📋 |
+| P1-2 | 实现 `TransactionProxyBuilder`（JavaPoet 生成代理子类 + 工厂类） | meta | 📋 |
+| P1-3 | 扩展 `HormEntityProcessor` 调用 `TransactionProxyBuilder` | meta | 📋 |
+| P1-4 | APT 生成 `META-INF/services/...TransactionProxyFactory` | meta | 📋 |
+| P1-5 | 实现 `MethodBridgeFactory` 降级（LambdaMetafactory 桥接） | core | 📋 |
+| P1-6 | 改造 `HormTransactionalBeanPostProcessor`（ServiceLoader 加载工厂 + 移除 JDK Proxy） | starter | 📋 |
+| P1-7 | 改造 `TransactionInterceptor`（保留降级路径，内部用 MethodBridgeFactory） | core | 📋 |
+| P1-8 | APT compile-testing（代理类和工厂类生成验证） | meta (test) | 📋 |
+| P1-9 | Spring Boot 集成测试（@Transactional 方法事务拦截验证） | starter (test) | 📋 |
+| P1-10 | 性能基准测试（JMH: Method.invoke vs APT 代理 vs LambdaMetafactory） | benchmark | 📋 |
+| **Phase 2: ServiceLoader 替代自定义索引（消除 R1 + R2）** | | | |
+| P2-1 | 定义 `EntityMetaProvider` SPI 接口 | meta | 📋 |
+| P2-2 | 定义 `TransactionAdvisorProvider` SPI 接口 | meta | 📋 |
+| P2-3 | APT 生成的 XxxMeta 实现 EntityMetaProvider | meta | 📋 |
+| P2-4 | APT 生成 `META-INF/services` 文件 | meta | 📋 |
+| P2-5 | 改造 `EntityMetaRegistry`（ServiceLoader 优先 + entities.idx 兼容回退） | core | 📋 |
+| P2-6 | 改造 `TransactionAdvisorRegistry`（ServiceLoader 优先 + transactions.idx 兼容回退） | core | 📋 |
+| P2-7 | 兼容性测试 | core (test) | 📋 |
+| **Phase 3: 清理冗余反射（消除 R4 + R5 + 优化 R6）** | | | |
+| P3-1 | 移除 CaffeineCache Class.forName（改用工厂方法 + NoClassDefFoundError） | cache | 📋 |
+| P3-2 | 移除 RedisCache Class.forName（改用工厂方法 + NoClassDefFoundError） | cache | 📋 |
+| P3-3 | TypeReference 增加 `of(Class)` 工厂方法 | cache | 📋 |
+| P3-4 | Cache 接口增加 `Class<V>` 重载 | cache | 📋 |
+| P3-5 | 回归测试 | all (test) | 📋 |
+
+### 反射消除目标
+
+| # | 文件 | 当前反射调用 | 消除方案 | 目标 |
+|---|------|-------------|---------|------|
+| R1 | `EntityMetaRegistry` | `Class.forName()` + `Method.invoke()` | ServiceLoader\<EntityMetaProvider\> | 接口直接调用 |
+| R2 | `TransactionAdvisorRegistry` | `Class.forName()` + `Field.get()` | ServiceLoader\<TransactionAdvisorProvider\> | 接口直接调用 |
+| R3 | `TransactionInterceptor` | `method.invoke(target, args)` | APT 代理子类直接调用 + LambdaMetafactory 降级 | 零反射 |
+| R4 | `CaffeineCache` | `Class.forName()` | 工厂方法 + NoClassDefFoundError | 零反射 |
+| R5 | `RedisCache` | `Class.forName()` | 工厂方法 + NoClassDefFoundError | 零反射 |
+| R6 | `TypeReference` | `getGenericSuperclass()` | 保留 + 增加 Class 重载 | 保留（Java 泛型唯一方案） |
+| R7 | `HormTransactionalBeanPostProcessor` | `Proxy.newProxyInstance()` | APT 代理子类 | 零反射 |
+| R8 | `HormTransactionalBeanPostProcessor` | `getDeclaredMethods()` + `isAnnotationPresent()` | APT 代理子类 | 零反射 |
+
+### 性能预期
+
+| 调用方式 | ns/op | 相对直接调用 |
+|---------|-------|------------|
+| 直接调用 | ~1.2 | 1.0x |
+| **APT 生成代理（目标）** | **~1.2** | **1.0x** |
+| LambdaMetafactory 降级 | ~3.1 | 2.6x |
+| Method.invoke()（当前） | ~8.5 | 7.1x |
+
+### 关键设计决策
+
+1. **APT 生成代理子类（Micronaut 模式）**：在编译期为含 `@Transactional` 方法的类生成代理子类，将事务拦截逻辑完全内联到生成的代码中。运行时无需 `Method.invoke`、无需 `Proxy.newProxyInstance`。此方案与 Micronaut 的编译期 AOP 模式本质相同。
+2. **委托模式**：代理子类持有 `delegate` 字段引用原始 Bean，而非在子类中重新注入字段。避免 Spring 字段注入问题。
+3. **TransactionProxyFactory SPI**：APT 为每个代理类生成工厂类，实现 `TransactionProxyFactory` 接口。`HormTransactionalBeanPostProcessor` 通过 ServiceLoader 发现工厂类并直接调用 `create(delegate, ctx)`，消除 `Constructor.newInstance`。
+4. **LambdaMetafactory 降级路径**：对于无法生成 APT 代理的场景（final 类/方法、第三方类），`TransactionInterceptor` 使用 LambdaMetafactory 运行时桥接替代 `Method.invoke`，性能约 ~3.1ns/op（vs Method.invoke ~8.5ns/op）。
+5. **ServiceLoader 替代自定义索引**：`EntityMetaRegistry` / `TransactionAdvisorRegistry` 从自定义 `entities.idx` / `transactions.idx` + `Class.forName` + 反射调用，迁移到 JDK 标准 `ServiceLoader` + 接口直接调用。保留自定义索引作为兼容回退。
+6. **TypeReference 保留**：超级类型令牌（`getGenericSuperclass()`）是 Java 生态处理泛型擦除的唯一标准方案（Jackson/Guava/Spring 均采用相同模式），不存在零反射替代。增加 `of(Class)` 工厂方法简化简单类型场景。
+7. **final 类/方法处理**：APT 在编译期检测 `final` 类/方法，发出 WARNING 日志；运行时降级到 LambdaMetafactory 桥接。
+
+### 设计文档
+
+详见 [docs/09-zero-reflection-optimization.md](./09-zero-reflection-optimization.md)
+
+---
+
 ## 后续里程碑概览
 
 | 里程碑 | 主题 | 预计 |
 |--------|------|------|
-| M8.5 | 数据库方言适配（MySQL/PostgreSQL/H2） | 2026 Q3 |
+| M8.5 | 数据库方言适配（MySQL/PostgreSQL/H2） | ✅ 已完成 |
+| M8.7 | 零反射优化 — 编译期代理生成与反射消除 | 2026 Q3 |
 | M9 | 性能基准与 GA 发布 | 2027 Q1-Q2 |
 
 ---
@@ -528,11 +600,10 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 
 ## 接续点（下次开发从这里开始）
 
-1. **可选**：将 `feature/m6-cache` squash merge 到 `main`：
-   ```bash
-   git -C e:\project\Holo\holo-horm checkout main
-   git -C e:\project\Holo\holo-horm merge --squash feature/m6-cache
-   git -C e:\project\Holo\holo-horm commit -m "feat(m6): squash merge cache chain and batch loading"
-   git -C e:\project\Holo\holo-horm tag -a v1.0.0-M6 -m "M6: cache chain + batch loading"
-   ```
-2. **启动 M7**：新建分支 `feature/m7-migration`，实现 Flyway 数据库迁移集成
+1. **M8.5 收尾**（如未完成）：
+   - 将 `feature/m8.5-dialect` squash merge 到 `main`
+   - 打 tag `v1.0.0-M8.5`
+2. **启动 M8.7**：新建分支 `feature/m8.7-zero-reflection`
+   - 必读 `docs/09-zero-reflection-optimization.md`（设计文档）
+   - Phase 1 优先：实现 `TransactionProxyBuilder` + 改造 `HormTransactionalBeanPostProcessor`
+   - 验证命令：`mvn -pl holo-horm-meta,holo-horm-core,holo-horm-spring-boot-starter -am verify -Pskip-enforcer`

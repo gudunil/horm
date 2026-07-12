@@ -79,7 +79,9 @@ graph TD
 | M5 | 多数据源 SPI 与路由 | 已完成 |
 | M6 | 缓存链（L1 + L2 组合）+ batch loading | 已完成 |
 | M7 | 数据库迁移（Flyway 集成） | 部分完成 |
-| M8 | Spring Boot Starter + @Transactional AOP | 规划中 |
+| M8 | Spring Boot Starter + @Transactional AOP | 已完成 |
+| M8.5 | 数据库方言适配（MySQL/PostgreSQL/H2） | 已完成 |
+| M8.7 | 零反射优化 — 编译期代理生成与反射消除 | 规划中 |
 | M9 | 性能基准与 GA 发布 | 规划中 |
 
 ## 构建命令
@@ -121,6 +123,8 @@ mvn compile -Pskip-enforcer
 - `docs/05-active-record.md` — Active Record API
 - `docs/06-extension-features.md` — 扩展特性
 - `docs/07-performance-security.md` — 性能与安全
+- `docs/08-dialect-adaptation.md` — 数据库方言适配
+- `docs/09-zero-reflection-optimization.md` — M8.7 零反射优化设计
 - `docs/PROGRESS.md` — 开发进度与里程碑
 
 ## 相关文件清单
