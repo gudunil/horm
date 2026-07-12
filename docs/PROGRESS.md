@@ -644,12 +644,14 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 | `c0a9ce2` | feat(benchmark) | Phase 1: 6 个基准类 + Setup + 实体 + MyBatis/Hibernate 对比 |
 | `226b90a` | docs | Phase 2: 5 篇新文档 + README/docs/README 更新 |
 | `f99100c` | feat(aot) | Phase 3: 4 模块 native-image 配置文件 |
-| `<本 commit>` | docs | Phase 4: CLAUDE.md + PROGRESS.md 更新 |
+| `b61c5ca` | docs | Phase 4: CLAUDE.md + PROGRESS.md 更新 |
+| `cc74f69` | docs(benchmark) | 真实 JMH 基准结果 + caffeine 依赖修复 + 13-benchmark-results.md 重写 |
 
 ### 已知限制（M9 范围内）
 
-- **基准结果为预期范围**：[docs/13-benchmark-results.md](./13-benchmark-results.md) 表格数据基于设计预期，实际数值需用户在本机运行 `java -jar ... BenchmarkRunner` 获取。
-- **未实现 batch insert 优化**：HORM 当前用循环 `repository.save(entity)`，未做 JDBC batch 优化（M10 计划）。
+- **基准结果已收集**：[docs/13-benchmark-results.md](./13-benchmark-results.md) 包含 2026-07-13 真实 JMH 数据。结果显示 HORM 在 FindById/CRUD 场景慢于 Hibernate/MyBatis（Active Record 抽象开销超过反射成本），但在大结果集 Query 和 FindMany 场景有竞争优势。详见文档第四章"综合分析"。
+- **未实现 batch insert 优化**：HORM 当前用循环 `repository.save(entity)`，未做 JDBC batch 优化（M10 计划）。BatchInsert 基准确认这是当前最慢场景。
+- **TransactionProxyBenchmark aptProxyDirect 异常**：3734 ns，远高于 jdkDynamicProxy (5 ns)，与 M8.7 设计预期不符，需 M10 调查。
 - **native-image 配置为模板**：未实际构建 Native Image 验证（需 GraalVM 环境）。生产部署必须用 Tracing Agent 补充业务实体反射配置。
 - **UserCrudTest 失败**：ByteBuddy 注入时序问题，M9 不修复（用户明确说明此失败是已知限制）。
 - **RedisCache L2 为 stub**：Native Image 部署若需 L2 缓存，需补充 Redisson 的 native-image 配置。
@@ -683,14 +685,16 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 ## 接续点（下次开发从这里开始）
 
 1. **M9 收尾**：
-   - 将 `feature/m9-ga-benchmark` squash merge 到 `main`
+   - 将 `feature/m9-ga-benchmark` squash merge 到 `main`（5 个 commit：c0a9ce2 / 226b90a / f99100c / b61c5ca / cc74f69）
    - 可选：打 tag `v1.0.0-M9`
-2. **运行实际基准**：在目标部署环境运行 `java -jar holo-horm-benchmark/target/benchmarks.jar` 收集真实数据，更新 [docs/13-benchmark-results.md](./13-benchmark-results.md) 表格
-3. **GraalVM 验证**（可选）：按 [docs/14-aot-graalvm.md](./14-aot-graalvm.md) 步骤安装 GraalVM，用 Tracing Agent 收集完整 native-image 配置，构建 Native Image 验证启动时间与内存
-4. **启动 M10**（待规划）：
-   - batch insert 优化（`Model.batchInsert(List<T>)` + JDBC batch）
-   - 查询缓存扩展（支持 JOIN/投影场景）
-   - lazy loading / batch loading（缓解 N+1）
-   - codegen CLI 模块实现
-   - examples 模块示例代码
-   - Maven Central 发布流程
+2. **GraalVM 验证**（可选）：按 [docs/14-aot-graalvm.md](./14-aot-graalvm.md) 步骤安装 GraalVM，用 Tracing Agent 收集完整 native-image 配置，构建 Native Image 验证启动时间与内存
+3. **启动 M10**（性能优化，基于真实基准结果）：
+   - **P0**: `Model.batchInsert(List<T>)` + JDBC batch（BatchInsert 当前最慢，预期提速 2-3 倍）
+   - **P0**: 缓存 `EntityMeta` 引用到 `Repository` 字段（FindById 7.56 μs，需减少 Map 查找）
+   - **P1**: 短路空 CacheChain（null 检查提前，减少 FindById/CRUD 方法调用）
+   - **P1**: 延迟 Cascade 扫描（UPDATE/DELETE ~20 μs，需减少注解扫描开销）
+   - **P1**: 调查 `aptProxyDirect` 3734 ns 异常（M8.7 遗留）
+   - **P2**: 预编译 SQL 模板（小结果集 Query 12.95 μs，预期提速 30-50%）
+   - **P2**: codegen CLI 模块实现
+   - **P2**: examples 模块示例代码
+   - **P2**: Maven Central 发布流程
