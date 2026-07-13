@@ -40,4 +40,17 @@ public interface Dialect {
     default BatchInsertSyntax batchInsertSyntax() {
         return BatchInsertSyntax.VALUES_LIST;
     }
+
+    /**
+     * Whether this dialect guarantees that {@link java.sql.PreparedStatement#getGeneratedKeys()}
+     * returns generated keys in the same order as the rows added via
+     * {@link java.sql.PreparedStatement#addBatch()}. Defaults to {@code true}.
+     *
+     * <p>When {@code false}, {@code JdbcOperations.batchInsert} refuses to
+     * perform batch inserts with generated keys to avoid silently assigning
+     * wrong primary keys to entities.
+     */
+    default boolean supportsBatchInsertGeneratedKeysInOrder() {
+        return true;
+    }
 }

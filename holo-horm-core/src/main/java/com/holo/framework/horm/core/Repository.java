@@ -62,4 +62,24 @@ public interface Repository<T> {
 
     /** Deletes the entity with the given primary key. */
     void deleteById(Object id);
+
+    /**
+     * Batch-inserts the given entities using JDBC {@code addBatch}/
+     * {@code executeBatch} for reduced network round-trips. Generated
+     * primary keys are backfilled onto each entity in insertion order.
+     *
+     * <p>When caching is enabled, each inserted entity is populated into
+     * the cache chain after transaction commit (subject to the entity's
+     * {@code WriteStrategy}).
+     *
+     * <p>Default implementation throws {@code UnsupportedOperationException}
+     * so that older implementations remain source-compatible.
+     *
+     * @param entities entities to insert; may be {@code null} or empty, in which
+     *                 case an empty list is returned
+     * @return the inserted entities with generated ids backfilled
+     */
+    default List<T> batchInsert(List<T> entities) {
+        throw new UnsupportedOperationException("batchInsert not implemented");
+    }
 }

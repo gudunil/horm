@@ -18,6 +18,7 @@ import java.lang.annotation.Target;
  *   <li>{@link GenerationType#SEQUENCE} — database sequence (M2+)</li>
  *   <li>{@link GenerationType#TABLE} — separate generator table (M2+)</li>
  *   <li>{@link GenerationType#UUID} — client-side UUID string</li>
+ *   <li>{@link GenerationType#MANUAL} — client-assigned primary key (M10+)</li>
  * </ul>
  *
  * <p>Example:

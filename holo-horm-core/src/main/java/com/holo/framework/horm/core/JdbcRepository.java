@@ -10,6 +10,7 @@ import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.Row;
+import com.holo.framework.horm.meta.annotation.GenerationType;
 
 import java.sql.ResultSet;
 import java.util.ArrayList;
@@ -58,6 +59,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     private final String dataSourceName;
     private final TypeReference<T> entityTypeRef = new TypeReference<>() {};
     private final CachePolicy runtimeCachePolicy;
+    private final SqlTemplates sqlTemplates;
 
     public JdbcRepository(Class<T> entityType, HormContext ctx) {
         this.entityType = entityType;
@@ -66,6 +68,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         this.mapper = meta.mapper();
         this.dataSourceName = MetaSupport.resolveDataSourceName(meta);
         this.runtimeCachePolicy = MetaSupport.toRuntimePolicy(meta.cachePolicy());
+        this.sqlTemplates = new SqlTemplates(meta);
     }
 
     @Override
@@ -81,18 +84,15 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
 
     /** Database lookup backing {@link #find(Object)} and the cache loader. */
     private T dbFind(Object id) {
-        FieldMeta<?> idField = requireIdField();
-        String sql = "SELECT * FROM " + MetaSupport.qualifiedTable(meta)
-            + " WHERE " + idField.column() + " = ?";
-        return JdbcOperations.query(ctx, dataSourceName, sql, List.of(id),
+        requireIdField();
+        return JdbcOperations.query(ctx, dataSourceName, sqlTemplates.findById(), List.of(id),
             rs -> rs.next() ? mapper.map(MetaSupport.toRow(rs, meta)) : null,
             "find " + entityType.getName() + " by id " + id);
     }
 
     @Override
     public List<T> all() {
-        String sql = "SELECT * FROM " + MetaSupport.qualifiedTable(meta);
-        return JdbcOperations.query(ctx, dataSourceName, sql, List.of(),
+        return JdbcOperations.query(ctx, dataSourceName, sqlTemplates.findAll(), List.of(),
             rs -> {
                 List<T> result = new ArrayList<>();
                 while (rs.next()) {
@@ -105,8 +105,7 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
 
     @Override
     public long count() {
-        String sql = "SELECT COUNT(*) FROM " + MetaSupport.qualifiedTable(meta);
-        return JdbcOperations.query(ctx, dataSourceName, sql, List.of(),
+        return JdbcOperations.query(ctx, dataSourceName, sqlTemplates.count(), List.of(),
             rs -> rs.next() ? rs.getLong(1) : 0L,
             "count " + entityType.getName());
     }
@@ -128,27 +127,24 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
     @Override
     public T save(T entity) {
         Object id = mapper.getId(entity);
-        return id == null ? insert(entity) : update(entity);
+        if (id == null) {
+            return insert(entity);
+        }
+        return isManualId() ? insert(entity) : update(entity);
+    }
+
+    private boolean isManualId() {
+        FieldMeta<?> idField = meta.idField();
+        return idField != null && idField.generationStrategy() == GenerationType.MANUAL;
     }
 
     private T insert(T entity) {
         requireIdField();
-        // Simplified M1 policy: the id column is always excluded from the
-        // INSERT column list so the data source generates it (IDENTITY).
-        List<String> columns = meta.fields().stream()
-            .filter(FieldMeta::insertable)
-            .filter(f -> !f.isId())
-            .map(FieldMeta::column)
-            .toList();
-        String sql = "INSERT INTO " + MetaSupport.qualifiedTable(meta) + " ("
-            + String.join(", ", columns)
-            + ") VALUES ("
-            + columns.stream().map(c -> "?").collect(Collectors.joining(", "))
-            + ")";
+        List<String> columns = sqlTemplates.insertColumns();
         Row row = mapper.toRow(entity);
         List<Object> bindings = columns.stream().map(row::get).toList();
-        JdbcOperations.insert(ctx, dataSourceName, sql, bindings,
-            generatedId -> mapper.setId(entity, generatedId),
+        JdbcOperations.insert(ctx, dataSourceName, sqlTemplates.insert(), bindings,
+            isManualId() ? null : generatedId -> mapper.setId(entity, generatedId),
             "insert " + entityType.getName());
 
         if (cacheEnabled() && runtimeCachePolicy.writeStrategy() != com.holo.framework.horm.cache.WriteStrategy.AROUND) {
@@ -236,11 +232,10 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
         FieldMeta<?> versionField = meta.versionField();
         Object id = mapper.getId(entity);
         if (versionField != null) {
-            String sql = "DELETE FROM " + MetaSupport.qualifiedTable(meta)
-                + " WHERE " + requireIdField().column() + " = ? AND "
-                + versionField.column() + " = ?";
+            requireIdField();
             List<Object> bindings = List.of(id, mapper.getField(entity, versionField.name()));
-            int affected = JdbcOperations.update(ctx, dataSourceName, sql, bindings,
+            int affected = JdbcOperations.update(ctx, dataSourceName,
+                sqlTemplates.deleteByIdAndVersion(), bindings,
                 "delete " + entityType.getName() + " by id " + id);
             if (affected == 0) {
                 throw new OptimisticLockException(
@@ -255,12 +250,37 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
 
     @Override
     public void deleteById(Object id) {
-        FieldMeta<?> idField = requireIdField();
-        String sql = "DELETE FROM " + MetaSupport.qualifiedTable(meta)
-            + " WHERE " + idField.column() + " = ?";
-        JdbcOperations.update(ctx, dataSourceName, sql, List.of(id),
+        requireIdField();
+        JdbcOperations.update(ctx, dataSourceName, sqlTemplates.deleteById(), List.of(id),
             "delete " + entityType.getName() + " by id " + id);
         invalidateCache(id);
+    }
+
+    @Override
+    public List<T> batchInsert(List<T> entities) {
+        if (entities == null || entities.isEmpty()) {
+            return List.of();
+        }
+        requireIdField();
+        List<String> columns = sqlTemplates.insertColumns();
+        List<List<Object>> batchBindings = new ArrayList<>(entities.size());
+        for (T entity : entities) {
+            Row row = mapper.toRow(entity);
+            batchBindings.add(columns.stream().map(row::get).toList());
+        }
+        final int[] index = {0};
+        JdbcOperations.batchInsert(ctx, dataSourceName, sqlTemplates.insert(), batchBindings,
+            isManualId() ? null : generatedId -> mapper.setId(entities.get(index[0]++), generatedId),
+            "batch insert " + entityType.getName());
+
+        if (cacheEnabled() && runtimeCachePolicy.writeStrategy() != com.holo.framework.horm.cache.WriteStrategy.AROUND) {
+            for (T entity : entities) {
+                CacheKey key = idKey(mapper.getId(entity));
+                TransactionManager.afterCommit(dataSourceName,
+                    () -> ctx.cacheChain().put(key, entity, runtimeCachePolicy));
+            }
+        }
+        return entities;
     }
 
     @Override

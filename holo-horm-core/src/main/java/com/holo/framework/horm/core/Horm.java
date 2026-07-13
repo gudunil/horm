@@ -5,6 +5,7 @@ import com.holo.framework.horm.meta.annotation.Propagation;
 
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Process-wide entrypoint for the HORM runtime.
@@ -24,6 +25,16 @@ import java.util.ServiceLoader;
  * each entity type.
  */
 public final class Horm {
+
+    /**
+     * Per-context cache of {@link JdbcRepository} instances. Each installed
+     * {@link HormContext} gets its own sub-cache so that switching contexts
+     * (e.g. in multi-tenant or parallel-test scenarios) no longer clears the
+     * entire repository cache. {@link HormContext} is used as the map key via
+     * identity semantics (it does not override {@code equals}/{@code hashCode}).
+     */
+    private static final ConcurrentHashMap<HormContext, ConcurrentHashMap<Class<?>, JdbcRepository<?>>>
+        REPOSITORY_CACHE_BY_CONTEXT = new ConcurrentHashMap<>();
 
     private Horm() {
     }
@@ -98,10 +109,19 @@ public final class Horm {
     /**
      * Returns the {@link Repository} for the given entity type.
      *
-     * <p>Each call constructs a fresh {@link JdbcRepository} bound to the
-     * currently installed {@link HormContext}. The repository automatically
-     * routes to the datasource declared in the entity's {@code @Entity(dataSource = ...)}
-     * annotation.
+     * <p>Repositories are cached per {@link HormContext} <em>and</em> per entity
+     * type. Switching contexts no longer invalidates the cache for other
+     * contexts, so multi-tenant and parallel-test scenarios keep their cached
+     * {@link JdbcRepository} instances. On the fast path — same context and
+     * cache hit — this method returns the cached repository without any
+     * allocation.
+     *
+     * <p>Each {@link HormContext} retains its own sub-cache via identity
+     * semantics. Context switching is therefore safe and no longer incurs the
+     * cost of re-creating repository instances for previously seen contexts.
+     *
+     * <p>The repository automatically routes to the datasource declared in
+     * the entity's {@code @Entity(dataSource = ...)} annotation.
      *
      * <p>The {@code T extends Model<T>} bound mirrors the {@link JdbcRepository}
      * constructor so the Active Record surface in {@link Model} can route
@@ -111,8 +131,20 @@ public final class Horm {
      * @throws com.holo.framework.horm.meta.EntityMeta lookup failures if
      *         {@code entityType} is not registered
      */
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public static <T extends Model<T>> Repository<T> repository(Class<T> entityType) {
-        return new JdbcRepository<>(entityType, HormContext.current());
+        HormContext ctx = HormContext.current();
+        ConcurrentHashMap<Class<?>, JdbcRepository<?>> cache =
+            REPOSITORY_CACHE_BY_CONTEXT.computeIfAbsent(ctx, k -> new ConcurrentHashMap<>());
+        JdbcRepository<?> cached = cache.get(entityType);
+        if (cached != null) {
+            return (Repository<T>) cached;
+        }
+        synchronized (Horm.class) {
+            cache = REPOSITORY_CACHE_BY_CONTEXT.computeIfAbsent(ctx, k -> new ConcurrentHashMap<>());
+            return (Repository<T>) cache.computeIfAbsent(
+                entityType, t -> new JdbcRepository<>((Class<? extends Model>) t, ctx));
+        }
     }
 
     // ===== Programmatic transaction API =====

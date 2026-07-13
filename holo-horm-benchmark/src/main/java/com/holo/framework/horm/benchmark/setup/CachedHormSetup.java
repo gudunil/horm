@@ -1,29 +1,32 @@
 package com.holo.framework.horm.benchmark.setup;
 
 import java.io.IOException;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Duration;
+
+import javax.sql.DataSource;
 
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 
-import com.holo.framework.horm.benchmark.BenchDataSourceProvider;
 import com.holo.framework.horm.benchmark.entity.CachedBenchUser;
 import com.holo.framework.horm.cache.CachePolicy;
 import com.holo.framework.horm.cache.CaffeineCache;
 import com.holo.framework.horm.cache.DefaultCacheChain;
 import com.holo.framework.horm.cache.key.CacheKey;
 import com.holo.framework.horm.cache.key.CacheKeyBuilder;
+import com.holo.framework.horm.core.DataSourceProvider;
 import com.holo.framework.horm.core.EntityMetaRegistry;
 import com.holo.framework.horm.core.HormContext;
 import com.holo.framework.horm.core.Model;
 
 /**
  * Initializes a HORM runtime with a Caffeine-backed L1 {@link DefaultCacheChain}
- * installed on the {@link HormContext}. Used by {@code CacheBenchmark} to
- * measure cache-hit vs cache-miss vs no-cache read paths.
+ * installed on the {@link HormContext}, backed by the shared HikariCP pool.
+ * Used by {@code CacheBenchmark} to measure cache-hit vs cache-miss vs no-cache read paths.
  */
 @State(Scope.Benchmark)
 public class CachedHormSetup {
@@ -42,7 +45,9 @@ public class CachedHormSetup {
             .build();
         CaffeineCache l1 = new CaffeineCache("bench-l1", policy);
         chain = new DefaultCacheChain(l1);
-        HormContext ctx = new HormContext(new BenchDataSourceProvider(), chain);
+        DataSource ds = BenchmarkEnv.getSharedDataSource();
+        DataSourceProvider provider = new DataSourceAdapter(ds);
+        HormContext ctx = new HormContext(provider, chain);
         HormContext.install(ctx);
         EntityMetaRegistry.lookup(CachedBenchUser.class);
         lookupKey = new CacheKeyBuilder()
@@ -65,5 +70,31 @@ public class CachedHormSetup {
     @TearDown(Level.Trial)
     public void tearDown() {
         HormContext.install(null);
+    }
+
+    /**
+     * Adapts a {@link DataSource} to HORM's {@link DataSourceProvider} interface.
+     */
+    private static class DataSourceAdapter implements DataSourceProvider {
+        private final DataSource dataSource;
+
+        DataSourceAdapter(DataSource dataSource) {
+            this.dataSource = dataSource;
+        }
+
+        @Override
+        public Connection getConnection() throws SQLException {
+            return dataSource.getConnection();
+        }
+
+        @Override
+        public void releaseConnection(Connection connection) {
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException ignored) {
+                }
+            }
+        }
     }
 }

@@ -36,5 +36,12 @@ public enum GenerationType {
      * Client-side generated UUID (string form). Suitable for distributed
      * systems and data sources without native auto-increment support.
      */
-    UUID
+    UUID,
+
+    /**
+     * Client-assigned primary key. The framework includes the ID column in
+     * INSERT statements and does not read back generated keys. The caller is
+     * responsible for setting a non-null id before saving a new entity.
+     */
+    MANUAL
 }

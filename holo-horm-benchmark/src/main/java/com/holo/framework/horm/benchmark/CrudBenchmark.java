@@ -24,6 +24,7 @@ import com.holo.framework.horm.benchmark.setup.HibernateSetup;
 import com.holo.framework.horm.benchmark.setup.HormSetup;
 import com.holo.framework.horm.benchmark.setup.JdbcSetup;
 import com.holo.framework.horm.benchmark.setup.MybatisSetup;
+import com.holo.framework.horm.core.Horm;
 import com.holo.framework.horm.core.Model;
 
 /**
@@ -53,22 +54,27 @@ public class CrudBenchmark {
         u.setEmail("horm-" + System.nanoTime() + "@bench.com");
         u.setName("horm-insert");
         u.setCreatedAt(Instant.now());
-        u.save();
+        // Use explicit transaction for fair comparison with MyBatis/Hibernate commit
+        Horm.tx(() -> u.save());
         return u;
     }
 
     @Benchmark
     public long jdbcInsert(JdbcSetup setup) throws Exception {
-        try (Connection conn = setup.dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "INSERT INTO bench_users (email, name, created_at) VALUES (?, ?, ?)",
-                 Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, "jdbc-" + System.nanoTime() + "@bench.com");
-            ps.setString(2, "jdbc-insert");
-            ps.setTimestamp(3, Timestamp.from(Instant.now()));
-            ps.executeUpdate();
-            try (var rs = ps.getGeneratedKeys()) {
-                return rs.next() ? rs.getLong(1) : -1L;
+        try (Connection conn = setup.dataSource.getConnection()) {
+            conn.setAutoCommit(false);  // Explicit transaction for fair comparison
+            try (PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO bench_users (email, name, created_at) VALUES (?, ?, ?)",
+                     Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, "jdbc-" + System.nanoTime() + "@bench.com");
+                ps.setString(2, "jdbc-insert");
+                ps.setTimestamp(3, Timestamp.from(Instant.now()));
+                ps.executeUpdate();
+                try (var rs = ps.getGeneratedKeys()) {
+                    long id = rs.next() ? rs.getLong(1) : -1L;
+                    conn.commit();
+                    return id;
+                }
             }
         }
     }
@@ -105,20 +111,27 @@ public class CrudBenchmark {
 
     @Benchmark
     public BenchUser hormUpdate(HormSetup setup) {
-        BenchUser u = Model.find(BenchUser.class, UPDATE_TARGET_ID);
-        u.setName("horm-updated-" + System.nanoTime());
-        u.save();
-        return u;
+        // Use explicit transaction for fair comparison with MyBatis/Hibernate commit
+        return Horm.tx(() -> {
+            BenchUser u = Model.find(BenchUser.class, UPDATE_TARGET_ID);
+            u.setName("horm-updated-" + System.nanoTime());
+            u.save();
+            return u;
+        });
     }
 
     @Benchmark
     public int jdbcUpdate(JdbcSetup setup) throws Exception {
-        try (Connection conn = setup.dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "UPDATE bench_users SET name = ? WHERE id = ?")) {
-            ps.setString(1, "jdbc-updated-" + System.nanoTime());
-            ps.setLong(2, UPDATE_TARGET_ID);
-            return ps.executeUpdate();
+        try (Connection conn = setup.dataSource.getConnection()) {
+            conn.setAutoCommit(false);  // Explicit transaction for fair comparison
+            try (PreparedStatement ps = conn.prepareStatement(
+                     "UPDATE bench_users SET name = ? WHERE id = ?")) {
+                ps.setString(1, "jdbc-updated-" + System.nanoTime());
+                ps.setLong(2, UPDATE_TARGET_ID);
+                int rows = ps.executeUpdate();
+                conn.commit();
+                return rows;
+            }
         }
     }
 
@@ -143,6 +156,7 @@ public class CrudBenchmark {
             Transaction tx = session.beginTransaction();
             HibernateBenchUser u = session.find(HibernateBenchUser.class, UPDATE_TARGET_ID);
             u.setName("hib-updated-" + System.nanoTime());
+            session.flush();  // Force SQL execution before commit
             tx.commit();
         }
     }
@@ -151,35 +165,41 @@ public class CrudBenchmark {
 
     @Benchmark
     public void hormDelete(HormSetup setup) {
-        BenchUser u = new BenchUser();
-        u.setEmail("horm-del-" + System.nanoTime() + "@bench.com");
-        u.setName("to-delete");
-        u.setCreatedAt(Instant.now());
-        u.save();
-        u.delete();
+        // Use explicit transaction for fair comparison with MyBatis/Hibernate commit
+        Horm.tx(() -> {
+            BenchUser u = new BenchUser();
+            u.setEmail("horm-del-" + System.nanoTime() + "@bench.com");
+            u.setName("to-delete");
+            u.setCreatedAt(Instant.now());
+            u.save();
+            u.delete();
+        });
     }
 
     @Benchmark
     public int jdbcDelete(JdbcSetup setup) throws Exception {
         long id;
-        try (Connection conn = setup.dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "INSERT INTO bench_users (email, name, created_at) VALUES (?, ?, ?)",
-                 Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, "jdbc-del-" + System.nanoTime() + "@bench.com");
-            ps.setString(2, "to-delete");
-            ps.setTimestamp(3, Timestamp.from(Instant.now()));
-            ps.executeUpdate();
-            try (var rs = ps.getGeneratedKeys()) {
-                rs.next();
-                id = rs.getLong(1);
+        try (Connection conn = setup.dataSource.getConnection()) {
+            conn.setAutoCommit(false);  // Explicit transaction for fair comparison
+            try (PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO bench_users (email, name, created_at) VALUES (?, ?, ?)",
+                     Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, "jdbc-del-" + System.nanoTime() + "@bench.com");
+                ps.setString(2, "to-delete");
+                ps.setTimestamp(3, Timestamp.from(Instant.now()));
+                ps.executeUpdate();
+                try (var rs = ps.getGeneratedKeys()) {
+                    rs.next();
+                    id = rs.getLong(1);
+                }
             }
-        }
-        try (Connection conn = setup.dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "DELETE FROM bench_users WHERE id = ?")) {
-            ps.setLong(1, id);
-            return ps.executeUpdate();
+            try (PreparedStatement ps = conn.prepareStatement(
+                     "DELETE FROM bench_users WHERE id = ?")) {
+                ps.setLong(1, id);
+                int rows = ps.executeUpdate();
+                conn.commit();
+                return rows;
+            }
         }
     }
 

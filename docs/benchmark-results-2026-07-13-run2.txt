@@ -1,0 +1,1557 @@
+﻿# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 3 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch
+# Parameters: (batchSize = 100)
+
+# Run progress: 0.00% complete, ETA 00:05:49
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:38:52.394 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:38:52.424 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:38:52.534 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:38:52.535 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:38:52.535 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:38:52.535 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:38:52.535 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:38:52.537 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:38:52.557 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:38:53.185 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2.572 ms/op
+# Warmup Iteration   2: 0.692 ms/op
+Iteration   1: 0.559 ms/op
+Iteration   2: 0.584 ms/op
+Iteration   3: 09:38:58.227 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+0.608 ms/op
+
+
+Result "com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch":
+  0.584 ±(99.9%) 0.446 ms/op [Average]
+  (min, avg, max) = (0.559, 0.584, 0.608), stdev = 0.024
+  CI (99.9%): [0.138, 1.029] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 3 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch
+# Parameters: (batchSize = 1000)
+
+# Run progress: 1.43% complete, ETA 00:07:25
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:38:58.930 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:38:58.960 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:38:59.057 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:38:59.058 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:38:59.058 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:38:59.058 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:38:59.058 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:38:59.059 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:38:59.078 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:38:59.688 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+28.370 ms/op
+# Warmup Iteration   2: 7.654 ms/op
+Iteration   1: 6.178 ms/op
+Iteration   2: 5.675 ms/op
+Iteration   3: 09:39:04.765 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+5.832 ms/op
+
+
+Result "com.holo.framework.horm.benchmark.BatchInsertBenchmark.hibernateBatch":
+  5.895 ±(99.9%) 4.703 ms/op [Average]
+  (min, avg, max) = (5.675, 5.895, 6.178), stdev = 0.258
+  CI (99.9%): [1.192, 10.598] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 3 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.BatchInsertBenchmark.hormBatch
+# Parameters: (batchSize = 100)
+
+# Run progress: 2.87% complete, ETA 00:07:21
+# Fork: 1 of 1
+# Warmup Iteration   1: 4.264 ms/op
+# Warmup Iteration   2: 1.285 ms/op
+Iteration   1: 1.126 ms/op
+Iteration   2: 1.125 ms/op
+Iteration   3: 1.125 ms/op
+
+
+Result "com.holo.framework.horm.benchmark.BatchInsertBenchmark.hormBatch":
+  1.125 ±(99.9%) 0.013 ms/op [Average]
+  (min, avg, max) = (1.125, 1.125, 1.126), stdev = 0.001
+  CI (99.9%): [1.112, 1.139] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 3 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.BatchInsertBenchmark.hormBatch
+# Parameters: (batchSize = 1000)
+
+# Run progress: 4.30% complete, ETA 00:06:54
+# Fork: 1 of 1
+# Warmup Iteration   1: 56.664 ms/op
+# Warmup Iteration   2: 15.175 ms/op
+Iteration   1: 10.443 ms/op
+Iteration   2: 10.335 ms/op
+Iteration   3: 10.351 ms/op
+
+
+Result "com.holo.framework.horm.benchmark.BatchInsertBenchmark.hormBatch":
+  10.376 ±(99.9%) 1.066 ms/op [Average]
+  (min, avg, max) = (10.335, 10.376, 10.443), stdev = 0.058
+  CI (99.9%): [9.310, 11.442] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 3 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch
+# Parameters: (batchSize = 100)
+
+# Run progress: 5.73% complete, ETA 00:06:38
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:39:16.576 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:39:16.585 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:39:16.585 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+0.754 ms/op
+# Warmup Iteration   2: 0.444 ms/op
+Iteration   1: 0.427 ms/op
+Iteration   2: 0.455 ms/op
+Iteration   3: 09:39:21.643 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:39:21.645 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+0.506 ms/op
+
+
+Result "com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch":
+  0.463 ±(99.9%) 0.733 ms/op [Average]
+  (min, avg, max) = (0.427, 0.463, 0.506), stdev = 0.040
+  CI (99.9%): [≈ 0, 1.196] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 3 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch
+# Parameters: (batchSize = 1000)
+
+# Run progress: 7.16% complete, ETA 00:06:27
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:39:22.243 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:39:22.252 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:39:22.253 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+7.681 ms/op
+# Warmup Iteration   2: 3.963 ms/op
+Iteration   1: 4.384 ms/op
+Iteration   2: 4.671 ms/op
+Iteration   3: 09:39:27.361 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:39:27.363 [com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+5.327 ms/op
+
+
+Result "com.holo.framework.horm.benchmark.BatchInsertBenchmark.jdbcBatch":
+  4.794 ±(99.9%) 8.816 ms/op [Average]
+  (min, avg, max) = (4.384, 4.794, 5.327), stdev = 0.483
+  CI (99.9%): [≈ 0, 13.611] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 3 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.BatchInsertBenchmark.mybatisBatch
+# Parameters: (batchSize = 100)
+
+# Run progress: 8.60% complete, ETA 00:06:18
+# Fork: 1 of 1
+# Warmup Iteration   1: 1.230 ms/op
+# Warmup Iteration   2: 0.457 ms/op
+Iteration   1: 0.448 ms/op
+Iteration   2: 0.495 ms/op
+Iteration   3: 0.631 ms/op
+
+
+Result "com.holo.framework.horm.benchmark.BatchInsertBenchmark.mybatisBatch":
+  0.525 ±(99.9%) 1.734 ms/op [Average]
+  (min, avg, max) = (0.448, 0.525, 0.631), stdev = 0.095
+  CI (99.9%): [≈ 0, 2.259] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 2 iterations, 1 s each
+# Measurement: 3 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.BatchInsertBenchmark.mybatisBatch
+# Parameters: (batchSize = 1000)
+
+# Run progress: 10.03% complete, ETA 00:06:11
+# Fork: 1 of 1
+# Warmup Iteration   1: 12.735 ms/op
+# Warmup Iteration   2: 4.604 ms/op
+Iteration   1: 4.504 ms/op
+Iteration   2: 5.007 ms/op
+Iteration   3: 5.719 ms/op
+
+
+Result "com.holo.framework.horm.benchmark.BatchInsertBenchmark.mybatisBatch":
+  5.077 ±(99.9%) 11.143 ms/op [Average]
+  (min, avg, max) = (4.504, 5.077, 5.719), stdev = 0.611
+  CI (99.9%): [≈ 0, 16.219] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CacheBenchmark.cacheHit
+
+# Run progress: 11.46% complete, ETA 00:06:04
+# Fork: 1 of 1
+# Warmup Iteration   1: 114.347 ns/op
+# Warmup Iteration   2: 99.581 ns/op
+# Warmup Iteration   3: 100.092 ns/op
+# Warmup Iteration   4: 100.095 ns/op
+# Warmup Iteration   5: 100.190 ns/op
+Iteration   1: 99.990 ns/op
+Iteration   2: 99.954 ns/op
+Iteration   3: 100.205 ns/op
+Iteration   4: 105.085 ns/op
+Iteration   5: 100.809 ns/op
+Iteration   6: 99.992 ns/op
+Iteration   7: 100.016 ns/op
+Iteration   8: 100.131 ns/op
+Iteration   9: 100.364 ns/op
+Iteration  10: 100.972 ns/op
+
+
+Result "com.holo.framework.horm.benchmark.CacheBenchmark.cacheHit":
+  100.752 ±(99.9%) 2.364 ns/op [Average]
+  (min, avg, max) = (99.954, 100.752, 105.085), stdev = 1.563
+  CI (99.9%): [98.388, 103.116] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CacheBenchmark.cacheMiss
+
+# Run progress: 15.76% complete, ETA 00:05:36
+# Fork: 1 of 1
+# Warmup Iteration   1: 70544.880 ns/op
+# Warmup Iteration   2: 16212.396 ns/op
+# Warmup Iteration   3: 8753.956 ns/op
+# Warmup Iteration   4: 8809.279 ns/op
+# Warmup Iteration   5: 8715.732 ns/op
+Iteration   1: 8662.545 ns/op
+Iteration   2: 8676.886 ns/op
+Iteration   3: 10311.306 ns/op
+Iteration   4: 10138.116 ns/op
+Iteration   5: 8741.282 ns/op
+Iteration   6: 8707.335 ns/op
+Iteration   7: 8674.284 ns/op
+Iteration   8: 8977.167 ns/op
+Iteration   9: 8758.748 ns/op
+Iteration  10: 9112.511 ns/op
+
+
+Result "com.holo.framework.horm.benchmark.CacheBenchmark.cacheMiss":
+  9076.018 ±(99.9%) 943.534 ns/op [Average]
+  (min, avg, max) = (8662.545, 9076.018, 10311.306), stdev = 624.089
+  CI (99.9%): [8132.484, 10019.552] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 5 iterations, 1 s each
+# Measurement: 10 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CacheBenchmark.noCache
+
+# Run progress: 20.06% complete, ETA 00:05:13
+# Fork: 1 of 1
+# Warmup Iteration   1: 46357.084 ns/op
+# Warmup Iteration   2: 10632.296 ns/op
+# Warmup Iteration   3: 6989.983 ns/op
+# Warmup Iteration   4: 6929.391 ns/op
+# Warmup Iteration   5: 7443.432 ns/op
+Iteration   1: 6957.384 ns/op
+Iteration   2: 7844.696 ns/op
+Iteration   3: 6960.435 ns/op
+Iteration   4: 6909.296 ns/op
+Iteration   5: 6921.970 ns/op
+Iteration   6: 6916.802 ns/op
+Iteration   7: 7248.362 ns/op
+Iteration   8: 6910.824 ns/op
+Iteration   9: 6892.531 ns/op
+Iteration  10: 6922.870 ns/op
+
+
+Result "com.holo.framework.horm.benchmark.CacheBenchmark.noCache":
+  7048.517 ±(99.9%) 451.235 ns/op [Average]
+  (min, avg, max) = (6892.531, 7048.517, 7844.696), stdev = 298.464
+  CI (99.9%): [6597.282, 7499.752] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete
+
+# Run progress: 24.36% complete, ETA 00:04:53
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:40:26.739 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:40:26.769 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:40:26.867 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:40:26.867 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:40:26.868 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:40:26.868 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:40:26.868 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:40:26.869 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:40:26.889 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:40:27.495 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+108.566 us/op
+# Warmup Iteration   2: 25.862 us/op
+# Warmup Iteration   3: 16.464 us/op
+Iteration   1: 10.853 us/op
+Iteration   2: 9.672 us/op
+Iteration   3: 9.627 us/op
+Iteration   4: 9.619 us/op
+Iteration   5: 09:40:35.569 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+9.818 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.hibernateDelete":
+  9.918 ±(99.9%) 2.036 us/op [Average]
+  (min, avg, max) = (9.619, 9.918, 10.853), stdev = 0.529
+  CI (99.9%): [7.882, 11.954] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert
+
+# Run progress: 26.65% complete, ETA 00:04:45
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:40:36.247 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:40:36.278 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:40:36.379 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:40:36.379 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:40:36.380 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:40:36.380 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:40:36.380 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:40:36.381 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:40:36.402 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:40:37.105 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+71.219 us/op
+# Warmup Iteration   2: 20.837 us/op
+# Warmup Iteration   3: 9.080 us/op
+Iteration   1: 7.097 us/op
+Iteration   2: 7.213 us/op
+Iteration   3: 7.641 us/op
+Iteration   4: 8.086 us/op
+Iteration   5: 09:40:45.190 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+10.353 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.hibernateInsert":
+  8.078 ±(99.9%) 5.123 us/op [Average]
+  (min, avg, max) = (7.097, 8.078, 10.353), stdev = 1.330
+  CI (99.9%): [2.955, 13.201] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate
+
+# Run progress: 28.94% complete, ETA 00:04:38
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:40:45.912 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:40:45.943 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:40:46.042 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:40:46.043 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:40:46.043 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:40:46.043 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:40:46.043 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:40:46.045 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:40:46.063 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:40:46.690 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+164.333 us/op
+# Warmup Iteration   2: 48.697 us/op
+# Warmup Iteration   3: 14.041 us/op
+Iteration   1: 8.482 us/op
+Iteration   2: 8.211 us/op
+Iteration   3: 8.222 us/op
+Iteration   4: 8.210 us/op
+Iteration   5: 09:40:54.772 [com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+8.197 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.hibernateUpdate":
+  8.265 ±(99.9%) 0.470 us/op [Average]
+  (min, avg, max) = (8.197, 8.265, 8.482), stdev = 0.122
+  CI (99.9%): [7.795, 8.734] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.hormDelete
+
+# Run progress: 31.23% complete, ETA 00:04:30
+# Fork: 1 of 1
+# Warmup Iteration   1: 110.761 us/op
+# Warmup Iteration   2: 33.274 us/op
+# Warmup Iteration   3: 20.063 us/op
+Iteration   1: 20.048 us/op
+Iteration   2: 22.607 us/op
+Iteration   3: 20.002 us/op
+Iteration   4: 19.882 us/op
+Iteration   5: 19.844 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.hormDelete":
+  20.476 ±(99.9%) 4.598 us/op [Average]
+  (min, avg, max) = (19.844, 20.476, 22.607), stdev = 1.194
+  CI (99.9%): [15.879, 25.074] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.hormInsert
+
+# Run progress: 33.52% complete, ETA 00:04:20
+# Fork: 1 of 1
+# Warmup Iteration   1: 58.197 us/op
+# Warmup Iteration   2: 14.719 us/op
+# Warmup Iteration   3: 11.690 us/op
+Iteration   1: 11.552 us/op
+Iteration   2: 11.584 us/op
+Iteration   3: 11.606 us/op
+Iteration   4: 11.563 us/op
+Iteration   5: 12.506 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.hormInsert":
+  11.762 ±(99.9%) 1.602 us/op [Average]
+  (min, avg, max) = (11.552, 11.762, 12.506), stdev = 0.416
+  CI (99.9%): [10.160, 13.365] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.hormUpdate
+
+# Run progress: 35.82% complete, ETA 00:04:11
+# Fork: 1 of 1
+# Warmup Iteration   1: 162.789 us/op
+# Warmup Iteration   2: 40.998 us/op
+# Warmup Iteration   3: 20.493 us/op
+Iteration   1: 18.005 us/op
+Iteration   2: 17.498 us/op
+Iteration   3: 17.485 us/op
+Iteration   4: 17.452 us/op
+Iteration   5: 17.490 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.hormUpdate":
+  17.586 ±(99.9%) 0.905 us/op [Average]
+  (min, avg, max) = (17.452, 17.586, 18.005), stdev = 0.235
+  CI (99.9%): [16.681, 18.491] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.jdbcDelete
+
+# Run progress: 38.11% complete, ETA 00:04:01
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:41:21.229 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcDelete-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:41:21.237 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcDelete-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:41:21.238 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcDelete-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+13.047 us/op
+# Warmup Iteration   2: 5.816 us/op
+# Warmup Iteration   3: 5.706 us/op
+Iteration   1: 5.966 us/op
+Iteration   2: 5.737 us/op
+Iteration   3: 5.719 us/op
+Iteration   4: 5.760 us/op
+Iteration   5: 09:41:29.319 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcDelete-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:41:29.322 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcDelete-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+5.738 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.jdbcDelete":
+  5.784 ±(99.9%) 0.396 us/op [Average]
+  (min, avg, max) = (5.719, 5.784, 5.966), stdev = 0.103
+  CI (99.9%): [5.388, 6.180] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.jdbcInsert
+
+# Run progress: 40.40% complete, ETA 00:03:52
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:41:29.904 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcInsert-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:41:29.913 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcInsert-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:41:29.913 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcInsert-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+10.838 us/op
+# Warmup Iteration   2: 4.404 us/op
+# Warmup Iteration   3: 4.412 us/op
+Iteration   1: 4.842 us/op
+Iteration   2: 5.328 us/op
+Iteration   3: 6.530 us/op
+Iteration   4: 74.867 us/op
+Iteration   5: 09:41:38.066 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcInsert-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:41:38.068 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcInsert-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+100.884 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.jdbcInsert":
+  38.490 ±(99.9%) 177.188 us/op [Average]
+  (min, avg, max) = (4.842, 38.490, 100.884), stdev = 46.015
+  CI (99.9%): [≈ 0, 215.679] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.jdbcUpdate
+
+# Run progress: 42.69% complete, ETA 00:03:43
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:41:38.653 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcUpdate-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:41:38.661 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcUpdate-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:41:38.662 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcUpdate-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+4.966 us/op
+# Warmup Iteration   2: 2.163 us/op
+# Warmup Iteration   3: 2.129 us/op
+Iteration   1: 2.129 us/op
+Iteration   2: 2.144 us/op
+Iteration   3: 2.134 us/op
+Iteration   4: 2.314 us/op
+Iteration   5: 09:41:46.721 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcUpdate-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:41:46.723 [com.holo.framework.horm.benchmark.CrudBenchmark.jdbcUpdate-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+2.131 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.jdbcUpdate":
+  2.170 ±(99.9%) 0.310 us/op [Average]
+  (min, avg, max) = (2.129, 2.170, 2.314), stdev = 0.081
+  CI (99.9%): [1.860, 2.480] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.mybatisDelete
+
+# Run progress: 44.99% complete, ETA 00:03:33
+# Fork: 1 of 1
+# Warmup Iteration   1: 26.987 us/op
+# Warmup Iteration   2: 7.497 us/op
+# Warmup Iteration   3: 7.161 us/op
+Iteration   1: 7.109 us/op
+Iteration   2: 7.130 us/op
+Iteration   3: 7.172 us/op
+Iteration   4: 7.082 us/op
+Iteration   5: 7.097 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.mybatisDelete":
+  7.118 ±(99.9%) 0.134 us/op [Average]
+  (min, avg, max) = (7.082, 7.118, 7.172), stdev = 0.035
+  CI (99.9%): [6.984, 7.252] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.mybatisInsert
+
+# Run progress: 47.28% complete, ETA 00:03:24
+# Fork: 1 of 1
+# Warmup Iteration   1: 17.878 us/op
+# Warmup Iteration   2: 6.169 us/op
+# Warmup Iteration   3: 5.770 us/op
+Iteration   1: 6.406 us/op
+Iteration   2: 6.595 us/op
+Iteration   3: 7.719 us/op
+Iteration   4: 8.286 us/op
+Iteration   5: 8.404 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.mybatisInsert":
+  7.482 ±(99.9%) 3.600 us/op [Average]
+  (min, avg, max) = (6.406, 7.482, 8.404), stdev = 0.935
+  CI (99.9%): [3.882, 11.082] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.CrudBenchmark.mybatisUpdate
+
+# Run progress: 49.57% complete, ETA 00:03:15
+# Fork: 1 of 1
+# Warmup Iteration   1: 9.628 us/op
+# Warmup Iteration   2: 3.454 us/op
+# Warmup Iteration   3: 3.491 us/op
+Iteration   1: 3.512 us/op
+Iteration   2: 3.520 us/op
+Iteration   3: 3.506 us/op
+Iteration   4: 3.488 us/op
+Iteration   5: 3.521 us/op
+
+
+Result "com.holo.framework.horm.benchmark.CrudBenchmark.mybatisUpdate":
+  3.509 ±(99.9%) 0.052 us/op [Average]
+  (min, avg, max) = (3.488, 3.509, 3.521), stdev = 0.014
+  CI (99.9%): [3.457, 3.562] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate
+
+# Run progress: 51.86% complete, ETA 00:03:06
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:42:13.734 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:42:13.765 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:42:13.865 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:42:13.865 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:42:13.865 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:42:13.865 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:42:13.865 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:42:13.867 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:42:13.887 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:42:14.500 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+46.218 us/op
+# Warmup Iteration   2: 4.599 us/op
+# Warmup Iteration   3: 2.559 us/op
+Iteration   1: 2.557 us/op
+Iteration   2: 2.546 us/op
+Iteration   3: 2.550 us/op
+Iteration   4: 2.547 us/op
+Iteration   5: 09:42:22.586 [com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+2.544 us/op
+
+
+Result "com.holo.framework.horm.benchmark.FindByIdBenchmark.hibernate":
+  2.549 ±(99.9%) 0.020 us/op [Average]
+  (min, avg, max) = (2.544, 2.549, 2.557), stdev = 0.005
+  CI (99.9%): [2.529, 2.569] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.FindByIdBenchmark.horm
+
+# Run progress: 54.15% complete, ETA 00:02:58
+# Fork: 1 of 1
+# Warmup Iteration   1: 42.431 us/op
+# Warmup Iteration   2: 9.776 us/op
+# Warmup Iteration   3: 6.955 us/op
+Iteration   1: 7.076 us/op
+Iteration   2: 7.072 us/op
+Iteration   3: 7.085 us/op
+Iteration   4: 7.524 us/op
+Iteration   5: 7.164 us/op
+
+
+Result "com.holo.framework.horm.benchmark.FindByIdBenchmark.horm":
+  7.184 ±(99.9%) 0.746 us/op [Average]
+  (min, avg, max) = (7.072, 7.184, 7.524), stdev = 0.194
+  CI (99.9%): [6.438, 7.930] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.FindByIdBenchmark.jdbc
+
+# Run progress: 56.45% complete, ETA 00:02:49
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:42:31.826 [com.holo.framework.horm.benchmark.FindByIdBenchmark.jdbc-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:42:31.835 [com.holo.framework.horm.benchmark.FindByIdBenchmark.jdbc-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:42:31.835 [com.holo.framework.horm.benchmark.FindByIdBenchmark.jdbc-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+1.362 us/op
+# Warmup Iteration   2: 0.901 us/op
+# Warmup Iteration   3: 0.909 us/op
+Iteration   1: 0.910 us/op
+Iteration   2: 0.911 us/op
+Iteration   3: 0.912 us/op
+Iteration   4: 0.910 us/op
+Iteration   5: 09:42:39.902 [com.holo.framework.horm.benchmark.FindByIdBenchmark.jdbc-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:42:39.904 [com.holo.framework.horm.benchmark.FindByIdBenchmark.jdbc-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+0.910 us/op
+
+
+Result "com.holo.framework.horm.benchmark.FindByIdBenchmark.jdbc":
+  0.911 ±(99.9%) 0.003 us/op [Average]
+  (min, avg, max) = (0.910, 0.911, 0.912), stdev = 0.001
+  CI (99.9%): [0.908, 0.914] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.FindByIdBenchmark.mybatis
+
+# Run progress: 58.74% complete, ETA 00:02:40
+# Fork: 1 of 1
+# Warmup Iteration   1: 9.364 us/op
+# Warmup Iteration   2: 3.322 us/op
+# Warmup Iteration   3: 3.179 us/op
+Iteration   1: 3.186 us/op
+Iteration   2: 3.377 us/op
+Iteration   3: 3.187 us/op
+Iteration   4: 3.187 us/op
+Iteration   5: 3.183 us/op
+
+
+Result "com.holo.framework.horm.benchmark.FindByIdBenchmark.mybatis":
+  3.224 ±(99.9%) 0.329 us/op [Average]
+  (min, avg, max) = (3.183, 3.224, 3.377), stdev = 0.085
+  CI (99.9%): [2.896, 3.553] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany
+
+# Run progress: 61.03% complete, ETA 00:02:31
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:42:49.288 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:42:49.317 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:42:49.414 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:42:49.414 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:42:49.414 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:42:49.414 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:42:49.414 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:42:49.415 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:42:49.435 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:42:50.045 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+181.996 us/op
+# Warmup Iteration   2: 80.817 us/op
+# Warmup Iteration   3: 72.096 us/op
+Iteration   1: 71.941 us/op
+Iteration   2: 72.209 us/op
+Iteration   3: 73.030 us/op
+Iteration   4: 72.486 us/op
+Iteration   5: 09:42:58.104 [com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+72.089 us/op
+
+
+Result "com.holo.framework.horm.benchmark.FindManyBenchmark.hibernateFindMany":
+  72.351 ±(99.9%) 1.651 us/op [Average]
+  (min, avg, max) = (71.941, 72.351, 73.030), stdev = 0.429
+  CI (99.9%): [70.699, 74.002] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.FindManyBenchmark.hormFindMany
+
+# Run progress: 63.32% complete, ETA 00:02:22
+# Fork: 1 of 1
+# Warmup Iteration   1: 157.273 us/op
+# Warmup Iteration   2: 114.024 us/op
+# Warmup Iteration   3: 73.592 us/op
+Iteration   1: 72.100 us/op
+Iteration   2: 72.268 us/op
+Iteration   3: 71.924 us/op
+Iteration   4: 71.865 us/op
+Iteration   5: 71.873 us/op
+
+
+Result "com.holo.framework.horm.benchmark.FindManyBenchmark.hormFindMany":
+  72.006 ±(99.9%) 0.671 us/op [Average]
+  (min, avg, max) = (71.865, 72.006, 72.268), stdev = 0.174
+  CI (99.9%): [71.335, 72.677] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.FindManyBenchmark.jdbcFindMany
+
+# Run progress: 65.62% complete, ETA 00:02:13
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:43:07.322 [com.holo.framework.horm.benchmark.FindManyBenchmark.jdbcFindMany-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:43:07.331 [com.holo.framework.horm.benchmark.FindManyBenchmark.jdbcFindMany-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:43:07.331 [com.holo.framework.horm.benchmark.FindManyBenchmark.jdbcFindMany-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+16.475 us/op
+# Warmup Iteration   2: 12.476 us/op
+# Warmup Iteration   3: 12.573 us/op
+Iteration   1: 12.553 us/op
+Iteration   2: 12.590 us/op
+Iteration   3: 12.567 us/op
+Iteration   4: 12.648 us/op
+Iteration   5: 09:43:15.383 [com.holo.framework.horm.benchmark.FindManyBenchmark.jdbcFindMany-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:43:15.386 [com.holo.framework.horm.benchmark.FindManyBenchmark.jdbcFindMany-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+13.301 us/op
+
+
+Result "com.holo.framework.horm.benchmark.FindManyBenchmark.jdbcFindMany":
+  12.732 ±(99.9%) 1.233 us/op [Average]
+  (min, avg, max) = (12.553, 12.732, 13.301), stdev = 0.320
+  CI (99.9%): [11.499, 13.965] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.FindManyBenchmark.mybatisFindMany
+
+# Run progress: 67.91% complete, ETA 00:02:04
+# Fork: 1 of 1
+# Warmup Iteration   1: 280.026 us/op
+# Warmup Iteration   2: 171.522 us/op
+# Warmup Iteration   3: 163.661 us/op
+Iteration   1: 159.908 us/op
+Iteration   2: 160.299 us/op
+Iteration   3: 159.948 us/op
+Iteration   4: 160.030 us/op
+Iteration   5: 159.613 us/op
+
+
+Result "com.holo.framework.horm.benchmark.FindManyBenchmark.mybatisFindMany":
+  159.959 ±(99.9%) 0.949 us/op [Average]
+  (min, avg, max) = (159.613, 159.959, 160.299), stdev = 0.246
+  CI (99.9%): [159.010, 160.908] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery
+# Parameters: (limit = 10)
+
+# Run progress: 70.20% complete, ETA 00:01:55
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:43:24.780 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:43:24.811 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:43:24.909 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:43:24.909 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:43:24.909 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:43:24.909 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:43:24.909 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:43:24.911 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:43:24.931 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:43:25.544 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+73.684 us/op
+# Warmup Iteration   2: 12.828 us/op
+# Warmup Iteration   3: 7.769 us/op
+Iteration   1: 7.771 us/op
+Iteration   2: 8.319 us/op
+Iteration   3: 7.751 us/op
+Iteration   4: 7.747 us/op
+Iteration   5: 09:43:33.633 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+7.741 us/op
+
+
+Result "com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery":
+  7.866 ±(99.9%) 0.978 us/op [Average]
+  (min, avg, max) = (7.741, 7.866, 8.319), stdev = 0.254
+  CI (99.9%): [6.888, 8.843] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery
+# Parameters: (limit = 100)
+
+# Run progress: 72.49% complete, ETA 00:01:46
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:43:34.285 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.Version -- HHH000412: Hibernate ORM core version 1.0.0-SNAPSHOT
+09:43:34.315 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.cache.internal.RegionFactoryInitiator -- HHH000026: Second-level cache disabled
+09:43:34.412 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] WARN org.hibernate.orm.connections.pooling -- HHH10001002: Using built-in connection pool (not intended for production use)
+09:43:34.412 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001005: Loaded JDBC driver class: org.h2.Driver
+09:43:34.412 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001012: Connecting with JDBC URL [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+09:43:34.412 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001001: Connection properties: {password=****, user=sa}
+09:43:34.412 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001003: Autocommit mode: false
+09:43:34.414 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001115: Connection pool size: 20 (min=1)
+09:43:34.434 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] WARN org.hibernate.orm.deprecation -- HHH90000025: H2Dialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+09:43:35.044 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.engine.transaction.jta.platform.internal.JtaPlatformInitiator -- HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+174.830 us/op
+# Warmup Iteration   2: 61.089 us/op
+# Warmup Iteration   3: 54.798 us/op
+Iteration   1: 54.979 us/op
+Iteration   2: 54.910 us/op
+Iteration   3: 54.737 us/op
+Iteration   4: 54.831 us/op
+Iteration   5: 09:43:43.114 [com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery-jmh-worker-1] INFO org.hibernate.orm.connections.pooling -- HHH10001008: Cleaning up connection pool [jdbc:h2:mem:bench;MODE=MySQL;DB_CLOSE_DELAY=-1]
+54.838 us/op
+
+
+Result "com.holo.framework.horm.benchmark.QueryBenchmark.hibernateQuery":
+  54.859 ±(99.9%) 0.350 us/op [Average]
+  (min, avg, max) = (54.737, 54.859, 54.979), stdev = 0.091
+  CI (99.9%): [54.510, 55.209] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.QueryBenchmark.hormQuery
+# Parameters: (limit = 10)
+
+# Run progress: 74.79% complete, ETA 00:01:38
+# Fork: 1 of 1
+# Warmup Iteration   1: 58.170 us/op
+# Warmup Iteration   2: 23.439 us/op
+# Warmup Iteration   3: 12.312 us/op
+Iteration   1: 12.146 us/op
+Iteration   2: 12.290 us/op
+Iteration   3: 12.124 us/op
+Iteration   4: 12.110 us/op
+Iteration   5: 12.246 us/op
+
+
+Result "com.holo.framework.horm.benchmark.QueryBenchmark.hormQuery":
+  12.183 ±(99.9%) 0.307 us/op [Average]
+  (min, avg, max) = (12.110, 12.183, 12.290), stdev = 0.080
+  CI (99.9%): [11.876, 12.491] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.QueryBenchmark.hormQuery
+# Parameters: (limit = 100)
+
+# Run progress: 77.08% complete, ETA 00:01:29
+# Fork: 1 of 1
+# Warmup Iteration   1: 82.849 us/op
+# Warmup Iteration   2: 38.989 us/op
+# Warmup Iteration   3: 32.836 us/op
+Iteration   1: 32.675 us/op
+Iteration   2: 32.652 us/op
+Iteration   3: 32.502 us/op
+Iteration   4: 32.483 us/op
+Iteration   5: 34.388 us/op
+
+
+Result "com.holo.framework.horm.benchmark.QueryBenchmark.hormQuery":
+  32.940 ±(99.9%) 3.135 us/op [Average]
+  (min, avg, max) = (32.483, 32.940, 34.388), stdev = 0.814
+  CI (99.9%): [29.805, 36.075] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery
+# Parameters: (limit = 10)
+
+# Run progress: 79.37% complete, ETA 00:01:20
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:44:00.970 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:44:00.979 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:44:00.979 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+2.441 us/op
+# Warmup Iteration   2: 1.646 us/op
+# Warmup Iteration   3: 1.707 us/op
+Iteration   1: 1.711 us/op
+Iteration   2: 1.710 us/op
+Iteration   3: 1.708 us/op
+Iteration   4: 1.706 us/op
+Iteration   5: 09:44:09.032 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:44:09.034 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+1.707 us/op
+
+
+Result "com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery":
+  1.708 ±(99.9%) 0.007 us/op [Average]
+  (min, avg, max) = (1.706, 1.708, 1.711), stdev = 0.002
+  CI (99.9%): [1.701, 1.716] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery
+# Parameters: (limit = 100)
+
+# Run progress: 81.66% complete, ETA 00:01:11
+# Fork: 1 of 1
+# Warmup Iteration   1: 09:44:09.617 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Starting...
+09:44:09.626 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.pool.HikariPool -- HikariPool-1 - Added connection conn1: url=jdbc:h2:mem:bench user=SA
+09:44:09.626 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Start completed.
+11.853 us/op
+# Warmup Iteration   2: 8.942 us/op
+# Warmup Iteration   3: 8.954 us/op
+Iteration   1: 8.938 us/op
+Iteration   2: 8.966 us/op
+Iteration   3: 9.353 us/op
+Iteration   4: 8.959 us/op
+Iteration   5: 09:44:17.698 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown initiated...
+09:44:17.701 [com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery-jmh-worker-1] INFO com.zaxxer.hikari.HikariDataSource -- HikariPool-1 - Shutdown completed.
+8.942 us/op
+
+
+Result "com.holo.framework.horm.benchmark.QueryBenchmark.jdbcQuery":
+  9.031 ±(99.9%) 0.694 us/op [Average]
+  (min, avg, max) = (8.938, 9.031, 9.353), stdev = 0.180
+  CI (99.9%): [8.338, 9.725] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.QueryBenchmark.mybatisQuery
+# Parameters: (limit = 10)
+
+# Run progress: 83.95% complete, ETA 00:01:02
+# Fork: 1 of 1
+# Warmup Iteration   1: 15.044 us/op
+# Warmup Iteration   2: 7.875 us/op
+# Warmup Iteration   3: 7.810 us/op
+Iteration   1: 7.812 us/op
+Iteration   2: 7.832 us/op
+Iteration   3: 8.096 us/op
+Iteration   4: 7.813 us/op
+Iteration   5: 7.807 us/op
+
+
+Result "com.holo.framework.horm.benchmark.QueryBenchmark.mybatisQuery":
+  7.872 ±(99.9%) 0.484 us/op [Average]
+  (min, avg, max) = (7.807, 7.872, 8.096), stdev = 0.126
+  CI (99.9%): [7.388, 8.356] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.QueryBenchmark.mybatisQuery
+# Parameters: (limit = 100)
+
+# Run progress: 86.25% complete, ETA 00:00:53
+# Fork: 1 of 1
+# Warmup Iteration   1: 78.995 us/op
+# Warmup Iteration   2: 56.981 us/op
+# Warmup Iteration   3: 57.165 us/op
+Iteration   1: 60.353 us/op
+Iteration   2: 57.391 us/op
+Iteration   3: 57.284 us/op
+Iteration   4: 57.046 us/op
+Iteration   5: 56.707 us/op
+
+
+Result "com.holo.framework.horm.benchmark.QueryBenchmark.mybatisQuery":
+  57.756 ±(99.9%) 5.681 us/op [Average]
+  (min, avg, max) = (56.707, 57.756, 60.353), stdev = 1.475
+  CI (99.9%): [52.076, 63.437] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.TransactionProxyBenchmark.aptProxyDirect
+
+# Run progress: 88.54% complete, ETA 00:00:44
+# Fork: 1 of 1
+java : [HORM] WARNING: Cannot create transaction proxy for com.holo.framework.horm.benchmark.service.BenchService — no 
+interfaces implemented. Transaction semantics will NOT be applied. Consider implementing an interface or using APT prox
+y generation.
+At line:15 char:7057
++ ... pgrep\bin'; java -jar holo-horm-benchmark/target/holo-horm-benchmark- ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([HORM] WARNING:...oxy generation.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+# Warmup Iteration   1: 13938.482 ns/op
+# Warmup Iteration   2: 3854.300 ns/op
+# Warmup Iteration   3: 3577.757 ns/op
+Iteration   1: 3576.003 ns/op
+Iteration   2: 3582.495 ns/op
+Iteration   3: 3577.469 ns/op
+Iteration   4: 3574.938 ns/op
+Iteration   5: 3575.437 ns/op
+
+
+Result "com.holo.framework.horm.benchmark.TransactionProxyBenchmark.aptProxyDirect":
+  3577.269 ±(99.9%) 11.828 ns/op [Average]
+  (min, avg, max) = (3574.938, 3577.269, 3582.495), stdev = 3.072
+  CI (99.9%): [3565.440, 3589.097] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.TransactionProxyBenchmark.directCall
+
+# Run progress: 90.83% complete, ETA 00:00:35
+# Fork: 1 of 1
+[HORM] WARNING: Cannot create transaction proxy for com.holo.framework.horm.benchmark.service.BenchService — no interfa
+ces implemented. Transaction semantics will NOT be applied. Consider implementing an interface or using APT proxy gener
+ation.
+# Warmup Iteration   1: 4.964 ns/op
+# Warmup Iteration   2: 5.643 ns/op
+# Warmup Iteration   3: 4.762 ns/op
+Iteration   1: 4.695 ns/op
+Iteration   2: 4.698 ns/op
+Iteration   3: 4.698 ns/op
+Iteration   4: 4.670 ns/op
+Iteration   5: 4.676 ns/op
+
+
+Result "com.holo.framework.horm.benchmark.TransactionProxyBenchmark.directCall":
+  4.687 ±(99.9%) 0.051 ns/op [Average]
+  (min, avg, max) = (4.670, 4.687, 4.698), stdev = 0.013
+  CI (99.9%): [4.637, 4.738] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.TransactionProxyBenchmark.jdkDynamicProxy
+
+# Run progress: 93.12% complete, ETA 00:00:26
+# Fork: 1 of 1
+[HORM] WARNING: Cannot create transaction proxy for com.holo.framework.horm.benchmark.service.BenchService — no interfa
+ces implemented. Transaction semantics will NOT be applied. Consider implementing an interface or using APT proxy gener
+ation.
+# Warmup Iteration   1: 4.980 ns/op
+# Warmup Iteration   2: 4.657 ns/op
+# Warmup Iteration   3: 4.718 ns/op
+Iteration   1: 4.693 ns/op
+Iteration   2: 4.697 ns/op
+Iteration   3: 4.696 ns/op
+Iteration   4: 4.671 ns/op
+Iteration   5: 4.982 ns/op
+
+
+Result "com.holo.framework.horm.benchmark.TransactionProxyBenchmark.jdkDynamicProxy":
+  4.748 ±(99.9%) 0.505 ns/op [Average]
+  (min, avg, max) = (4.671, 4.748, 4.982), stdev = 0.131
+  CI (99.9%): [4.242, 5.253] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.TransactionProxyBenchmark.methodBridge
+
+# Run progress: 95.42% complete, ETA 00:00:17
+# Fork: 1 of 1
+[HORM] WARNING: Cannot create transaction proxy for com.holo.framework.horm.benchmark.service.BenchService — no interfa
+ces implemented. Transaction semantics will NOT be applied. Consider implementing an interface or using APT proxy gener
+ation.
+# Warmup Iteration   1: 12.580 ns/op
+# Warmup Iteration   2: 11.955 ns/op
+# Warmup Iteration   3: 11.310 ns/op
+Iteration   1: 11.269 ns/op
+Iteration   2: 11.331 ns/op
+Iteration   3: 11.422 ns/op
+Iteration   4: 11.436 ns/op
+Iteration   5: 11.351 ns/op
+
+
+Result "com.holo.framework.horm.benchmark.TransactionProxyBenchmark.methodBridge":
+  11.362 ±(99.9%) 0.264 ns/op [Average]
+  (min, avg, max) = (11.269, 11.362, 11.436), stdev = 0.069
+  CI (99.9%): [11.098, 11.626] (assumes normal distribution)
+
+
+# JMH version: 1.37
+# VM version: JDK 17.0.18, OpenJDK 64-Bit Server VM, 17.0.18+8-LTS
+# VM invoker: E:\modules\FlyEnv\PhpWebStudy-Data\env\java\bin\java.exe
+# VM options: -Xms256m -Xmx256m
+# Blackhole mode: compiler (auto-detected, use -Djmh.blackhole.autoDetect=false to disable)
+# Warmup: 3 iterations, 1 s each
+# Measurement: 5 iterations, 1 s each
+# Timeout: 10 min per iteration
+# Threads: 1 thread, will synchronize iterations
+# Benchmark mode: Average time, time/op
+# Benchmark: com.holo.framework.horm.benchmark.TransactionProxyBenchmark.methodInvoke
+
+# Run progress: 97.71% complete, ETA 00:00:08
+# Fork: 1 of 1
+[HORM] WARNING: Cannot create transaction proxy for com.holo.framework.horm.benchmark.service.BenchService — no interfa
+ces implemented. Transaction semantics will NOT be applied. Consider implementing an interface or using APT proxy gener
+ation.
+# Warmup Iteration   1: 6.357 ns/op
+# Warmup Iteration   2: 13.347 ns/op
+# Warmup Iteration   3: 11.874 ns/op
+Iteration   1: 11.979 ns/op
+Iteration   2: 11.870 ns/op
+Iteration   3: 11.895 ns/op
+Iteration   4: 12.451 ns/op
+Iteration   5: 11.865 ns/op
+
+
+Result "com.holo.framework.horm.benchmark.TransactionProxyBenchmark.methodInvoke":
+  12.012 ±(99.9%) 0.961 ns/op [Average]
+  (min, avg, max) = (11.865, 12.012, 12.451), stdev = 0.250
+  CI (99.9%): [11.051, 12.973] (assumes normal distribution)
+
+
+# Run complete. Total time: 00:06:25
+
+REMEMBER: The numbers below are just data. To gain reusable insights, you need to follow up on
+why the numbers are the way they are. Use profilers (see -prof, -lprof), design factorial
+experiments, perform baseline and negative tests that provide experimental control, make sure
+the benchmarking environment is safe on JVM/OS/HW level, ask for reviews from the domain experts.
+Do not assume the numbers tell you what you want them to tell.
+
+NOTE: Current JVM experimentally supports Compiler Blackholes, and they are in use. Please exercise
+extra caution when trusting the results, look into the generated code to check the benchmark still
+works, and factor in a small probability of new VM bugs. Additionally, while comparisons between
+different JVMs are already problematic, the performance difference caused by different Blackhole
+modes can be very significant. Please make sure you use the consistent Blackhole mode for comparisons.
+
+Benchmark                                  (batchSize)  (limit)  Mode  Cnt     Score     Error  Units
+BatchInsertBenchmark.hibernateBatch                100      N/A  avgt    3     0.584 ±   0.446  ms/op
+BatchInsertBenchmark.hibernateBatch               1000      N/A  avgt    3     5.895 ±   4.703  ms/op
+BatchInsertBenchmark.hormBatch                     100      N/A  avgt    3     1.125 ±   0.013  ms/op
+BatchInsertBenchmark.hormBatch                    1000      N/A  avgt    3    10.376 ±   1.066  ms/op
+BatchInsertBenchmark.jdbcBatch                     100      N/A  avgt    3     0.463 ±   0.733  ms/op
+BatchInsertBenchmark.jdbcBatch                    1000      N/A  avgt    3     4.794 ±   8.816  ms/op
+BatchInsertBenchmark.mybatisBatch                  100      N/A  avgt    3     0.525 ±   1.734  ms/op
+BatchInsertBenchmark.mybatisBatch                 1000      N/A  avgt    3     5.077 ±  11.143  ms/op
+CacheBenchmark.cacheHit                            N/A      N/A  avgt   10   100.752 ±   2.364  ns/op
+CacheBenchmark.cacheMiss                           N/A      N/A  avgt   10  9076.018 ± 943.534  ns/op
+CacheBenchmark.noCache                             N/A      N/A  avgt   10  7048.517 ± 451.235  ns/op
+CrudBenchmark.hibernateDelete                      N/A      N/A  avgt    5     9.918 ±   2.036  us/op
+CrudBenchmark.hibernateInsert                      N/A      N/A  avgt    5     8.078 ±   5.123  us/op
+CrudBenchmark.hibernateUpdate                      N/A      N/A  avgt    5     8.265 ±   0.470  us/op
+CrudBenchmark.hormDelete                           N/A      N/A  avgt    5    20.476 ±   4.598  us/op
+CrudBenchmark.hormInsert                           N/A      N/A  avgt    5    11.762 ±   1.602  us/op
+CrudBenchmark.hormUpdate                           N/A      N/A  avgt    5    17.586 ±   0.905  us/op
+CrudBenchmark.jdbcDelete                           N/A      N/A  avgt    5     5.784 ±   0.396  us/op
+CrudBenchmark.jdbcInsert                           N/A      N/A  avgt    5    38.490 ± 177.188  us/op
+CrudBenchmark.jdbcUpdate                           N/A      N/A  avgt    5     2.170 ±   0.310  us/op
+CrudBenchmark.mybatisDelete                        N/A      N/A  avgt    5     7.118 ±   0.134  us/op
+CrudBenchmark.mybatisInsert                        N/A      N/A  avgt    5     7.482 ±   3.600  us/op
+CrudBenchmark.mybatisUpdate                        N/A      N/A  avgt    5     3.509 ±   0.052  us/op
+FindByIdBenchmark.hibernate                        N/A      N/A  avgt    5     2.549 ±   0.020  us/op
+FindByIdBenchmark.horm                             N/A      N/A  avgt    5     7.184 ±   0.746  us/op
+FindByIdBenchmark.jdbc                             N/A      N/A  avgt    5     0.911 ±   0.003  us/op
+FindByIdBenchmark.mybatis                          N/A      N/A  avgt    5     3.224 ±   0.329  us/op
+FindManyBenchmark.hibernateFindMany                N/A      N/A  avgt    5    72.351 ±   1.651  us/op
+FindManyBenchmark.hormFindMany                     N/A      N/A  avgt    5    72.006 ±   0.671  us/op
+FindManyBenchmark.jdbcFindMany                     N/A      N/A  avgt    5    12.732 ±   1.233  us/op
+FindManyBenchmark.mybatisFindMany                  N/A      N/A  avgt    5   159.959 ±   0.949  us/op
+QueryBenchmark.hibernateQuery                      N/A       10  avgt    5     7.866 ±   0.978  us/op
+QueryBenchmark.hibernateQuery                      N/A      100  avgt    5    54.859 ±   0.350  us/op
+QueryBenchmark.hormQuery                           N/A       10  avgt    5    12.183 ±   0.307  us/op
+QueryBenchmark.hormQuery                           N/A      100  avgt    5    32.940 ±   3.135  us/op
+QueryBenchmark.jdbcQuery                           N/A       10  avgt    5     1.708 ±   0.007  us/op
+QueryBenchmark.jdbcQuery                           N/A      100  avgt    5     9.031 ±   0.694  us/op
+QueryBenchmark.mybatisQuery                        N/A       10  avgt    5     7.872 ±   0.484  us/op
+QueryBenchmark.mybatisQuery                        N/A      100  avgt    5    57.756 ±   5.681  us/op
+TransactionProxyBenchmark.aptProxyDirect           N/A      N/A  avgt    5  3577.269 ±  11.828  ns/op
+TransactionProxyBenchmark.directCall               N/A      N/A  avgt    5     4.687 ±   0.051  ns/op
+TransactionProxyBenchmark.jdkDynamicProxy          N/A      N/A  avgt    5     4.748 ±   0.505  ns/op
+TransactionProxyBenchmark.methodBridge             N/A      N/A  avgt    5    11.362 ±   0.264  ns/op
+TransactionProxyBenchmark.methodInvoke             N/A      N/A  avgt    5    12.012 ±   0.961  ns/op

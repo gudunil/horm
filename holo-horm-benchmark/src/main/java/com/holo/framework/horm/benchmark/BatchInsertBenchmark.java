@@ -5,6 +5,8 @@ import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import org.hibernate.Session;
@@ -27,6 +29,7 @@ import com.holo.framework.horm.benchmark.setup.HibernateSetup;
 import com.holo.framework.horm.benchmark.setup.HormSetup;
 import com.holo.framework.horm.benchmark.setup.JdbcSetup;
 import com.holo.framework.horm.benchmark.setup.MybatisSetup;
+import com.holo.framework.horm.core.Horm;
 
 /**
  * Compares batch-insert throughput across HORM, hand-written JDBC, MyBatis
@@ -51,36 +54,43 @@ public class BatchInsertBenchmark {
     @Benchmark
     public void hormBatch(HormSetup setup) {
         long stamp = System.nanoTime();
+        List<BenchUser> users = new ArrayList<>(batchSize);
         for (int i = 0; i < batchSize; i++) {
             BenchUser u = new BenchUser();
             u.setEmail("batch-" + stamp + "-" + i + "@bench.com");
             u.setName("horm-batch");
             u.setCreatedAt(Instant.now());
-            u.save();
+            users.add(u);
         }
+        // Use explicit transaction for fair comparison with MyBatis/Hibernate commit
+        Horm.tx(() -> Horm.repository(BenchUser.class).batchInsert(users));
     }
 
     @Benchmark
     public void jdbcBatch(JdbcSetup setup) throws Exception {
         long stamp = System.nanoTime();
-        try (Connection conn = setup.dataSource.getConnection();
-             PreparedStatement ps = conn.prepareStatement(
-                 "INSERT INTO bench_users (email, name, created_at) VALUES (?, ?, ?)")) {
-            for (int i = 0; i < batchSize; i++) {
-                ps.setString(1, "batch-" + stamp + "-" + i + "@bench.com");
-                ps.setString(2, "jdbc-batch");
-                ps.setTimestamp(3, Timestamp.from(Instant.now()));
-                ps.addBatch();
-                if (i % 200 == 199) ps.executeBatch();
+        try (Connection conn = setup.dataSource.getConnection()) {
+            conn.setAutoCommit(false);  // Explicit transaction for fair comparison
+            try (PreparedStatement ps = conn.prepareStatement(
+                     "INSERT INTO bench_users (email, name, created_at) VALUES (?, ?, ?)")) {
+                for (int i = 0; i < batchSize; i++) {
+                    ps.setString(1, "batch-" + stamp + "-" + i + "@bench.com");
+                    ps.setString(2, "jdbc-batch");
+                    ps.setTimestamp(3, Timestamp.from(Instant.now()));
+                    ps.addBatch();
+                    if (i % 200 == 199) ps.executeBatch();
+                }
+                ps.executeBatch();
+                conn.commit();
             }
-            ps.executeBatch();
         }
     }
 
     @Benchmark
     public void mybatisBatch(MybatisSetup setup) {
         long stamp = System.nanoTime();
-        try (var session = setup.sqlSessionFactory.openSession()) {
+        // Use BATCH executor for fair comparison with JDBC addBatch/executeBatch
+        try (var session = setup.openBatchSession()) {
             for (int i = 0; i < batchSize; i++) {
                 MybatisBenchUser u = new MybatisBenchUser();
                 u.setEmail("batch-" + stamp + "-" + i + "@bench.com");

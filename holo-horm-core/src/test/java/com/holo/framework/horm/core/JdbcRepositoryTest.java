@@ -4,6 +4,7 @@ import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.Row;
+import com.holo.framework.horm.meta.annotation.GenerationType;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -55,6 +56,7 @@ class JdbcRepositoryTest {
         mapper = mock(Mapper.class);
         FieldMeta<Long> idField = FieldMeta.<Long>builder()
             .name("id").column("id").type(Long.class).id(true)
+            .generationStrategy(GenerationType.IDENTITY)
             .build();
         FieldMeta<String> emailField = FieldMeta.<String>builder()
             .name("email").column("email").type(String.class)
@@ -162,6 +164,49 @@ class JdbcRepositoryTest {
         verify(conn).prepareStatement(sql.capture());
         assertThat(sql.getValue())
             .isEqualTo("UPDATE test_entities SET email = ? WHERE id = ?");
+    }
+
+    @Test
+    void saveInsertsWhenManualIdIsSet() throws Exception {
+        FieldMeta<Long> manualId = FieldMeta.<Long>builder()
+            .name("id").column("id").type(Long.class).id(true)
+            .generationStrategy(GenerationType.MANUAL)
+            .build();
+        FieldMeta<String> emailField = FieldMeta.<String>builder()
+            .name("email").column("email").type(String.class)
+            .build();
+        EntityMeta<TestEntity> meta = EntityMeta.<TestEntity>builder()
+            .type(TestEntity.class)
+            .tableName("test_entities")
+            .fields(List.of(manualId, emailField))
+            .idField(manualId)
+            .mapper(mapper)
+            .build();
+        EntityMetaRegistry.registerManual(meta);
+
+        JdbcRepository<TestEntity> manualRepo = new JdbcRepository<>(TestEntity.class, new HormContext(conn));
+
+        TestEntity entity = new TestEntity();
+        when(mapper.getId(entity)).thenReturn(100L);
+        Row row = Row.create("test_entities");
+        row.set("id", 100L);
+        when(mapper.toRow(entity)).thenReturn(row);
+        when(conn.prepareStatement(anyString(), eq(Statement.RETURN_GENERATED_KEYS)))
+            .thenReturn(ps);
+        when(ps.executeUpdate()).thenReturn(1);
+        ResultSet genKeys = mock(ResultSet.class);
+        when(ps.getGeneratedKeys()).thenReturn(genKeys);
+
+        TestEntity returned = manualRepo.save(entity);
+
+        assertThat(returned).isSameAs(entity);
+        verify(ps).executeUpdate();
+        verify(ps, never()).getGeneratedKeys();
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(conn).prepareStatement(sql.capture(), eq(Statement.RETURN_GENERATED_KEYS));
+        assertThat(sql.getValue())
+            .isEqualTo("INSERT INTO test_entities (id, email) VALUES (?, ?)");
     }
 
     @Test

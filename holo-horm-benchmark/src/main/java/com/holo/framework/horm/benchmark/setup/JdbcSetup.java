@@ -14,13 +14,9 @@ import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
 import org.openjdk.jmh.annotations.TearDown;
 
-import com.holo.framework.horm.benchmark.BenchDataSourceProvider;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-
 /**
- * Hand-written JDBC environment backed by HikariCP. Serves as the
- * baseline (zero ORM overhead) for all CRUD/query benchmarks.
+ * Hand-written JDBC environment backed by the shared HikariCP pool.
+ * Serves as the baseline (zero ORM overhead) for all CRUD/query benchmarks.
  */
 @State(Scope.Benchmark)
 public class JdbcSetup {
@@ -30,19 +26,13 @@ public class JdbcSetup {
     @org.openjdk.jmh.annotations.Setup(Level.Trial)
     public void setUp() throws SQLException, IOException {
         BenchmarkEnv.ensureInitialized();
-        HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(BenchDataSourceProvider.JDBC_URL);
-        config.setUsername("sa");
-        config.setPassword("");
-        config.setMaximumPoolSize(10);
-        dataSource = new HikariDataSource(config);
+        // Use the shared HikariCP pool (consistent with other frameworks)
+        dataSource = BenchmarkEnv.getSharedDataSource();
     }
 
     @TearDown(Level.Trial)
     public void tearDown() {
-        if (dataSource instanceof AutoCloseable c) {
-            try { c.close(); } catch (Exception ignored) {}
-        }
+        // DataSource is shared and closed by BenchmarkEnv, no explicit close here.
     }
 
     /** Hand-rolled findById used by benchmarks. */

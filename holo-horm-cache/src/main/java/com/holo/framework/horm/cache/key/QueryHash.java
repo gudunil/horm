@@ -33,6 +33,20 @@ public final class QueryHash {
     /** Length of the truncated hex digest returned by every overload. */
     public static final int HASH_LENGTH = 16;
 
+    /**
+     * Per-thread SHA-256 {@link MessageDigest} instance. MessageDigest is
+     * not thread-safe, so each thread gets its own instance. The instance
+     * is {@code reset()} before each use to clear any prior state.
+     */
+    private static final ThreadLocal<MessageDigest> SHA256_HOLDER =
+        ThreadLocal.withInitial(() -> {
+            try {
+                return MessageDigest.getInstance("SHA-256");
+            } catch (NoSuchAlgorithmException e) {
+                throw new IllegalStateException("SHA-256 algorithm not available", e);
+            }
+        });
+
     private QueryHash() {
         throw new AssertionError("QueryHash is a utility class and must not be instantiated");
     }
@@ -101,14 +115,8 @@ public final class QueryHash {
     // ===== Internal =====
 
     private static String sha256Truncated(String input, int truncateLength) {
-        MessageDigest md;
-        try {
-            md = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException e) {
-            // SHA-256 is mandated by the JCA spec and shipped with every JDK;
-            // if it's missing the JVM is fundamentally broken.
-            throw new IllegalStateException("SHA-256 algorithm not available", e);
-        }
+        MessageDigest md = SHA256_HOLDER.get();
+        md.reset();
         byte[] digest = md.digest(input.getBytes(StandardCharsets.UTF_8));
         String hex = bytesToHex(digest);
         return hex.substring(0, Math.min(truncateLength, hex.length()));

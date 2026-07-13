@@ -92,6 +92,11 @@ public abstract class Model<T extends Model<T>> {
      * the related entities are cascaded automatically.
      */
     public final void save() {
+        EntityMeta<T> meta = meta();
+        if (!meta.hasPersistCascade()) {
+            repository().save(self());
+            return;
+        }
         Set<Object> visited = new HashSet<>();
         visited.add(this);
         cascadePersist(this, visited);
@@ -114,6 +119,11 @@ public abstract class Model<T extends Model<T>> {
      * the related entities are cascaded automatically.
      */
     public final void delete() {
+        EntityMeta<T> meta = meta();
+        if (!meta.hasDeleteCascade()) {
+            repository().delete(self());
+            return;
+        }
         Set<Object> visited = new HashSet<>();
         visited.add(this);
         cascadeDelete(this, visited);

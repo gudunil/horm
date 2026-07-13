@@ -20,8 +20,9 @@
 | M8.5   | ✅ 完成 | 2026-07-11     | —          |
 | M8.7   | ✅ 完成 | 2026-07-12     | —          |
 | M9     | ✅ 完成 | 2026-07-13     | —          |
+| M10    | ✅ 完成 | 2026-07-13     | —          |
 
-**当前分支**：`feature/m9-ga-benchmark`（M9 已完成，待 squash merge 到 `main`）
+**当前分支**：`feature/m10-performance-optimization`（M10 性能优化与风险修复已完成，待合并到 `main`）
 
 ---
 
@@ -666,7 +667,70 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 | M8.5 | 数据库方言适配（MySQL/PostgreSQL/H2） | ✅ 已完成 |
 | M8.7 | 零反射优化 — 编译期代理生成与反射消除 | ✅ 已完成 |
 | M9 | 性能基准与 GA 发布 | ✅ 已完成 |
-| M10 | 后续优化（batch insert、查询缓存扩展、lazy loading） | 待规划 |
+| M10 | 性能优化与风险修复（batch insert、Repository 缓存、SQL 模板预生成、SingleFlight、风险缓解 R1-R5） | ✅ 已完成 |
+
+---
+
+## M10: 性能优化与风险修复（已完成）
+
+### 交付清单
+
+| 子任务 | 描述 | 状态 |
+|--------|------|------|
+| **Phase 1: P0 性能优化** | | |
+| O1 | `Horm.repository()` 按 `HormContext` 缓存 `JdbcRepository` 实例，避免上下文切换时缓存失效 | ✅ |
+| O2 | `SqlTemplates` 预生成 `INSERT/UPDATE/DELETE/FIND` SQL 模板，减少运行时字符串拼接 | ✅ |
+| O3 | `JdbcRepository.batchInsert(List<T>)` + `JdbcOperations.batchInsert` 使用 JDBC `addBatch`/`executeBatch`，批量回填生成键 | ✅ |
+| O4 | `DefaultCacheChain` 集成 `SingleFlightLoader`，消除缓存击穿风险 | ✅ |
+| **Phase 2: 风险缓解计划落地（R1-R5）** | | |
+| R1 | `Horm.repository()` 改为 per-context 缓存，切换数据源后旧上下文缓存保留 | ✅ |
+| R2 | `DefaultCacheChain` SingleFlight loader 捕获 `Throwable`，保证 checked exception 透传并发布 ERROR 事件 | ✅ |
+| R3 | `Dialect.supportsBatchInsertGeneratedKeysInOrder()` + `JdbcOperations.batchInsert` 方言校验，不支持时直接抛异常 | ✅ |
+| R4 | `GenerationType.MANUAL` + `EntityMeta.insertableColumns()` + `JdbcRepository.save()` 支持用户手动指定主键 | ✅ |
+| R5 | `JdbcOperations.releaseConnection` 捕获释放异常作为 suppressed exception，避免吞掉原始 SQL 异常 | ✅ |
+| **Phase 3: 测试与回归** | | |
+| T1 | 新增 `HormRepositoryCacheTest`（4 测试）验证 per-context 缓存行为 | ✅ |
+| T2 | 新增 `SqlTemplatesTest`（8 测试）验证 SQL 模板预生成 | ✅ |
+| T3 | 新增 `JdbcRepositoryBatchInsertTest`（9 测试）验证 batch 机制、键回填、失败路径、方言校验 | ✅ |
+| T4 | 新增 `JdbcOperationsResourceTest`（1 测试）验证连接释放失败不吞原始异常 | ✅ |
+| T5 | 新增 `DefaultCacheChainSingleFlightTest`（4 测试）验证 SingleFlight 集成 | ✅ |
+| T6 | 修复 `UserCrudTest` ByteBuddy 静态方法绑定问题：将 `User` 从 `src/test/java` 移到 `src/main/java` | ✅ |
+| T7 | 全量 `mvn -pl holo-horm-meta,holo-horm-core,holo-horm-cache -am verify -Pskip-enforcer` 通过 | ✅ |
+
+### 测试与覆盖率
+
+- **测试总数**：931（meta 模块 168 + cache 模块 372 + core 模块 391）
+- 新增测试：26（core 20 + cache 4 + meta 修正 2）
+- **JaCoCo 覆盖率**（verify 通过）：
+  - meta 模块 processor 包：> 80% ✅
+  - cache 模块整体：> 87% ✅
+  - core 模块整体：> 84% ✅
+- **验证命令**：`mvn -pl holo-horm-meta,holo-horm-core,holo-horm-cache -am verify -Pskip-enforcer`
+
+### 关键设计决策
+
+1. **Per-context Repository 缓存**：`REPOSITORY_CACHE_BY_CONTEXT` 使用 `Map<HormContext, Map<Class<?>, JdbcRepository<?>>>`，解决单数据源/多数据源切换时缓存失效问题；HormContext 生命周期结束时缓存自然回收。
+2. **SQL 模板预生成**：`SqlTemplates` 在 `JdbcRepository` 构造时一次性生成常用 SQL，避免每次操作重复拼接字符串；`insertColumns` 根据 `GenerationType` 动态决定是否包含 ID 列。
+3. **JDBC Batch Insert**：`JdbcOperations.batchInsert` 使用 `PreparedStatement.addBatch()` + `executeBatch()`，回填生成键时校验键数量与 batch size 一致，并检查 `EXECUTE_FAILED`。
+4. **SingleFlight 集成**：`DefaultCacheChain` 在 L1/L2 均未命中时通过 `SingleFlightLoader` 聚合对同一 key 的并发加载，仅执行一次 loader，并将异常透传给所有等待者。
+5. **MANUAL 主键策略**：新增 `GenerationType.MANUAL`，`EntityMeta.insertableColumns()` 包含手动 ID 列，`JdbcRepository.save()` 在 ID 非空且策略为 MANUAL 时执行 INSERT 而不更新。
+6. **方言批量键顺序校验**：`Dialect.supportsBatchInsertGeneratedKeysInOrder()` 默认 `true`，不确定的方言可覆盖为 `false`，`JdbcOperations.batchInsert` 在运行前拒绝，避免静默数据错乱。
+7. **资源释放异常不吞原异常**：`releaseConnection` 将释放异常添加为 `suppressed`，保留原始 `HormException` 及其 cause 链。
+8. **UserCrudTest 修复方案**：测试实体 `User` 放在 `src/main/java`，使 ByteBuddy 主代码转换阶段先注入 Active Record 静态方法，测试编译时绑定到生成方法而非 `Model.find` fallback。
+
+### 提交记录
+
+| Commit | 类型 | 内容 |
+|--------|------|------|
+| `5c644e0` | docs | 更新 PROGRESS.md 记录真实基准结果与 M10 优先级 |
+| `cc74f69` | docs(benchmark) | 收集真实 JMH 结果并重写 benchmark 报告 |
+| `<本 commit>` | perf(core,cache,meta) | M10 性能优化与风险修复落地 |
+
+### 已知限制（M10 范围内）
+
+- `Repository.batchInsert` 返回的实体列表仍依赖 JDBC 驱动保证生成键顺序；方言已提供校验钩子，但复杂场景仍需用户确认驱动行为。
+- `GenerationType.MANUAL` 当前仅在 `JdbcRepository.save()` 路径生效；`batchInsert` 若使用 MANUAL 策略会跳过生成键回填（已处理）。
+- `User` 作为测试实体被移到 `src/main/java`，会打包进核心 jar；这是修复 ByteBuddy 时序问题的必要权衡，后续可通过单独 `holo-horm-examples` 模块隔离。
 
 ---
 
@@ -684,17 +748,14 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 
 ## 接续点（下次开发从这里开始）
 
-1. **M9 收尾**：
-   - 将 `feature/m9-ga-benchmark` squash merge 到 `main`（5 个 commit：c0a9ce2 / 226b90a / f99100c / b61c5ca / cc74f69）
-   - 可选：打 tag `v1.0.0-M9`
-2. **GraalVM 验证**（可选）：按 [docs/14-aot-graalvm.md](./14-aot-graalvm.md) 步骤安装 GraalVM，用 Tracing Agent 收集完整 native-image 配置，构建 Native Image 验证启动时间与内存
-3. **启动 M10**（性能优化，基于真实基准结果）：
-   - **P0**: `Model.batchInsert(List<T>)` + JDBC batch（BatchInsert 当前最慢，预期提速 2-3 倍）
-   - **P0**: 缓存 `EntityMeta` 引用到 `Repository` 字段（FindById 7.56 μs，需减少 Map 查找）
-   - **P1**: 短路空 CacheChain（null 检查提前，减少 FindById/CRUD 方法调用）
-   - **P1**: 延迟 Cascade 扫描（UPDATE/DELETE ~20 μs，需减少注解扫描开销）
-   - **P1**: 调查 `aptProxyDirect` 3734 ns 异常（M8.7 遗留）
-   - **P2**: 预编译 SQL 模板（小结果集 Query 12.95 μs，预期提速 30-50%）
-   - **P2**: codegen CLI 模块实现
-   - **P2**: examples 模块示例代码
-   - **P2**: Maven Central 发布流程
+1. **M10 收尾**：
+   - 将 `feature/m10-performance-optimization` 合并到 `main`
+   - 可选：打 tag `v1.0.0-M10`
+2. **代码整理**：
+   - 将 `User` 等测试实体迁移到独立的 `holo-horm-examples` 或测试 fixtures 模块，避免污染核心 jar
+   - 评估是否将 `SqlTemplates` 扩展到 `QueryImpl`，预生成 `SELECT/WHERE/ORDER BY/LIMIT` 模板
+3. **后续里程碑候选**（待规划）：
+   - **M11 lazy loading / batch loading**：关联 `fetch` 的 N+1 进一步优化
+   - **M12 codegen CLI**：DDL 双向生成、实体脚手架
+   - **M13 examples**：多数据源、缓存、Spring Boot 完整示例
+   - **Maven Central 发布**：GPG 签名、staging、release 流程

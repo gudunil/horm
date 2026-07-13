@@ -74,6 +74,13 @@ public final class DefaultCacheChain implements CacheChain {
     private final List<CacheEventListener> listeners;
 
     /**
+     * Coalesces concurrent load requests for the same key onto a single
+     * loader invocation, preventing cache stampede when many threads request
+     * the same absent key simultaneously.
+     */
+    private final SingleFlightLoader<Object, Object> singleFlight = new SingleFlightLoader<>();
+
+    /**
      * Constructs a chain with the given initial tiers. The list is
      * copied defensively so that subsequent mutations of the argument
      * by the caller do not affect the chain.
@@ -148,7 +155,7 @@ public final class DefaultCacheChain implements CacheChain {
             Optional<V> cached = tier.get(key, type);
             if (cached.isPresent()) {
                 V value = cached.get();
-                publishEvent(CacheEvent.of(
+                if (hasListeners()) publishEvent(CacheEvent.of(
                     CacheEventType.HIT, tier.name(), tier.level(), key, value));
                 // Back-fill tiers above this hit (indices 0..i-1).
                 backFillAbove(key, value, i, null);
@@ -158,7 +165,7 @@ public final class DefaultCacheChain implements CacheChain {
                 }
                 return Optional.of(value);
             }
-            publishEvent(CacheEvent.of(
+            if (hasListeners()) publishEvent(CacheEvent.of(
                 CacheEventType.MISS, tier.name(), tier.level(), key, null));
         }
         // No cache-tier held the entry. The plain get() (without loader)
@@ -166,6 +173,58 @@ public final class DefaultCacheChain implements CacheChain {
         return Optional.empty();
     }
 
+    /**
+     * Read-through variant of {@link #get}: if the key is absent or expired,
+     * the {@code loader} is invoked to compute the value, which is then cached
+     * under {@code policy} before being returned.
+     *
+     * <p><strong>Checked Exception Constraint.</strong>
+     * The {@code loader} parameter uses {@link java.util.function.Supplier},
+     * which does not allow throwing checked exceptions (only {@link RuntimeException}
+     * and {@link Error}). If your loader needs to handle checked exceptions
+     * (e.g., {@link java.sql.SQLException} or {@link java.io.IOException}),
+     * you must either:
+     * <ul>
+     *   <li>Wrap the checked exception in a {@link RuntimeException} or
+     *       {@link CacheLoadException} before throwing it from the loader</li>
+     *   <li>Handle the checked exception internally in the loader and return
+     *       a default value or {@code null}</li>
+     * </ul>
+     *
+     * <p><strong>SingleFlight Behavior.</strong>
+     * When multiple threads concurrently request the same absent key, this
+     * implementation uses {@link SingleFlightLoader} to coalesce the requests
+     * onto a single loader invocation (preventing cache stampede). The winner
+     * thread executes the loader; all waiting threads share the result (or
+     * exception). Exception propagation follows these rules:
+     * <ul>
+     *   <li>{@link RuntimeException} and {@link Error}: Propagated to all
+     *       waiting threads wrapped in {@link CacheLoadException}</li>
+     *   <li>{@code null} result: Cached only if {@link CachePolicy#nullable()}
+     *       is {@code true} (using a {@link NullMarker} sentinel)</li>
+     * </ul>
+     *
+     * <p><strong>Error Event Publishing.</strong>
+     * Only the winner thread (the one that actually executes the loader)
+     * publishes a {@link CacheEventType#ERROR} event via
+     * {@link #publishEvent}. Waiting threads that receive the exception via
+     * {@link CacheLoadException} do NOT re-publish error events, avoiding
+     * duplicate event notifications.
+     *
+     * @param key    the cache key; must not be {@code null}
+     * @param type   the expected value type; must not be {@code null}
+     * @param loader the value supplier invoked on miss; must not throw
+     *               checked exceptions (see above constraint)
+     * @param policy the policy governing the cached entry; must not be {@code null}
+     * @param <K>    key type
+     * @param <V>    value type
+     * @return the cached or freshly loaded value, wrapped in
+     *         {@link Optional#empty()} if both the cache and the loader
+     *         yielded {@code null} (only possible when
+     *         {@link CachePolicy#nullable()} is {@code true})
+     * @throws CacheLoadException if the loader throws a {@link RuntimeException}
+     *         or {@link Error}; the original exception is preserved as the cause
+     */
     @Override
     public <K, V> Optional<V> get(K key,
                                   TypeReference<V> type,
@@ -184,7 +243,7 @@ public final class DefaultCacheChain implements CacheChain {
             Optional<V> cached = tier.get(key, type);
             if (cached.isPresent()) {
                 V value = cached.get();
-                publishEvent(CacheEvent.of(
+                if (hasListeners()) publishEvent(CacheEvent.of(
                     CacheEventType.HIT, tier.name(), tier.level(), key, value));
                 backFillAbove(key, value, i, policy);
                 // NullMarker hit: logical value is null, do NOT invoke loader.
@@ -193,29 +252,37 @@ public final class DefaultCacheChain implements CacheChain {
                 }
                 return Optional.of(value);
             }
-            publishEvent(CacheEvent.of(
+            if (hasListeners()) publishEvent(CacheEvent.of(
                 CacheEventType.MISS, tier.name(), tier.level(), key, null));
         }
 
-        // All tiers missed: invoke the loader.
+        // All tiers missed: invoke the loader via single-flight to prevent
+        // cache stampede. Only the winner thread executes the loader; all
+        // concurrent waiters share its result (or failure).
         V loaded;
         try {
-            loaded = loader.get();
-        } catch (RuntimeException | Error ex) {
-            // Publish ERROR on the head tier (the chain-level event), then
-            // re-throw wrapped in CacheLoadException so callers can catch
-            // uniformly.
-            Cache head = peekFirst();
-            String headName = head == null ? NAME : head.name();
-            CacheLevel headLevel = head == null ? CacheLevel.L1 : head.level();
-            Throwable cause = ex instanceof CacheLoadException cle
-                ? cle.getCause() != null ? cle.getCause() : cle
-                : ex;
-            publishEvent(CacheEvent.error(headName, headLevel, key, ex));
-            if (ex instanceof CacheLoadException cle) {
-                throw cle;
-            }
-            throw new CacheLoadException("Cache load failed for key " + key, cause);
+            @SuppressWarnings({"unchecked", "rawtypes"})
+            V result = (V) singleFlight.load((Object) key, () -> {
+                try {
+                    return loader.get();
+                } catch (RuntimeException | Error ex) {
+                    // Publish ERROR only by the winner thread (the one that
+                    // actually executes the loader). Waiters receive the
+                    // exception via CacheLoadException and do NOT re-publish.
+                    // Checked exceptions cannot be declared by Supplier#get(),
+                    // but SingleFlightLoader already defensively wraps any
+                    // Throwable that escapes the loader.
+                    Cache head = peekFirst();
+                    String headName = head == null ? NAME : head.name();
+                    CacheLevel headLevel = head == null ? CacheLevel.L1 : head.level();
+                    if (hasListeners()) publishEvent(
+                        CacheEvent.error(headName, headLevel, key, ex));
+                    throw ex;
+                }
+            });
+            loaded = result;
+        } catch (CacheLoadException ex) {
+            throw ex;
         }
 
         // Loader succeeded; decide whether to cache the result.
@@ -249,7 +316,7 @@ public final class DefaultCacheChain implements CacheChain {
                 for (Map.Entry<K, V> e : found.entrySet()) {
                     K k = e.getKey();
                     V v = e.getValue();
-                    publishEvent(CacheEvent.of(
+                    if (hasListeners()) publishEvent(CacheEvent.of(
                         CacheEventType.HIT, tier.name(), tier.level(), k, v));
                     // NullMarker hit: logical value is null.
                     V normalized = NullMarker.isNullMarker(v) ? null : v;
@@ -289,7 +356,7 @@ public final class DefaultCacheChain implements CacheChain {
             for (Map.Entry<K, V> e : found.entrySet()) {
                 K k = e.getKey();
                 V v = e.getValue();
-                publishEvent(CacheEvent.of(
+                if (hasListeners()) publishEvent(CacheEvent.of(
                     CacheEventType.HIT, tier.name(), tier.level(), k, v));
                 if (NullMarker.isNullMarker(v)) {
                     result.put(k, null);
@@ -315,7 +382,7 @@ public final class DefaultCacheChain implements CacheChain {
             Cache head = peekFirst();
             String headName = head == null ? NAME : head.name();
             CacheLevel headLevel = head == null ? CacheLevel.L1 : head.level();
-            publishEvent(CacheEvent.error(headName, headLevel, remaining, ex));
+            if (hasListeners()) publishEvent(CacheEvent.error(headName, headLevel, remaining, ex));
             if (ex instanceof CacheLoadException cle) {
                 throw cle;
             }
@@ -376,7 +443,7 @@ public final class DefaultCacheChain implements CacheChain {
         Objects.requireNonNull(key, "key");
         for (Cache tier : levels) {
             tier.invalidate(key);
-            publishEvent(CacheEvent.of(
+            if (hasListeners()) publishEvent(CacheEvent.of(
                 CacheEventType.INVALIDATE, tier.name(), tier.level(), key, null));
         }
     }
@@ -391,7 +458,7 @@ public final class DefaultCacheChain implements CacheChain {
             tier.invalidateAll(keys);
             // Bulk-invalidate event carries null as the key (per the
             // CacheChain contract — one event per tier, not per key).
-            publishEvent(CacheEvent.of(
+            if (hasListeners()) publishEvent(CacheEvent.of(
                 CacheEventType.INVALIDATE, tier.name(), tier.level(), null, null));
         }
     }
@@ -400,7 +467,7 @@ public final class DefaultCacheChain implements CacheChain {
     public void invalidateAll() {
         for (Cache tier : levels) {
             tier.invalidateAll();
-            publishEvent(CacheEvent.of(
+            if (hasListeners()) publishEvent(CacheEvent.of(
                 CacheEventType.INVALIDATE, tier.name(), tier.level(), null, null));
         }
     }
@@ -448,10 +515,11 @@ public final class DefaultCacheChain implements CacheChain {
             } catch (RuntimeException ex) {
                 // Continue closing the remaining tiers; surface the first
                 // failure as a published event so the caller is aware.
-                publishEvent(CacheEvent.error(
+                if (hasListeners()) publishEvent(CacheEvent.error(
                     tier.name(), tier.level(), null, ex));
             }
         }
+        singleFlight.close();
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -531,6 +599,16 @@ public final class DefaultCacheChain implements CacheChain {
         Objects.requireNonNull(listener, "listener");
         listeners.add(listener);
         return this;
+    }
+
+    /**
+     * Returns {@code true} when at least one listener is registered. Hot-path
+     * callers use this to skip {@link CacheEvent} construction entirely when
+     * no listeners are attached, avoiding unnecessary short-lived object
+     * allocation on every cache hit/miss.
+     */
+    private boolean hasListeners() {
+        return !listeners.isEmpty();
     }
 
     /**

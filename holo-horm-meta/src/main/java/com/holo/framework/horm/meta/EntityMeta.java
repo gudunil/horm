@@ -1,6 +1,8 @@
 package com.holo.framework.horm.meta;
 
 import com.holo.framework.horm.meta.annotation.CacheLevel;
+import com.holo.framework.horm.meta.annotation.CascadeType;
+import com.holo.framework.horm.meta.annotation.GenerationType;
 
 import java.util.List;
 import java.util.Objects;
@@ -37,6 +39,8 @@ public final class EntityMeta<T> {
     private final boolean cached;
     private final CachePolicy cachePolicy;
     private final CacheLevel[] cacheLevels;
+    private final boolean hasPersistCascade;
+    private final boolean hasDeleteCascade;
 
     private EntityMeta(Builder<T> b) {
         this.type = Objects.requireNonNull(b.type, "type");
@@ -51,6 +55,18 @@ public final class EntityMeta<T> {
         this.cached = b.cached;
         this.cachePolicy = b.cachePolicy;
         this.cacheLevels = b.cacheLevels == null ? new CacheLevel[0] : b.cacheLevels.clone();
+        this.hasPersistCascade = computeHasCascade(this.relations, CascadeType.PERSIST);
+        this.hasDeleteCascade = computeHasCascade(this.relations, CascadeType.REMOVE);
+    }
+
+    private static boolean computeHasCascade(List<RelationMeta> relations, CascadeType target) {
+        if (relations == null || relations.isEmpty()) return false;
+        for (RelationMeta r : relations) {
+            for (CascadeType ct : r.cascadeTypes()) {
+                if (ct == CascadeType.ALL || ct == target) return true;
+            }
+        }
+        return false;
     }
 
     public Class<T> type() { return type; }
@@ -62,6 +78,20 @@ public final class EntityMeta<T> {
     public Mapper<T> mapper() { return mapper; }
     public List<RelationMeta> relations() { return relations; }
     public FieldMeta<?> versionField() { return versionField; }
+
+    /**
+     * Whether this entity has any relation with {@code CascadeType.PERSIST}
+     * or {@code CascadeType.ALL}. When {@code false}, {@code Model.save()}
+     * can skip cascade scanning entirely.
+     */
+    public boolean hasPersistCascade() { return hasPersistCascade; }
+
+    /**
+     * Whether this entity has any relation with {@code CascadeType.REMOVE}
+     * or {@code CascadeType.ALL}. When {@code false}, {@code Model.delete()}
+     * can skip cascade scanning entirely.
+     */
+    public boolean hasDeleteCascade() { return hasDeleteCascade; }
 
     /**
      * Whether this entity is eligible for caching. {@code false} when the
@@ -105,11 +135,11 @@ public final class EntityMeta<T> {
         return Optional.empty();
     }
 
-    /** Returns the names of columns included in INSERT statements (excludes non-insertable and id-with-identity). */
+    /** Returns the names of columns included in INSERT statements (excludes non-insertable and auto-generated ids). */
     public List<String> insertableColumns() {
         return fields.stream()
             .filter(FieldMeta::insertable)
-            .filter(f -> !(f.isId() && f.generationStrategy() != null))
+            .filter(f -> !f.isId() || f.generationStrategy() == GenerationType.MANUAL)
             .map(FieldMeta::column)
             .toList();
     }

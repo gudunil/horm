@@ -189,10 +189,11 @@ class EntityMetaTest {
     }
 
     @Test
-    void insertableColumnsIncludesIdWithoutGenerationStrategy() {
+    void insertableColumnsIncludesManualIdField() {
         FieldMeta<Long> manualId = FieldMeta.<Long>builder()
             .name("id").column("id").type(Long.class)
             .id(true)
+            .generationStrategy(GenerationType.MANUAL)
             .insertable(true)
             .build();
         EntityMeta<Object> meta = buildMeta(List.of(manualId, nameField()));

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -13,10 +12,18 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.sql.DataSource;
+
 import com.holo.framework.horm.benchmark.BenchDataSourceProvider;
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
  * Shared H2 in-memory database bootstrap for all JMH benchmarks.
+ *
+ * <p>Provides a common {@link HikariDataSource} so all frameworks (JDBC, HORM,
+ * MyBatis, Hibernate) use the same connection pool configuration, ensuring
+ * fair performance comparisons.
  *
  * <p>Initializes the {@code bench_users} schema and pre-populates
  * {@link #PRE_FILL_COUNT} rows exactly once per JVM (the H2 memory DB
@@ -29,25 +36,50 @@ public final class BenchmarkEnv {
     /** Number of rows pre-populated into {@code bench_users}. */
     public static final int PRE_FILL_COUNT = 1000;
 
+    /** HikariCP maximum pool size (consistent across all frameworks). */
+    public static final int MAX_POOL_SIZE = 10;
+
     private static volatile boolean initialized = false;
+    private static volatile HikariDataSource sharedDataSource;
 
     private BenchmarkEnv() {}
+
+    /**
+     * Returns the shared {@link HikariDataSource} instance.
+     * Lazily initialized on first access.
+     */
+    public static synchronized DataSource getSharedDataSource() {
+        if (sharedDataSource == null) {
+            HikariConfig config = new HikariConfig();
+            config.setJdbcUrl(BenchDataSourceProvider.JDBC_URL);
+            config.setUsername("sa");
+            config.setPassword("");
+            config.setMaximumPoolSize(MAX_POOL_SIZE);
+            config.setPoolName("bench-pool");
+            // Fast fail on connection acquisition
+            config.setConnectionTimeout(3000);
+            sharedDataSource = new HikariDataSource(config);
+        }
+        return sharedDataSource;
+    }
 
     /** Ensures the schema and seed data exist. Idempotent and thread-safe. */
     public static synchronized void ensureInitialized() throws SQLException, IOException {
         if (initialized) return;
-        try (Connection conn = openConnection()) {
+        try (Connection conn = getSharedDataSource().getConnection()) {
             executeSchema(conn);
             seedData(conn);
         }
         initialized = true;
     }
 
-    /** Opens a fresh connection to the shared H2 memory database. */
+    /**
+     * Opens a connection from the shared HikariCP pool.
+     * @deprecated Use {@link #getSharedDataSource()} instead for direct pool access.
+     */
+    @Deprecated
     public static Connection openConnection() throws SQLException {
-        Connection conn = DriverManager.getConnection(BenchDataSourceProvider.JDBC_URL, "sa", "");
-        conn.setAutoCommit(true);
-        return conn;
+        return getSharedDataSource().getConnection();
     }
 
     /** Returns the ids of all pre-populated rows (1..{@link #PRE_FILL_COUNT}). */
