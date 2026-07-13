@@ -3,8 +3,8 @@
 > 本文记录 HORM 1.0.0-SNAPSHOT 的 JMH 性能基准测试设计、真实测试结果与分析。
 >
 > **测试日期**：2026-07-13
-> - 第一次运行（公平性修复后重跑 CRUD/Query/Batch）：[benchmark-results-2026-07-13-run3.txt](./benchmark-results-2026-07-13-run3.txt)
-> - 第二次运行（TransactionProxy 使用 no-op 连接隔离代理开销）：[benchmark-results-2026-07-13-aptproxy-fixed.txt](./benchmark-results-2026-07-13-aptproxy-fixed.txt)
+> - 公平性修复后完整套件重跑：[benchmark-results-2026-07-13-run5.txt](./benchmark-results-2026-07-13-run5.txt)
+> - 历史数据（公平性修复前）：[benchmark-results-2026-07-13-run3.txt](./benchmark-results-2026-07-13-run3.txt)
 
 ---
 
@@ -93,40 +93,40 @@ java -jar holo-horm/holo-horm-benchmark/target/holo-horm-benchmark-1.0.0-SNAPSHO
 
 | 框架 | 平均时间（μs/op） | 误差 ± | 相对 JDBC |
 |------|-------------------|--------|----------|
-| 手写 JDBC | **0.812** | 0.056 | 1.0x |
-| HORM | **1.602** | 0.153 | 2.0x |
-| Hibernate | 2.454 | 0.242 | 3.0x |
-| MyBatis | 3.146 | 0.033 | 3.9x |
+| 手写 JDBC | **0.796** | 0.005 | 1.0x |
+| HORM | **1.575** | 0.006 | 2.0x |
+| Hibernate | 2.475 | 0.140 | 3.1x |
+| MyBatis | 3.150 | 0.019 | 4.0x |
 
-**分析**：HORM 在 FindById 场景下表现良好，比 JDBC 慢 2 倍，但比 Hibernate 快 35%，比 MyBatis 快 49%。这得益于 APT 生成的零反射 Mapper 和 SqlTemplates 预编译。
+**分析**：HORM 在 FindById 场景下表现良好，比 JDBC 慢约 2 倍，但比 Hibernate 快 36%，比 MyBatis 快 50%。这得益于 APT 生成的零反射 Mapper 和 SqlTemplates 预编译。
 
 ### 3.2 CRUD（INSERT / UPDATE / DELETE）
 
 | 操作 | JDBC | HORM | MyBatis | Hibernate |
 |------|------|------|---------|-----------|
-| INSERT | 21.176 ± 115.829 | **14.205 ± 66.425** | 7.163 ± 3.369 | 8.249 ± 2.881 |
-| UPDATE | **2.556 ± 0.068** | 5.289 ± 0.090 | 3.539 ± 0.331 | 8.510 ± 2.301 |
-| DELETE | 5.774 ± 0.339 | 6.199 ± 0.238 | 6.921 ± 0.113 | 9.709 ± 0.583 |
+| INSERT | 25.020 ± 154.589 | 8.036 ± 13.373 | **7.335 ± 3.713** | 7.901 ± 3.315 |
+| UPDATE | **2.613 ± 0.212** | 5.450 ± 0.026 | 3.407 ± 0.104 | 9.168 ± 3.686 |
+| DELETE | **5.543 ± 0.150** | 6.438 ± 0.700 | 7.479 ± 0.051 | 9.562 ± 0.744 |
 
-> 单位：μs/op。JDBC INSERT 误差极大（115.829），疑似 GC 或 JIT 抖动异常值。
+> 单位：μs/op。JDBC INSERT 误差极大（154.589），疑似 GC 或 JIT 抖动异常值。
 
 **分析**：
-- **INSERT**：HORM 在显式事务下约 14 μs，比 MyBatis 慢约 2 倍（MyBatis 的 SqlSession 复用更高效）
-- **UPDATE**：HORM 约 5.3 μs，比 JDBC 慢 2 倍，但比 Hibernate 快 37%
-- **DELETE**：HORM 约 6.2 μs，与 JDBC/MyBatis 接近，比 Hibernate 快 36%
+- **INSERT**：HORM 约 8.0 μs，与 MyBatis/Hibernate 接近，但 JDBC 因异常抖动不具可比性
+- **UPDATE**：HORM 约 5.5 μs，比 JDBC 慢约 2.1 倍，但比 Hibernate 快 40%
+- **DELETE**：HORM 约 6.4 μs，比 JDBC 慢约 16%，比 MyBatis 快 14%，比 Hibernate 快 33%
 
 ### 3.3 Query（条件查询 + 排序 + 分页）
 
 | 框架 | limit=10（μs/op） | limit=100（μs/op） |
 |------|-------------------|---------------------|
-| 手写 JDBC | **1.667 ± 0.022** | **8.761 ± 0.077** |
-| HORM | 3.524 ± 0.195 | 16.169 ± 0.210 |
-| MyBatis | 8.163 ± 0.250 | 56.860 ± 0.544 |
-| Hibernate | 7.280 ± 0.111 | 52.709 ± 1.061 |
+| 手写 JDBC | **1.689 ± 0.148** | **9.003 ± 0.489** |
+| HORM | 3.429 ± 0.285 | 18.245 ± 1.124 |
+| MyBatis | 8.343 ± 0.441 | 59.531 ± 0.197 |
+| Hibernate | 7.477 ± 0.053 | 51.838 ± 0.698 |
 
 **分析**：
-- **limit=10**：HORM 比 JDBC 慢 2.1 倍，但比 Hibernate 快 51%，比 MyBatis 快 57%
-- **limit=100**：HORM 比 JDBC 慢 1.8 倍，但比 Hibernate 快 69%，比 MyBatis 快 72%
+- **limit=10**：HORM 比 JDBC 慢约 2.0 倍，但比 Hibernate 快 54%，比 MyBatis 快 59%
+- **limit=100**：HORM 比 JDBC 慢约 2.0 倍，但比 Hibernate 快 65%，比 MyBatis 快 69%
 
 **结论**：HORM 的查询 DSL 在所有结果集规模下都优于 Hibernate 和 MyBatis，接近手写 JDBC 水平。
 
@@ -134,26 +134,26 @@ java -jar holo-horm/holo-horm-benchmark/target/holo-horm-benchmark-1.0.0-SNAPSHO
 
 | 场景 | 平均时间（ns/op） | 误差 ± | 说明 |
 |------|-------------------|--------|------|
-| cacheHit | **110.570** | 0.947 | L1 命中，直接从 Caffeine 取值 |
-| noCache | 1491.713 | 17.913 | 无 CacheChain，直接查 DB |
-| cacheMiss | 3615.661 | 58.918 | 缓存未命中，查 DB + 回填 |
+| cacheHit | **109.592** | 1.217 | L1 命中，直接从 Caffeine 取值 |
+| noCache | 1522.735 | 24.540 | 无 CacheChain，直接查 DB |
+| cacheMiss | 3655.226 | 25.539 | 缓存未命中，查 DB + 回填 |
 
 **分析**：
-- **缓存命中是 DB 查询的 13 倍快**（111 ns vs 1492 ns），加速显著
+- **缓存命中是 DB 查询的约 14 倍快**（110 ns vs 1523 ns），加速显著
 - `cacheMiss` 比 `noCache` 慢约 2.4 倍（包含 invalidate + 回填开销）
 
 ### 3.5 BatchInsert（批量插入）
 
 | 框架 | batchSize=100（ms/op） | batchSize=1000（ms/op） |
 |------|------------------------|--------------------------|
-| HORM | **0.462 ± 0.544** | **4.526 ± 6.478** |
-| 手写 JDBC | 0.461 ± 1.350 | 5.118 ± 29.010 |
-| MyBatis | 0.492 ± 0.942 | 4.907 ± 10.312 |
-| Hibernate | 0.574 ± 0.417 | 5.600 ± 5.202 |
+| HORM | **0.482 ± 0.586** | 4.763 ± 10.549 |
+| 手写 JDBC | 0.496 ± 2.258 | **4.696 ± 15.410** |
+| MyBatis | 0.512 ± 0.839 | 4.916 ± 8.920 |
+| Hibernate | 0.583 ± 0.085 | 6.198 ± 4.430 |
 
 **分析**：修复公平性问题后，所有框架的批量插入性能处于同一水平：
-- **100 条**：HORM 0.462 ms，与 JDBC 基线（0.461 ms）几乎相同
-- **1000 条**：HORM 4.526 ms，与 JDBC（5.118 ms）和 MyBatis（4.907 ms）接近，比 Hibernate（5.600 ms）快约 19%
+- **100 条**：HORM 0.482 ms，与 JDBC 基线（0.496 ms）几乎相同
+- **1000 条**：HORM 4.763 ms，与 JDBC（4.696 ms）和 MyBatis（4.916 ms）接近，比 Hibernate（6.198 ms）快约 23%
 
 **结论**：HORM 的 `Repository.batchInsert()` 使用 JDBC batch，性能与手写 JDBC 持平。
 
@@ -161,26 +161,26 @@ java -jar holo-horm/holo-horm-benchmark/target/holo-horm-benchmark-1.0.0-SNAPSHO
 
 | 框架 | 平均时间（μs/op） | 误差 ± |
 |------|-------------------|--------|
-| 手写 JDBC | **12.209 ± 0.210** | 
-| HORM | 24.251 ± 0.183 |
-| Hibernate | 73.913 ± 1.830 |
-| MyBatis | 164.854 ± 2.589 |
+| 手写 JDBC | **12.546 ± 1.317** |
+| HORM | 23.999 ± 1.273 |
+| Hibernate | 74.233 ± 0.451 |
+| MyBatis | 171.223 ± 3.076 |
 
 **分析**：
-- HORM 比 Hibernate 快 67%，比 MyBatis 快 85%
-- HORM 比 JDBC 慢 2 倍（APT Mapper 映射开销）
+- HORM 比 Hibernate 快 68%，比 MyBatis 快 86%
+- HORM 比 JDBC 慢约 1.9 倍（APT Mapper 映射开销）
 
 ### 3.7 TransactionProxy（M8.7 代理对比）
 
 | 方式 | 平均时间（ns/op） | 误差 ± | 说明 |
 |------|-------------------|--------|------|
-| directCall | **4.704** | 0.261 | 直接方法调用（理论应最快） |
-| jdkDynamicProxy | 4.766 | 0.039 | 因 `BenchService` 无接口，实际退化为 directCall |
-| methodBridge | 11.559 | 0.765 | LambdaMetafactory 桥接 |
-| methodInvoke | 11.815 | 0.125 | Method.invoke 反射 |
-| aptProxyDirect | **68.153** | 0.353 | APT 代理直接调用（no-op 连接） |
+| directCall | **5.096** | 0.751 | 直接方法调用（理论应最快） |
+| jdkDynamicProxy | 4.865 | 0.189 | 因 `BenchService` 无接口，实际退化为 directCall |
+| methodBridge | 11.581 | 0.937 | LambdaMetafactory 桥接 |
+| methodInvoke | 15.913 | 0.407 | Method.invoke 反射 |
+| aptProxyDirect | **625.606** | 11.157 | APT 代理直接调用（共享 HikariCP 数据源） |
 
-**说明**：原 `aptProxyDirect` 3545 ns/op 的异常值主要来源于 `BenchDataSourceProvider` 每次新建 H2 连接并真实 commit/close。新增 `NoOpDataSourceProvider` 后，代理本身开销降至约 **63 ns/op**（相对 directCall），降幅 **98%**。`jdkDynamicProxy` 因 `BenchService` 未实现接口而退化，建议后续补充接口化目标以公平对比。
+**说明**：`TransactionProxyBenchmark` 已改用 `BenchmarkEnv.getSharedDataSource()`（与 `HormSetup` 一致），确保与 HORM 其他基准在同等连接池条件下对比。在此条件下 `aptProxyDirect` 为 **626 ns/op**，比最初异常值（3734 ns/op）降低 **83%**，主要收益来自 HikariCP 连接复用。剩余开销主要为连接获取/释放 + 事务上下文管理。`jdkDynamicProxy` 因 `BenchService` 未实现接口而退化，建议后续补充接口化目标以公平对比。
 
 ---
 
@@ -190,19 +190,19 @@ java -jar holo-horm/holo-horm-benchmark/target/holo-horm-benchmark-1.0.0-SNAPSHO
 
 | 场景 | HORM 表现 | 对比 |
 |------|----------|------|
-| FindById | 1.602 μs | 比 Hibernate 快 35%，比 MyBatis 快 49% |
-| 大结果集查询（limit=100） | 16.17 μs | 比 Hibernate 快 69%，比 MyBatis 快 72% |
-| 小结果集查询（limit=10） | 3.52 μs | 比 Hibernate 快 51%，比 MyBatis 快 57% |
-| 批量查询 100 ID | 24.25 μs | 比 Hibernate 快 67%，比 MyBatis 快 85% |
-| 批量插入 | 4.526 ms（1000条） | 与 JDBC/MyBatis 持平 |
-| 缓存命中 | 111 ns | 比 DB 查询快 13 倍 |
+| FindById | 1.575 μs | 比 Hibernate 快 36%，比 MyBatis 快 50% |
+| 大结果集查询（limit=100） | 18.245 μs | 比 Hibernate 快 65%，比 MyBatis 快 69% |
+| 小结果集查询（limit=10） | 3.429 μs | 比 Hibernate 快 54%，比 MyBatis 快 59% |
+| 批量查询 100 ID | 23.999 μs | 比 Hibernate 快 68%，比 MyBatis 快 86% |
+| 批量插入 | 4.763 ms（1000条） | 与 JDBC/MyBatis 持平 |
+| 缓存命中 | 109.592 ns | 比 DB 查询快约 14 倍 |
 
 ### 4.2 HORM 劣势场景
 
 | 场景 | HORM 表现 | 根因 | 改进计划 |
 |------|----------|------|---------|
-| INSERT（显式事务） | 14.2 μs | Horm.tx() 事务管理开销 | 优化事务上下文获取 |
-| UPDATE | 5.3 μs | 乐观锁版本检查开销 | 可选关闭乐观锁 |
+| INSERT（显式事务） | 8.0 μs | Horm.tx() 事务管理开销 + Repository 构造 | 优化事务上下文获取与 Repository 缓存 |
+| UPDATE | 5.5 μs | 乐观锁版本检查开销 | 可选关闭乐观锁 |
 
 ### 4.3 公平性修复效果
 
@@ -216,9 +216,9 @@ java -jar holo-horm/holo-horm-benchmark/target/holo-horm-benchmark-1.0.0-SNAPSHO
 
 修复公平性问题后，HORM 在以下场景表现出色：
 
-1. **FindById**：比 Hibernate 快 35%，比 MyBatis 快 49%
-2. **Query**：比 Hibernate 快 51-72%，比 MyBatis 快 57-72%
-3. **FindMany**：比 Hibernate 快 67%，比 MyBatis 快 85%
+1. **FindById**：比 Hibernate 快 36%，比 MyBatis 快 50%
+2. **Query**：比 Hibernate 快 54-65%，比 MyBatis 快 59-69%
+3. **FindMany**：比 Hibernate 快 68%，比 MyBatis 快 86%
 4. **BatchInsert**：与 JDBC/MyBatis 持平
 
 HORM 的零反射设计和 APT 预编译 SQL 模板在查询场景带来显著优势。
@@ -288,7 +288,8 @@ List<User> users = Model.query(User.class).fetch(UserQueryMeta.ORDERS).list();
 ## 七、参考
 
 - [基准测试源码](../holo-horm-benchmark/src/main/java/com/holo/framework/horm/benchmark/)
-- [原始结果数据 2026-07-13-run3](./benchmark-results-2026-07-13-run3.txt)
+- [完整套件重跑结果 2026-07-13-run5](./benchmark-results-2026-07-13-run5.txt)
+- [历史数据 2026-07-13-run3](./benchmark-results-2026-07-13-run3.txt)
 - [JMH 官方文档](https://openjdk.org/projects/code-tools/jmh/)
 - [04-cache-chain.md](./04-cache-chain.md) — 缓存链设计
 - [09-zero-reflection-optimization.md](./09-zero-reflection-optimization.md) — 零反射优化

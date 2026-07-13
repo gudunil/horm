@@ -1,6 +1,8 @@
 package com.holo.framework.horm.benchmark;
 
 import com.holo.framework.horm.benchmark.service.BenchService;
+import com.holo.framework.horm.benchmark.setup.BenchmarkEnv;
+import com.holo.framework.horm.core.DataSourceProvider;
 import com.holo.framework.horm.core.HormContext;
 import com.holo.framework.horm.core.MethodBridgeFactory;
 import com.holo.framework.horm.core.TransactionAdvisorRegistry;
@@ -23,9 +25,13 @@ import org.openjdk.jmh.annotations.TearDown;
 import org.openjdk.jmh.annotations.Warmup;
 
 import java.lang.reflect.Method;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.concurrent.TimeUnit;
+
+import javax.sql.DataSource;
 
 /**
  * JMH benchmark comparing transaction proxy invocation paths:
@@ -36,7 +42,9 @@ import java.util.concurrent.TimeUnit;
  *   <li>{@code TransactionInterceptor} — JDK dynamic proxy with MethodBridge</li>
  * </ol>
  *
- * <p>Measures the overhead of proxy invocation only (no actual database I/O).
+ * <p>Measures proxy invocation overhead under the same shared HikariCP data source
+ * used by the rest of the HORM benchmark suite, so the numbers are comparable
+ * with other HORM benchmarks.
  */
 @BenchmarkMode(Mode.AverageTime)
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -57,9 +65,13 @@ public class TransactionProxyBenchmark {
     public void setUp() throws Exception {
         target = new BenchService();
 
-        // Use a no-op datasource so the benchmark measures proxy dispatch
-        // overhead only, not real JDBC connection acquisition / commit / close.
-        noOpCtx = new HormContext(new NoOpDataSourceProvider());
+        // Use the shared HikariCP data source (same as HormSetup) so that
+        // this benchmark is comparable with the rest of the HORM benchmark
+        // suite. This measures proxy dispatch + real connection-pool overhead.
+        BenchmarkEnv.ensureInitialized();
+        DataSource ds = BenchmarkEnv.getSharedDataSource();
+        DataSourceProvider provider = new DataSourceAdapter(ds);
+        noOpCtx = new HormContext(provider);
         HormContext.install(noOpCtx);
 
         // 1. Method.invoke baseline
@@ -119,5 +131,29 @@ public class TransactionProxyBenchmark {
     @Benchmark
     public Object directCall() {
         return target.execute("test");
+    }
+
+    /** Adapts a {@link DataSource} to HORM's {@link DataSourceProvider} interface. */
+    private static class DataSourceAdapter implements DataSourceProvider {
+        private final DataSource dataSource;
+
+        DataSourceAdapter(DataSource dataSource) {
+            this.dataSource = dataSource;
+        }
+
+        @Override
+        public Connection getConnection() throws SQLException {
+            return dataSource.getConnection();
+        }
+
+        @Override
+        public void releaseConnection(Connection connection) {
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException ignored) {
+                }
+            }
+        }
     }
 }
