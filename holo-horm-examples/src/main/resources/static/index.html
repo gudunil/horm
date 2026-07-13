@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holo HORM 示例控制台</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --danger: #dc2626;
+            --danger-dark: #b91c1c;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+            --text: #1e293b;
+            --muted: #64748b;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        header {
+            background: var(--primary);
+            color: white;
+            padding: 1.5rem 2rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        header p {
+            margin: 0.25rem 0 0;
+            opacity: 0.9;
+            font-size: 0.875rem;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 1.5rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 0.75rem;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+        }
+
+        .card h2 {
+            margin: 0 0 1rem;
+            font-size: 1.125rem;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.75rem;
+        }
+
+        .form-group {
+            margin-bottom: 1rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.25rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: var(--danger-dark);
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-weight: 600;
+            color: var(--muted);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        tbody tr:hover {
+            background: #f1f5f9;
+        }
+
+        .empty {
+            text-align: center;
+            color: var(--muted);
+            padding: 2rem;
+        }
+
+        .toast {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-size: 0.875rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: translateY(-0.5rem);
+            transition: all 0.2s;
+            pointer-events: none;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.success {
+            background: #16a34a;
+        }
+
+        .toast.error {
+            background: var(--danger);
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: #dbeafe;
+            color: var(--primary-dark);
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Holo HORM 示例控制台</h1>
+        <p>Active Record + 查询 DSL + 事务 + 缓存 + 多数据源</p>
+    </header>
+
+    <div class="container">
+        <div class="grid">
+            <aside>
+                <div class="card">
+                    <h2>新建用户</h2>
+                    <form id="createUserForm">
+                        <div class="form-group">
+                            <label for="email">邮箱</label>
+                            <input type="email" id="email" required placeholder="user@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="nickname">昵称</label>
+                            <input type="text" id="nickname" required placeholder="昵称">
+                        </div>
+                        <button type="submit" class="btn-primary">创建用户</button>
+                    </form>
+                </div>
+
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h2>下单</h2>
+                    <form id="placeOrderForm">
+                        <div class="form-group">
+                            <label for="orderUserId">用户</label>
+                            <select id="orderUserId" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="orderProductId">商品</label>
+                            <select id="orderProductId" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="orderAmount">数量</label>
+                            <input type="number" id="orderAmount" min="1" value="1" required>
+                        </div>
+                        <button type="submit" class="btn-primary">提交订单</button>
+                    </form>
+                </div>
+
+                <div class="card" style="margin-top: 1.5rem;">
+                    <h2>操作提示</h2>
+                    <p style="font-size: 0.875rem; color: var(--muted);">
+                        本页面直接调用 Spring Boot 暴露的 REST 接口，演示 HORM 的 Active Record 风格交互。
+                        商品数据可在 H2 控制台手动插入。
+                    </p>
+                </div>
+            </aside>
+
+            <main>
+                <div class="card">
+                    <h2>用户列表</h2>
+                    <div class="actions">
+                        <input type="text" id="searchEmail" placeholder="按邮箱搜索..." style="max-width: 240px;">
+                        <button id="searchBtn" class="btn-primary">搜索</button>
+                        <button id="refreshBtn" class="btn-primary">刷新</button>
+                    </div>
+                    <table style="margin-top: 1rem;">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>邮箱</th>
+                                <th>昵称</th>
+                                <th>版本</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="userTableBody">
+                            <tr>
+                                <td colspan="6" class="empty">加载中...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <div id="toast" class="toast"></div>
+
+    <script>
+        const API_BASE = '/api/users';
+        const toastEl = document.getElementById('toast');
+
+        function showToast(message, type = 'success') {
+            toastEl.textContent = message;
+            toastEl.className = `toast ${type} show`;
+            setTimeout(() => toastEl.classList.remove('show'), 3000);
+        }
+
+        function formatDate(value) {
+            if (!value) return '-';
+            const date = new Date(value);
+            return date.toLocaleString('zh-CN');
+        }
+
+        async function api(path, options = {}) {
+            const response = await fetch(path, {
+                headers: { 'Content-Type': 'application/json' },
+                ...options
+            });
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text || `HTTP ${response.status}`);
+            }
+            if (response.status === 204) return null;
+            return response.json().catch(() => null);
+        }
+
+        async function loadUsers(email = '') {
+            const url = email ? `${API_BASE}?email=${encodeURIComponent(email)}` : API_BASE;
+            const tbody = document.getElementById('userTableBody');
+            try {
+                const users = await api(url);
+                const userSelect = document.getElementById('orderUserId');
+                userSelect.innerHTML = users.length
+                    ? users.map(u => `<option value="${u.id}">${u.email}</option>`).join('')
+                    : '<option value="">暂无用户</option>';
+
+                tbody.innerHTML = users.length
+                    ? users.map(u => `
+                        <tr data-id="${u.id}">
+                            <td>${u.id}</td>
+                            <td>${u.email}</td>
+                            <td>
+                                <input type="text" value="${u.nickname || ''}" class="nickname-input" style="width: 120px;">
+                            </td>
+                            <td><span class="badge">${u.version ?? 0}</span></td>
+                            <td>${formatDate(u.createdAt)}</td>
+                            <td>
+                                <button class="btn-primary btn-sm update-btn">更新</button>
+                                <button class="btn-danger btn-sm delete-btn">删除</button>
+                            </td>
+                        </tr>
+                    `).join('')
+                    : '<tr><td colspan="6" class="empty">暂无用户</td></tr>';
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="6" class="empty">加载失败: ${err.message}</td></tr>`;
+                showToast(err.message, 'error');
+            }
+        }
+
+        async function loadProducts() {
+            const select = document.getElementById('orderProductId');
+            try {
+                const products = await api('/api/products');
+                select.innerHTML = products.length
+                    ? products.map(p => `<option value="${p.id}">${p.name} (${p.sku}) - ¥${p.price}</option>`).join('')
+                    : '<option value="">暂无商品</option>';
+            } catch (err) {
+                select.innerHTML = '<option value="">商品加载失败</option>';
+            }
+        }
+
+        document.getElementById('createUserForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const nickname = document.getElementById('nickname').value.trim();
+            try {
+                await api(API_BASE, {
+                    method: 'POST',
+                    body: JSON.stringify({ email, nickname })
+                });
+                showToast('用户创建成功');
+                e.target.reset();
+                await loadUsers();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        });
+
+        document.getElementById('placeOrderForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const userId = document.getElementById('orderUserId').value;
+            const productId = document.getElementById('orderProductId').value;
+            const amount = parseInt(document.getElementById('orderAmount').value, 10);
+            if (!userId || !productId) {
+                showToast('请选择用户和商品', 'error');
+                return;
+            }
+            try {
+                await api(`${API_BASE}/${userId}/orders`, {
+                    method: 'POST',
+                    body: JSON.stringify({ productId, amount })
+                });
+                showToast('下单成功');
+                document.getElementById('orderAmount').value = 1;
+                await loadUsers();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        });
+
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            loadUsers(document.getElementById('searchEmail').value.trim());
+        });
+
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            document.getElementById('searchEmail').value = '';
+            loadUsers();
+        });
+
+        document.getElementById('searchEmail').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') loadUsers(e.target.value.trim());
+        });
+
+        document.getElementById('userTableBody').addEventListener('click', async (e) => {
+            const row = e.target.closest('tr');
+            if (!row) return;
+            const id = row.dataset.id;
+
+            if (e.target.classList.contains('update-btn')) {
+                const nickname = row.querySelector('.nickname-input').value.trim();
+                try {
+                    await api(`${API_BASE}/${id}`, {
+                        method: 'PUT',
+                        body: JSON.stringify({ nickname })
+                    });
+                    showToast('用户更新成功');
+                    await loadUsers();
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
+            }
+
+            if (e.target.classList.contains('delete-btn')) {
+                if (!confirm('确定删除该用户吗？')) return;
+                try {
+                    await api(`${API_BASE}/${id}`, { method: 'DELETE' });
+                    showToast('用户删除成功');
+                    await loadUsers();
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadUsers();
+            loadProducts();
+        });
+    </script>
+</body>
+</html>

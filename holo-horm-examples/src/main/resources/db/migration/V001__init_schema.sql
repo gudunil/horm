@@ -1,0 +1,30 @@
+CREATE TABLE IF NOT EXISTS users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(128) NOT NULL,
+    nickname VARCHAR(64),
+    version BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_users_email (email)
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    sku VARCHAR(64) NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    price DECIMAL(19, 4) NOT NULL,
+    UNIQUE KEY uk_products_sku (sku)
+);
+
+CREATE TABLE IF NOT EXISTS orders (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT NOT NULL,
+    product_id BIGINT NOT NULL,
+    amount INT NOT NULL,
+    total_price DECIMAL(19, 4) NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_orders_user_id (user_id),
+    CONSTRAINT fk_orders_user_id FOREIGN KEY (user_id) REFERENCES users (id),
+    CONSTRAINT fk_orders_product_id FOREIGN KEY (product_id) REFERENCES products (id)
+);

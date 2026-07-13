@@ -15,6 +15,10 @@
     <name>Holo :: HORM :: Migration</name>
     <description>HORM 数据库迁移工具：基于版本号管理 DDL 变更，支持正向/回滚、校验和、多数据源。</description>
 
+    <properties>
+        <flyway.version>10.15.2</flyway.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.holo.framework</groupId>
@@ -25,6 +29,12 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
+            <version>${flyway.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-mysql</artifactId>
+            <version>${flyway.version}</version>
         </dependency>
 
         <dependency>
