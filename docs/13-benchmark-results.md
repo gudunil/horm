@@ -2,8 +2,9 @@
 
 > 本文记录 HORM 1.0.0-SNAPSHOT 的 JMH 性能基准测试设计、真实测试结果与分析。
 >
-> **测试日期**：2026-07-13（公平性修复后重跑：Hibernate Update 加 flush，MyBatis Batch 用 BATCH Executor，统一显式事务）
-> **原始数据**：[benchmark-results-2026-07-13-run3.txt](./benchmark-results-2026-07-13-run3.txt)（本次运行）
+> **测试日期**：2026-07-13
+> - 第一次运行（公平性修复后重跑 CRUD/Query/Batch）：[benchmark-results-2026-07-13-run3.txt](./benchmark-results-2026-07-13-run3.txt)
+> - 第二次运行（TransactionProxy 使用 no-op 连接隔离代理开销）：[benchmark-results-2026-07-13-aptproxy-fixed.txt](./benchmark-results-2026-07-13-aptproxy-fixed.txt)
 
 ---
 
@@ -173,13 +174,13 @@ java -jar holo-horm/holo-horm-benchmark/target/holo-horm-benchmark-1.0.0-SNAPSHO
 
 | 方式 | 平均时间（ns/op） | 误差 ± | 说明 |
 |------|-------------------|--------|------|
-| directCall | **4.639** | 0.151 | 直接方法调用（理论应最快） |
-| jdkDynamicProxy | 4.720 | 0.424 | JDK 动态代理（基准） |
-| methodBridge | 11.349 | 0.128 | LambdaMetafactory 桥接 |
-| methodInvoke | 11.514 | 0.427 | Method.invoke 反射 |
-| aptProxyDirect | 3545.494 | 74.221 | APT 代理直接调用 |
+| directCall | **4.704** | 0.261 | 直接方法调用（理论应最快） |
+| jdkDynamicProxy | 4.766 | 0.039 | 因 `BenchService` 无接口，实际退化为 directCall |
+| methodBridge | 11.559 | 0.765 | LambdaMetafactory 桥接 |
+| methodInvoke | 11.815 | 0.125 | Method.invoke 反射 |
+| aptProxyDirect | **68.153** | 0.353 | APT 代理直接调用（no-op 连接） |
 
-**说明**：`aptProxyDirect` 结果异常高，BenchService 未实现接口导致代理警告。TransactionProxyBenchmark 需进一步调查。
+**说明**：原 `aptProxyDirect` 3545 ns/op 的异常值主要来源于 `BenchDataSourceProvider` 每次新建 H2 连接并真实 commit/close。新增 `NoOpDataSourceProvider` 后，代理本身开销降至约 **63 ns/op**（相对 directCall），降幅 **98%**。`jdkDynamicProxy` 因 `BenchService` 未实现接口而退化，建议后续补充接口化目标以公平对比。
 
 ---
 

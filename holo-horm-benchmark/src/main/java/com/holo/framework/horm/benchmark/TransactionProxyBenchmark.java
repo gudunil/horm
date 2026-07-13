@@ -51,10 +51,16 @@ public class TransactionProxyBenchmark {
     private MethodBridgeFactory.MethodBridge methodBridge;
     private Object aptProxy;
     private Object jdkProxy;
+    private HormContext noOpCtx;
 
     @Setup(Level.Trial)
     public void setUp() throws Exception {
         target = new BenchService();
+
+        // Use a no-op datasource so the benchmark measures proxy dispatch
+        // overhead only, not real JDBC connection acquisition / commit / close.
+        noOpCtx = new HormContext(new NoOpDataSourceProvider());
+        HormContext.install(noOpCtx);
 
         // 1. Method.invoke baseline
         executeMethod = BenchService.class.getMethod("execute", String.class);
@@ -72,8 +78,7 @@ public class TransactionProxyBenchmark {
             }
         }
         if (factory != null) {
-            HormContext ctx = new HormContext(new BenchDataSourceProvider());
-            aptProxy = factory.create(target, ctx);
+            aptProxy = factory.create(target, noOpCtx);
         }
 
         // 4. JDK dynamic proxy (TransactionInterceptor.createProxy)

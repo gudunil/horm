@@ -366,14 +366,30 @@ private <K, V> void backFillAbove(K key, V value, int hitIndex, CachePolicy poli
 
 ### 3.9 根因 9：事务代理性能异常（影响：@Transactional 方法调用）
 
-`TransactionProxyBenchmark.aptProxyDirect` 测得 3734 ns/op，远超 JDK 动态代理（4.99 ns）和 Method.invoke（11.86 ns）。
+`TransactionProxyBenchmark.aptProxyDirect` 原测得 3734 ns/op，远超 JDK 动态代理（4.99 ns）和 Method.invoke（11.86 ns）。
 
-**可能根因**（需进一步验证）：
-1. benchmark 内部每次迭代重新查找代理实例，而非复用
-2. APT 生成代理子类的 `super` 调用路径有额外事务上下文初始化
-3. 事务管理器 ThreadLocal 查找开销被计入
+**调查结果**：
+- 3734 ns 的绝大部分并非代理分发开销，而是 benchmark 每次都经过真实 JDBC 连接生命周期：
+  - `BenchDataSourceProvider.getConnection()` 调用 `DriverManager.getConnection(...)` 新建 H2 内存连接
+  - `TransactionManager.begin()` 设置 `setAutoCommit(false)`
+  - `TransactionManager.commit()` 调用 `Connection.commit()`
+  - `TransactionManager.cleanup()` 恢复 `setAutoCommit(true)` 并 `close()` 连接
+- 为隔离代理本身开销，新增 `NoOpDataSourceProvider`：返回一个 JDK 动态代理的 `Connection`，`commit/rollback/close/setAutoCommit` 全部 no-op。
+- 重新运行后 `aptProxyDirect` 降至 **68 ns/op**，较之前降低 **98%**。
 
-**调查方向**：检查 [TransactionProxyBuilder.java](../holo-horm-meta/src/main/java/com/holo/framework/horm/meta/processor/TransactionProxyBuilder.java) 生成的代理类源码，对比 `jdkDynamicProxy` 基准的实现差异。
+| 基准 | 修复前 (ns/op) | 修复后 (ns/op) | 说明 |
+|------|---------------|---------------|------|
+| directCall | ~7 | 4.7 | 纯方法调用，无事务 |
+| methodInvoke | ~11.9 | 11.8 | 反射调用 |
+| methodBridge | — | 11.6 | LambdaMetafactory |
+| aptProxyDirect | **3734** | **68** | APT 代理 + 事务边界（no-op 连接） |
+| jdkDynamicProxy | ~5 | 4.8 | 因 `BenchService` 无接口，实际退化为 directCall |
+
+**结论**：APT 代理本身的开销约为 **63 ns/op**（相对 directCall），属于合理范围。原 3734 ns 是 benchmark 设计问题（测量了不该测量的数据库连接开销），并非代理实现缺陷。
+
+**遗留问题**：
+- `jdkDynamicProxy` 基准当前因 `BenchService` 未实现接口而退化，建议后续让 `BenchService` 实现接口，或新增 `BenchServiceInterface` 以公平对比 JDK 动态代理。
+- 真实生产环境（使用连接池）中，`@Transactional` 方法的真实成本仍包括从连接池获取/归还连接，但该成本与代理实现无关。
 
 ### 3.10 根因汇总表
 
@@ -387,7 +403,7 @@ private <K, V> void backFillAbove(K key, V value, int hitIndex, CachePolicy poli
 | R6：CacheEvent 无监听器仍构造 | 缓存命中热路径 | 50-100 ns | 易 |
 | R7：QueryHash SHA-256 重计算 | 查询缓存 | 1-5 μs | 易 |
 | R8：defaultBackFillPolicy 回填 | L1+L2 链缓存命中 | 100-300 ns | 易 |
-| R9：事务代理异常 | @Transactional | 3700+ ns | 需调查 |
+| R9：事务代理异常 | @Transactional | 3700+ ns（实测为 benchmark 设计问题，代理本身约 63 ns） | 已调查清楚 |
 
 ---
 

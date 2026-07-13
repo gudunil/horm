@@ -652,7 +652,7 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 
 - **基准结果已收集**：[docs/13-benchmark-results.md](./13-benchmark-results.md) 包含 2026-07-13 真实 JMH 数据。结果显示 HORM 在 FindById/CRUD 场景慢于 Hibernate/MyBatis（Active Record 抽象开销超过反射成本），但在大结果集 Query 和 FindMany 场景有竞争优势。详见文档第四章"综合分析"。
 - **未实现 batch insert 优化**：HORM 当前用循环 `repository.save(entity)`，未做 JDBC batch 优化（M10 计划）。BatchInsert 基准确认这是当前最慢场景。
-- **TransactionProxyBenchmark aptProxyDirect 异常**：3734 ns，远高于 jdkDynamicProxy (5 ns)，与 M8.7 设计预期不符，需 M10 调查。
+- **TransactionProxyBenchmark aptProxyDirect 异常**：3734 ns，远高于 jdkDynamicProxy (5 ns)，与 M8.7 设计预期不符，需 M10 调查。**（M10 已调查清楚：根因是 benchmark 测量了真实 H2 连接新建/commit/close 开销；使用 no-op 连接后降至 68 ns/op。）**
 - **native-image 配置为模板**：未实际构建 Native Image 验证（需 GraalVM 环境）。生产部署必须用 Tracing Agent 补充业务实体反射配置。
 - **UserCrudTest 失败**：ByteBuddy 注入时序问题，M9 不修复（用户明确说明此失败是已知限制）。
 - **RedisCache L2 为 stub**：Native Image 部署若需 L2 缓存，需补充 Redisson 的 native-image 配置。
@@ -696,6 +696,8 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 | T5 | 新增 `DefaultCacheChainSingleFlightTest`（4 测试）验证 SingleFlight 集成 | ✅ |
 | T6 | 修复 `UserCrudTest` ByteBuddy 静态方法绑定问题：将 `User` 从 `src/test/java` 移到 `src/main/java` | ✅ |
 | T7 | 全量 `mvn -pl holo-horm-meta,holo-horm-core,holo-horm-cache -am verify -Pskip-enforcer` 通过 | ✅ |
+| **Phase 4: M8.7 遗留问题调查** | | |
+| R9 | 调查 `TransactionProxyBenchmark.aptProxyDirect` 3734 ns/op 异常；新增 `NoOpDataSourceProvider` 隔离 JDBC 连接开销后降至 68 ns/op | ✅ |
 
 ### 测试与覆盖率
 
@@ -717,6 +719,7 @@ JdbcRepository/QueryImpl 通过 Dialect 生成 SQL，新增 PG 支持。
 6. **方言批量键顺序校验**：`Dialect.supportsBatchInsertGeneratedKeysInOrder()` 默认 `true`，不确定的方言可覆盖为 `false`，`JdbcOperations.batchInsert` 在运行前拒绝，避免静默数据错乱。
 7. **资源释放异常不吞原异常**：`releaseConnection` 将释放异常添加为 `suppressed`，保留原始 `HormException` 及其 cause 链。
 8. **UserCrudTest 修复方案**：测试实体 `User` 放在 `src/main/java`，使 ByteBuddy 主代码转换阶段先注入 Active Record 静态方法，测试编译时绑定到生成方法而非 `Model.find` fallback。
+9. **aptProxyDirect 异常调查结论**：原 3734 ns/op 不是代理分发开销，而是 benchmark 每次都经过真实 H2 连接新建/commit/close。新增 `NoOpDataSourceProvider` 返回 no-op `Connection` 代理后，`aptProxyDirect` 降至 68 ns/op；APT 代理真实开销约为 63 ns/op。
 
 ### 提交记录
 
