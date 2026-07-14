@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Factory for scalar function {@link FuncExpr} / {@link ComparableExpr}
@@ -140,6 +141,17 @@ public final class Functions {
             Collections.unmodifiableList(bindings), null);
     }
 
+    // —— Alias support ——
+
+    /**
+     * Attach an alias to any expression (for projection naming).
+     * Returns a new immutable {@code Expr}; the original is unchanged.
+     */
+    public static <T> Expr<T> alias(Expr<T> expr, String alias) {
+        Objects.requireNonNull(alias, "alias must not be null");
+        return new AliasedExpr<>(expr, alias);
+    }
+
     // —— Escape hatch ——
 
     /**
@@ -203,5 +215,30 @@ public final class Functions {
         @Override public List<Object> bindings() { return bindings; }
         @Override public Class<T> javaType() { return javaType; }
         @Override public String alias() { return alias; }
+    }
+
+    private static final class AliasedExpr<T> implements Expr<T>, FuncExpr<T> {
+        private final Expr<T> delegate;
+        private final String alias;
+
+        AliasedExpr(Expr<T> delegate, String alias) {
+            this.delegate = delegate;
+            this.alias = alias;
+        }
+
+        @Override public String sqlFragment() { return delegate.sqlFragment(); }
+        @Override public List<Object> bindings() { return delegate.bindings(); }
+        @Override public Class<T> javaType() { return delegate.javaType(); }
+        @Override public String alias() { return alias; }
+
+        @Override
+        public FunctionType functionType() {
+            return delegate instanceof FuncExpr<?> f ? f.functionType() : null;
+        }
+
+        @Override
+        public List<Expr<?>> arguments() {
+            return delegate instanceof FuncExpr<?> f ? f.arguments() : List.of();
+        }
     }
 }

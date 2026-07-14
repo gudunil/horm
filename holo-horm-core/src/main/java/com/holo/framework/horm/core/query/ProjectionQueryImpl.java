@@ -167,7 +167,8 @@ final class ProjectionQueryImpl<T extends Model<T>> implements ProjectionQuery {
             }
             bindings.addAll(p.bindings());
             if (p.alias() != null) {
-                sql.append(" AS ").append(p.alias());
+                char q = dialect.identifierQuoteChar();
+                sql.append(" AS ").append(q).append(p.alias()).append(q);
             }
         }
     }
@@ -241,6 +242,7 @@ final class ProjectionQueryImpl<T extends Model<T>> implements ProjectionQuery {
     private String resolveColumn(Expr<?> expr) {
         if (expr.alias() != null) return expr.alias();
         if (expr instanceof TypedField<?, ?> f) return f.column();
-        return expr.sqlFragment();
+        // 对于函数表达式，将 sqlFragment 转为小写以匹配 Row 中的列名（H2/MySQL 返回大写列标签）
+        return expr.sqlFragment().toLowerCase();
     }
 }
