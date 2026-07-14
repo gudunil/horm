@@ -4,6 +4,7 @@ import com.holo.framework.horm.core.Model;
 import com.holo.framework.horm.meta.query.Condition;
 import com.holo.framework.horm.meta.query.RelationField;
 import com.holo.framework.horm.meta.query.TypedField;
+import com.holo.framework.horm.meta.query.expr.Expr;
 
 import java.util.List;
 import java.util.Optional;
@@ -123,4 +124,39 @@ public interface Query<T extends Model<T>> {
 
     /** Return {@code true} if any row matches the current WHERE clause. */
     boolean exists();
+
+    // —— M11: GROUP BY / HAVING / Projection ——
+
+    /**
+     * GROUP BY clause (by typed fields). May be called multiple times to append fields.
+     *
+     * @throws com.holo.framework.horm.core.HormException if any field's entityType
+     *         does not match this query's T (consistent with orderBy cross-entity validation)
+     */
+    Query<T> groupBy(TypedField<T, ?>... fields);
+
+    /**
+     * GROUP BY clause (by expressions), supporting function grouping such as
+     * {@code GROUP BY YEAR(created_at)}.
+     */
+    Query<T> groupBy(Expr<?>... expressions);
+
+    /** HAVING clause, accepting Conditions (produced by ComparableExpr comparison methods). */
+    Query<T> having(Condition... conditions);
+
+    /**
+     * Switch to projection mode. Returns a {@link ProjectionQuery} that
+     * carries forward the current WHERE / ORDER BY / LIMIT / OFFSET /
+     * GROUP BY / HAVING state and adds the specified projection expressions.
+     *
+     * <p>Once invoked, the returned {@link ProjectionQuery} supports
+     * further {@code groupBy}/{@code having} calls and terminal methods
+     * ({@code listRows}/{@code listScalar}/{@code firstRow}).
+     *
+     * <p>After calling {@code selectExpr}, calling {@code fetch} /
+     * {@code leftJoin} / {@code innerJoin} / {@code join} throws
+     * {@link com.holo.framework.horm.core.HormException} (projection and
+     * eager fetch are mutually exclusive).
+     */
+    ProjectionQuery selectExpr(Expr<?>... projections);
 }

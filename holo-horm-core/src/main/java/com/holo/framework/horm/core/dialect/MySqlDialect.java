@@ -1,5 +1,7 @@
 package com.holo.framework.horm.core.dialect;
 
+import com.holo.framework.horm.meta.query.expr.FunctionType;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Arrays;
@@ -98,5 +100,27 @@ public class MySqlDialect implements Dialect {
     @Override
     public String timestampType() {
         return "DATETIME(6)";
+    }
+
+    @Override
+    public String functionSql(FunctionType type, List<String> args) {
+        return switch (type) {
+            case DATE_FORMAT -> "DATE_FORMAT(" + args.get(0) + ", ?)";
+            case YEAR -> "YEAR(" + args.get(0) + ")";
+            case MONTH -> "MONTH(" + args.get(0) + ")";
+            case DAY -> "DAY(" + args.get(0) + ")";
+            case NOW -> "NOW()";
+            case CONCAT -> "CONCAT(" + String.join(", ", args) + ")";
+            default -> Dialect.super.functionSql(type, args);
+        };
+    }
+
+    @Override
+    public String translateDateFormatPattern(String javaPattern) {
+        return javaPattern
+            .replace("yyyy", "%Y").replace("yy", "%y")
+            .replace("MM", "%m").replace("dd", "%d")
+            .replace("HH", "%H").replace("mm", "%i")
+            .replace("ss", "%s");
     }
 }

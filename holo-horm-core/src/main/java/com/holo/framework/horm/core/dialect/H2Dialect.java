@@ -1,5 +1,7 @@
 package com.holo.framework.horm.core.dialect;
 
+import com.holo.framework.horm.meta.query.expr.FunctionType;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -149,5 +151,40 @@ public class H2Dialect implements Dialect {
             return "TIMESTAMP";
         }
         return "DATETIME(6)";
+    }
+
+    @Override
+    public String functionSql(FunctionType type, List<String> args) {
+        if (isPostgresqlMode()) {
+            return switch (type) {
+                case DATE_FORMAT -> "TO_CHAR(" + args.get(0) + ", ?)";
+                case YEAR -> "EXTRACT(YEAR FROM " + args.get(0) + ")";
+                case MONTH -> "EXTRACT(MONTH FROM " + args.get(0) + ")";
+                case DAY -> "EXTRACT(DAY FROM " + args.get(0) + ")";
+                case NOW -> "CURRENT_TIMESTAMP";
+                case CONCAT -> String.join(" || ", args);
+                default -> Dialect.super.functionSql(type, args);
+            };
+        }
+        return switch (type) {
+            case DATE_FORMAT -> "FORMATDATETIME(" + args.get(0) + ", ?)";
+            case YEAR -> "EXTRACT(YEAR FROM " + args.get(0) + ")";
+            case MONTH -> "EXTRACT(MONTH FROM " + args.get(0) + ")";
+            case DAY -> "EXTRACT(DAY FROM " + args.get(0) + ")";
+            case NOW -> "CURRENT_TIMESTAMP";
+            default -> Dialect.super.functionSql(type, args);
+        };
+    }
+
+    @Override
+    public String translateDateFormatPattern(String javaPattern) {
+        if (isPostgresqlMode()) {
+            return javaPattern
+                .replace("yyyy", "YYYY").replace("yy", "YY")
+                .replace("MM", "MM").replace("dd", "DD")
+                .replace("HH", "HH24").replace("mm", "MI")
+                .replace("ss", "SS");
+        }
+        return javaPattern;
     }
 }

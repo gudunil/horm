@@ -65,6 +65,37 @@ public final class Conditions {
         return new SimpleCondition(field.column() + " IS NOT NULL", Collections.emptyList());
     }
 
+    /**
+     * Embed a raw SQL fragment as a Condition.
+     *
+     * <p><strong>WARNING:</strong> Bypasses type safety. The user is
+     * responsible for ensuring the fragment returns boolean and that
+     * placeholder count matches bindings length.
+     *
+     * <pre>{@code
+     * Model.query(User.class)
+     *     .where(Conditions.raw("DATE(created_at) = ?", date))
+     *     .list();
+     * }</pre>
+     */
+    public static Condition raw(String sqlFragment, Object... bindings) {
+        return new SimpleCondition(sqlFragment, Arrays.asList(bindings));
+    }
+
+    /**
+     * Variant that prepends an expression's pre-rendered bindings
+     * before appending trailing comparison values. Used by
+     * {@code ComparableExpr} default methods and internal rendering.
+     * <p>Not named {@code raw} to avoid overload ambiguity with
+     * {@link #raw(String, Object...)}.
+     */
+    public static Condition rawWithLeading(String sqlFragment, List<Object> leadingBindings, Object... trailingBindings) {
+        List<Object> all = new ArrayList<>(leadingBindings.size() + trailingBindings.length);
+        all.addAll(leadingBindings);
+        Collections.addAll(all, trailingBindings);
+        return new SimpleCondition(sqlFragment, all);
+    }
+
     private static final class SimpleCondition implements Condition {
         private final String fragment;
         private final List<Object> bindings;

@@ -1,5 +1,7 @@
 package com.holo.framework.horm.core;
 
+import com.holo.framework.horm.meta.RowMapper;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -81,5 +83,30 @@ public interface Repository<T> {
      */
     default List<T> batchInsert(List<T> entities) {
         throw new UnsupportedOperationException("batchInsert not implemented");
+    }
+
+    /**
+     * Execute a raw SQL query and map rows via this repository's entity Mapper.
+     * Does not participate in cache chain (no APT metadata for CacheKey).
+     *
+     * @param sql      SQL query text with {@code ?} placeholders
+     * @param bindings parameter values for the placeholders
+     * @return list of mapped entities
+     */
+    default List<T> rawQuery(String sql, Object... bindings) {
+        throw new UnsupportedOperationException("rawQuery not implemented");
+    }
+
+    /**
+     * Execute a raw SQL query with a custom row mapper.
+     * Does not participate in cache chain (no APT metadata for CacheKey).
+     *
+     * @param sql      SQL query text with {@code ?} placeholders
+     * @param mapper   custom mapper for result rows
+     * @param bindings parameter values for the placeholders
+     * @return list of mapped objects
+     */
+    default <R> List<R> rawQuery(String sql, RowMapper<R> mapper, Object... bindings) {
+        throw new UnsupportedOperationException("rawQuery not implemented");
     }
 }

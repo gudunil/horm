@@ -21,6 +21,7 @@ import com.holo.framework.horm.meta.Row;
 import com.holo.framework.horm.meta.query.Condition;
 import com.holo.framework.horm.meta.query.RelationField;
 import com.holo.framework.horm.meta.query.TypedField;
+import com.holo.framework.horm.meta.query.expr.Expr;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -65,6 +66,10 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
     private final List<RelationField<T, ?>> joins = new ArrayList<>();
     private final List<JoinKind> joinKinds = new ArrayList<>();
     private List<TypedField<T, ?>> selectFields;  // null means SELECT *
+
+    // M11: GROUP BY / HAVING state
+    private final List<Expr<?>> groupByExprs = new ArrayList<>();
+    private final List<Condition> havingConditions = new ArrayList<>();
 
     private final CachePolicy runtimeCachePolicy;
 
@@ -228,6 +233,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
 
     /** Database execution backing {@link #list()} and the query-cache loader. */
     private List<T> dbList(long effectiveLimit) {
+        checkNoGroupBy();
         StringBuilder sql = new StringBuilder("SELECT * FROM ").append(MetaSupport.qualifiedTable(meta));
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
@@ -265,6 +271,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
 
     /** Database execution backing {@link #findFirst()} and the query-cache loader. */
     private Optional<T> dbFindFirst() {
+        checkNoGroupBy();
         StringBuilder sql = new StringBuilder("SELECT * FROM ").append(MetaSupport.qualifiedTable(meta));
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
@@ -280,6 +287,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
 
     @Override
     public long count() {
+        checkNoGroupBy();
         StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM ").append(MetaSupport.qualifiedTable(meta));
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
@@ -291,6 +299,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
 
     @Override
     public boolean exists() {
+        checkNoGroupBy();
         StringBuilder sql = new StringBuilder("SELECT 1 FROM ").append(MetaSupport.qualifiedTable(meta));
         List<Object> bindings = new ArrayList<>();
         appendWhere(sql, bindings);
@@ -300,6 +309,75 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         return JdbcOperations.query(ctx, dataSourceName, sql.toString(), bindings,
             ResultSet::next,
             "check existence of " + entityType.getName());
+    }
+
+    // —— M11: GROUP BY / HAVING / Projection ——
+
+    @Override
+    public Query<T> groupBy(TypedField<T, ?>... fields) {
+        if (fields == null || fields.length == 0) {
+            return this;
+        }
+        for (TypedField<T, ?> f : fields) {
+            if (f == null) continue;
+            if (!f.entityType().equals(entityType)) {
+                throw new HormException(
+                    "GROUP BY field '" + f.name()
+                        + "' does not belong to entity '" + entityType.getName() + "'");
+            }
+            groupByExprs.add(f);
+        }
+        return this;
+    }
+
+    @Override
+    public Query<T> groupBy(Expr<?>... expressions) {
+        if (expressions == null || expressions.length == 0) {
+            return this;
+        }
+        for (Expr<?> e : expressions) {
+            if (e != null) {
+                groupByExprs.add(e);
+            }
+        }
+        return this;
+    }
+
+    private void checkNoGroupBy() {
+        if (!groupByExprs.isEmpty()) {
+            throw new HormException(
+                "GROUP BY is set but selectExpr() was not called. "
+                + "GROUP BY requires projection mode. Call selectExpr(...) to use GROUP BY.");
+        }
+    }
+
+    @Override
+    public Query<T> having(Condition... conditions) {
+        if (conditions == null || conditions.length == 0) {
+            return this;
+        }
+        for (Condition c : conditions) {
+            if (c != null) {
+                havingConditions.add(c);
+            }
+        }
+        return this;
+    }
+
+    @Override
+    public ProjectionQuery selectExpr(Expr<?>... projections) {
+        if (projections == null || projections.length == 0) {
+            throw new IllegalArgumentException("selectExpr requires at least one projection");
+        }
+        return new ProjectionQueryImpl<>(
+            ctx, meta, dataSourceName, entityType,
+            new ArrayList<>(whereConditions),
+            new ArrayList<>(orderByClauses),
+            limit, offset,
+            new ArrayList<>(groupByExprs),
+            new ArrayList<>(havingConditions),
+            Arrays.asList(projections)
+        );
     }
 
     private void appendConditions(Condition... conditions) {
@@ -615,7 +693,7 @@ public final class QueryImpl<T extends Model<T>> implements Query<T> {
         return new ArrayList<>(byRootId.values());
     }
 
-    private record OrderBy(String column, Order direction, String alias) {
+    record OrderBy(String column, Order direction, String alias) {
         // alias: null = bare column (default path); "t0"/"t1"/... = JOIN path
     }
 

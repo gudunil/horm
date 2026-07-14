@@ -64,12 +64,6 @@
       <artifactId>assertj-core</artifactId>
       <version>3.25.3</version>
       <scope>test</scope>
-      <exclusions>
-        <exclusion>
-          <artifactId>byte-buddy</artifactId>
-          <groupId>net.bytebuddy</groupId>
-        </exclusion>
-      </exclusions>
     </dependency>
   </dependencies>
 </project>

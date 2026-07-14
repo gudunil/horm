@@ -144,6 +144,7 @@ public class HormEntityProcessor extends AbstractProcessor {
                 entityMetaProviderNames.add(descriptor.generatedPackage() + '.' + descriptor.simpleName() + "Meta");
                 MapperBuilder.build(descriptor, processingEnv.getFiler());
                 QueryMetaBuilder.build(descriptor, processingEnv.getFiler());
+                AggMetaBuilder.build(descriptor, processingEnv.getFiler());
             } catch (Exception ex) {
                 messager().printMessage(
                     Diagnostic.Kind.ERROR,

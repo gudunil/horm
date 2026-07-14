@@ -1,6 +1,8 @@
 package com.holo.framework.horm.core;
 
 import com.holo.framework.horm.core.datasource.DataSourceRegistry;
+import com.holo.framework.horm.core.query.RawSql;
+import com.holo.framework.horm.core.query.RawSqlImpl;
 import com.holo.framework.horm.meta.annotation.Propagation;
 
 import java.util.Map;
@@ -225,6 +227,31 @@ public final class Horm {
                            java.util.concurrent.Callable<T> action) {
         return TransactionManager.execute(HormContext.current(), dataSourceName,
             TransactionDefinition.builder().propagation(propagation).build(), action);
+    }
+
+    // ===== Raw SQL API =====
+
+    /**
+     * Global raw SQL entry point on the default datasource, not bound to
+     * a specific entity type. Naming aligns with {@link #install}/
+     * {@link #migrate} verb style.
+     *
+     * <p>Does not participate in cache chain (no APT metadata for CacheKey).
+     */
+    public static RawSql rawSql() {
+        return new RawSqlImpl(HormContext.current(), DataSourceRegistry.DEFAULT_NAME);
+    }
+
+    /**
+     * Raw SQL entry point on the specified datasource.
+     * Naming aligns with {@link #tx(String, Runnable)} datasource overload.
+     *
+     * <p>Does not participate in cache chain (no APT metadata for CacheKey).
+     *
+     * @param dataSourceName the target datasource name
+     */
+    public static RawSql rawSql(String dataSourceName) {
+        return new RawSqlImpl(HormContext.current(), dataSourceName);
     }
 
     // ===== Migration API =====

@@ -10,6 +10,7 @@ import com.holo.framework.horm.meta.EntityMeta;
 import com.holo.framework.horm.meta.FieldMeta;
 import com.holo.framework.horm.meta.Mapper;
 import com.holo.framework.horm.meta.Row;
+import com.holo.framework.horm.meta.RowMapper;
 import com.holo.framework.horm.meta.annotation.GenerationType;
 
 import java.sql.ResultSet;
@@ -390,6 +391,32 @@ public final class JdbcRepository<T extends Model<T>> implements Repository<T> {
             throw new HormException("Entity " + entityType.getName() + " has no @Id field");
         }
         return idField;
+    }
+
+    @Override
+    public List<T> rawQuery(String sql, Object... bindings) {
+        return JdbcOperations.query(ctx, dataSourceName, sql, List.of(bindings),
+            rs -> {
+                List<T> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(mapper.map(MetaSupport.toRow(rs, meta)));
+                }
+                return result;
+            },
+            "rawQuery " + entityType.getName());
+    }
+
+    @Override
+    public <R> List<R> rawQuery(String sql, RowMapper<R> rowMapper, Object... bindings) {
+        return JdbcOperations.query(ctx, dataSourceName, sql, List.of(bindings),
+            rs -> {
+                List<R> result = new ArrayList<>();
+                while (rs.next()) {
+                    result.add(rowMapper.map(rs));
+                }
+                return result;
+            },
+            "rawQuery " + entityType.getName());
     }
 
 }

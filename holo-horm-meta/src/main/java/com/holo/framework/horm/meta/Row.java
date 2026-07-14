@@ -1,5 +1,7 @@
 package com.holo.framework.horm.meta;
 
+import com.holo.framework.horm.meta.query.expr.Expr;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -61,6 +63,40 @@ public interface Row {
 
     /** Returns a snapshot view of all column → value pairs. */
     Map<String, Object> asMap();
+
+    /**
+     * Whether a column is present in this row (key exists, regardless of null value).
+     * Unlike {@link #has(String)} which returns false for SQL NULL values,
+     * this method returns true as long as the column key exists.
+     * This distinguishes "column absent" from "column is NULL", consistent
+     * with {@code ResultSet.findColumn()} vs {@code ResultSet.wasNull()}.
+     */
+    default boolean contains(String column) {
+        return asMap().containsKey(column);
+    }
+
+    /**
+     * Typed accessor by expression reference. The expression's alias
+     * (or generated column name) is used to look up the value, and the
+     * expression's {@link Expr#javaType()} drives the typed accessor.
+     *
+     * @throws IllegalArgumentException if the expression has no resolvable alias
+     *         or the column is absent from the row
+     */
+    @SuppressWarnings("unchecked")
+    default <T> T get(Expr<T> expr) {
+        String column = ExprColumnResolver.resolve(expr);
+        if (!contains(column)) {
+            // Fallback: try sqlFragment() as column name for raw expressions
+            String fragment = expr.sqlFragment();
+            if (!fragment.equals(column) && contains(fragment)) {
+                column = fragment;
+            } else {
+                throw new IllegalArgumentException("Column '" + column + "' not present in row");
+            }
+        }
+        return (T) ExprAccessor.get(this, column, expr.javaType());
+    }
 
     /** Creates a new empty mutable row bound to the given table name. */
     static Row create(String table) {
